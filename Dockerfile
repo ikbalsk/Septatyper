@@ -1,3 +1,4 @@
+# SeptaTyper web database - works with flat repo layout (all files in root)
 FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends ncbi-blast+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
