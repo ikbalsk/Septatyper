@@ -160,3 +160,21 @@ code,pre{font-family:var(--mono);font-size:.82rem}
 pre{background:var(--navy);color:#dbe8f8;padding:12px 14px;border-radius:6px;overflow-x:auto;margin:8px 0}
 footer{border-top:1px solid var(--line);padding:18px 16px;text-align:center;color:var(--muted);font-size:.85rem}
 footer a{color:var(--muted)}
+
+/* actions, batch, print */
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 4px}
+.actions .btn{padding:8px 14px;font-size:.9rem}
+.print-only{display:none}
+tr.clk{cursor:pointer} tr.clk:hover td{background:var(--blue-soft)}
+.prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:10px 0}
+.prog i{display:block;height:100%;background:var(--blue);transition:width .3s}
+@media print{
+  .top,footer,#pf,.page-head,.no-print,.hero,nav{display:none!important}
+  .print-only{display:block!important;margin-bottom:10px;color:#333}
+  body{background:#fff;color:#000}
+  .page{display:none!important} .page.on{display:block!important}
+  .grid2{display:block}
+  .band{border:0;padding:0;background:#fff}
+  main{padding:0}
+  .badge{border:1px solid currentColor}
+}

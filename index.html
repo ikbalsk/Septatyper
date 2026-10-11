@@ -78,11 +78,16 @@
       <div class="seg" id="pmode" role="tablist">
         <button type="button" data-m="file" class="on">Upload file</button>
         <button type="button" data-m="paste">Paste sequence</button>
+        <button type="button" data-m="batch">Batch</button>
         <button type="button" data-m="manual">Enter residues</button>
       </div>
       <div id="m-file">
         <div class="drop" id="drop" tabindex="0" role="button">Choose a FASTA file or drop it here<br><span id="fname" class="muted">.fa .fasta .fna .gz, up to 60 MB</span></div>
         <input type="file" id="file" hidden accept=".fa,.fasta,.fna,.fas,.txt,.gz">
+      </div>
+      <div id="m-batch" style="display:none">
+        <div class="drop" id="bdrop" tabindex="0" role="button">Choose up to 10 FASTA files<br><span id="bnames" class="muted">One genome per file. Results appear in one table you can download.</span></div>
+        <input type="file" id="bfile" hidden multiple accept=".fa,.fasta,.fna,.fas,.txt,.gz">
       </div>
       <div id="m-paste" style="display:none"><label for="seq">Nucleotide FASTA</label><textarea id="seq" placeholder=">gyrA&#10;ATGAGCGAC..."></textarea></div>
       <div id="m-gene">

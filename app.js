@@ -79,9 +79,65 @@ INIT.home = async () => {
 
 /* ----------------------------------------------------------------- predict */
 let PMODE = "file", PFILE = null;
+
+/* ------------------------------------------------------- exports and batch */
+let LAST = null, BATCH = [], PFILES = [];
+const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+const toCsv = rows => { const cols = Object.keys(rows[0]); return [cols.join(","), ...rows.map(r => cols.map(c => csvCell(r[c])).join(","))].join("\n"); };
+function flat(res, name, error) {
+  const p = (res && res.prediction) || {}, a = (res && res.analysis) || {}, pos = a.positions || {}, cd = k => (pos[k] || {}).codon || "";
+  return { file: name, species: res ? res.species_name : "", site: res ? res.habitat : "", septatype: (res && res.septatype) || "",
+    call: error ? "Error" : (p.call || "No call"), basis: p.tier || "", n_isolates: p.n_isolates ?? "", n_resistant: p.n_resistant ?? "", n_susceptible: p.n_susceptible ?? "",
+    mean_H: p.mean_h ?? "", gyrA83_codon: cd("gyrA83"), gyrA87_codon: cd("gyrA87"), parC80_codon: cd("parC80"), parC84_codon: cd("parC84"), recN346_codon: cd("recN346"),
+    notes: error || ((res && res.warnings) || []).join(" | ") };
+}
+function download(name, text, type) {
+  const u = URL.createObjectURL(new Blob([text], { type })), a = document.createElement("a");
+  a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 1000);
+}
+function printNow() {
+  const ds = $$("details"), was = ds.map(d => d.open); ds.forEach(d => d.open = true);
+  window.print(); ds.forEach((d, i) => d.open = was[i]);
+}
+const TIER = { database: "Database", database_other_site: "Database (other site)", grammar: "Grammar (new)" };
+function drawBatch(done, total) {
+  const rows = BATCH.map((x, i) => {
+    if (x.error) return `<tr><td>${esc(x.name)}</td><td colspan="4" class="muted">${esc(x.error)}</td></tr>`;
+    const p = x.res.prediction;
+    return `<tr class="clk" data-act="detail" data-i="${i}"><td>${esc(x.name)}</td><td class="mono nw">${p ? mutSep(x.res.septatype) : "-"}</td><td>${p ? badge(p.call, 1) : "No call"}</td><td>${p ? esc(TIER[p.tier] || p.tier) : "-"}</td><td class="stat">${p && p.known ? p.n_resistant + " of " + p.n_isolates + " resistant" : "-"}</td></tr>`;
+  }).join("");
+  const working = done < total;
+  $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing file ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
+    <div class="scroll"><table><tr><th>File</th><th>Septatype</th><th>Call</th><th>Basis</th><th>Support</th></tr>${rows}</table></div>
+    ${working ? "" : `<div class="actions no-print"><button class="btn solid" data-act="bcsv" type="button">Download CSV</button><button class="btn line" data-act="print" type="button">Print or save as PDF</button></div><p class="muted" style="font-size:.85rem">Tap a row for the full result.</p>`}
+    <p class="print-only">SeptaTyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
+}
+async function runBatch(species, habitat) {
+  if (!PFILES.length) throw new Error("Choose at least one FASTA file.");
+  BATCH = [];
+  for (let i = 0; i < PFILES.length; i++) {
+    drawBatch(i, PFILES.length);
+    const f = PFILES[i], fd = new FormData();
+    fd.append("species", species); fd.append("habitat", habitat); fd.append("qnrB2", "auto"); fd.append("qnrS1", "auto"); fd.append("file", f);
+    try { const res = await api("/api/v1/predict", { method: "POST", body: fd }); res._name = f.name; BATCH.push({ name: f.name, res }); }
+    catch (e) { BATCH.push({ name: f.name, error: e.message }); }
+  }
+  drawBatch(PFILES.length, PFILES.length);
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-act]"); if (!b) return;
+  const act = b.dataset.act;
+  if (act === "print") printNow();
+  else if (act === "csv" && LAST) download("septatyper_result.csv", toCsv([flat(LAST, LAST._name || "result")]), "text/csv");
+  else if (act === "json" && LAST) download("septatyper_result.json", JSON.stringify(LAST, null, 2), "application/json");
+  else if (act === "bcsv") download("septatyper_batch.csv", toCsv(BATCH.map(x => flat(x.res, x.name, x.error))), "text/csv");
+  else if (act === "detail") { const x = BATCH[+b.dataset.i]; if (x && x.res) { $("#bdetail").innerHTML = renderResult(x.res); $("#bdetail").scrollIntoView({ behavior: "smooth" }); } }
+});
+
 function renderResult(r, extra) {
   const p = r.prediction, a = r.analysis;
-  let h = `<div class="band result">`;
+  LAST = r;
+  let h = `<div class="band result"><p class="print-only">SeptaTyper report, ${new Date().toLocaleDateString()}. ${esc(r.species_name)}, ${esc(SITE[r.habitat] || r.habitat)}. ${esc(r._name || "")}</p>`;
   if (!p) {
     h += `<h3>No call could be made</h3><p>A complete septatype could not be built from this input.</p>`;
   } else {
@@ -116,7 +172,7 @@ function renderResult(r, extra) {
       `</table></div><p class="muted" style="font-size:.85rem;margin-top:8px">${a.input.records} sequence record(s), ${fmt(a.input.total_bp)} bp.</p></details>`;
   }
   if (p && p.novel) h += `<div class="info">This septatype is new for ${esc(SHORT[r.species])}. If you have the laboratory phenotype, <a href="#/submit">submit the isolate</a> so curators can add it.</div>`;
-  h += (extra || "") + `<p class="muted" style="font-size:.8rem">Research use only. Confirm with laboratory testing.</p></div>`;
+  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div><p class="muted" style="font-size:.8rem">Research use only. Confirm with laboratory testing.</p></div>`;
   return h;
 }
 INIT.predict = () => {
@@ -132,7 +188,8 @@ INIT.predict = () => {
     $$("#pmode button").forEach(x => x.classList.toggle("on", x === b));
     $("#m-file").style.display = PMODE === "file" ? "" : "none";
     $("#m-paste").style.display = PMODE === "paste" ? "" : "none";
-    $("#m-gene").style.display = PMODE === "manual" ? "none" : "";
+    $("#m-batch").style.display = PMODE === "batch" ? "" : "none";
+    $("#m-gene").style.display = (PMODE === "file" || PMODE === "paste") ? "" : "none";
     $("#m-manual").style.display = PMODE === "manual" ? "" : "none";
   });
   const drop = $("#drop"), fi = $("#file");
@@ -143,11 +200,24 @@ INIT.predict = () => {
   ["dragover", "dragenter"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
   drop.addEventListener("drop", e => setF(e.dataTransfer.files[0]));
+  const bd = $("#bdrop"), bf = $("#bfile");
+  const setB = fs => { PFILES = [...fs].slice(0, 10); $("#bnames").textContent = PFILES.length ? PFILES.map(f => f.name).join(", ") + (fs.length > 10 ? " (first 10 used)" : "") : "One genome per file. Results appear in one table you can download."; };
+  bd.onclick = () => bf.click(); bd.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); bf.click(); } };
+  bf.onchange = () => setB(bf.files);
+  ["dragover", "dragenter"].forEach(ev => bd.addEventListener(ev, e => { e.preventDefault(); bd.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => bd.addEventListener(ev, e => { e.preventDefault(); bd.classList.remove("over"); }));
+  bd.addEventListener("drop", e => setB(e.dataTransfer.files));
   $("#ex").onclick = () => { ["L", "N", "I", "E", "L"].forEach((v, i) => $("#" + ["r83", "r87", "r80", "r84", "r346"][i]).value = v); $("#mqb").checked = false; $("#mqs").checked = false; };
   $("#pf").onsubmit = async e => {
     e.preventDefault();
     const err = $("#perr"), btn = $("#go"); err.innerHTML = "";
     btn.disabled = true; const old = btn.textContent; btn.textContent = "Analysing";
+    if (PMODE === "batch") {
+      try { await runBatch($("#sp").value, $("#hb").value); if (innerWidth < 860) $("#presult").scrollIntoView({ behavior: "smooth" }); }
+      catch (ex) { $("#presult").innerHTML = ""; err.innerHTML = `<div class="err">${esc(ex.message)}</div>`; }
+      finally { btn.disabled = false; btn.textContent = old; }
+      return;
+    }
     $("#presult").innerHTML = `<div class="band muted">${PMODE === "manual" ? "Looking up the septatype" : "Reading the sequence. A full genome takes up to a minute."}</div>`;
     try {
       let res;
@@ -163,6 +233,7 @@ INIT.predict = () => {
         else { if (!$("#seq").value.trim()) throw new Error("Paste a nucleotide sequence first."); fd.append("sequence", $("#seq").value); }
         res = await api("/api/v1/predict", { method: "POST", body: fd });
       }
+      res._name = PMODE === "manual" ? "manual entry" : PMODE === "paste" ? "pasted sequence" : (PFILE && PFILE.name) || "";
       $("#presult").innerHTML = renderResult(res);
       if (innerWidth < 860) $("#presult").scrollIntoView({ behavior: "smooth" });
     } catch (ex) { $("#presult").innerHTML = ""; err.innerHTML = `<div class="err">${esc(ex.message)}</div>`; }
