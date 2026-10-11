@@ -1,368 +1,295 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SeptaTyper - Ciprofloxacin Resistance Database</title>
-<style>
-:root{--bg:#fff;--fg:#1a1a1a;--muted:#5b6b7b;--card:#f6f8fb;--border:#dbe3ec;--accent:#0b5cab;
---accent2:#083d73;--green:#1a7f37;--red:#c0392b;--gray:#6b7280;--hero1:#0b5cab;--hero2:#083d73;}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1419;--fg:#e8eef4;--muted:#9fb0c0;--card:#182028;
---border:#2a3542;--accent:#4da3ff;--accent2:#7cc0ff;--green:#3fb950;--red:#f47067;--hero1:#123a63;--hero2:#0b2540;}}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);
-color:var(--fg);font-size:16px;line-height:1.5;}
-.hero{background:linear-gradient(135deg,var(--hero1),var(--hero2));color:#fff;padding:26px 18px 20px;}
-.hero h1{margin:0;font-size:28px;letter-spacing:.5px;}
-.hero p{margin:6px 0 0;opacity:.92;font-size:14px;max-width:640px;}
-.counter{display:flex;gap:18px;margin-top:14px;flex-wrap:wrap;}
-.counter div{background:rgba(255,255,255,.14);border-radius:10px;padding:8px 16px;}
-.counter b{font-size:22px;display:block;} .counter span{font-size:12px;opacity:.85;}
-nav{display:flex;position:sticky;top:0;background:var(--bg);z-index:10;border-bottom:1px solid var(--border);
-overflow-x:auto;}
-nav button{flex:1;min-width:90px;padding:13px 6px;border:0;background:none;color:var(--muted);font-size:14px;
-font-weight:700;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;}
-nav button.active{color:var(--accent);border-bottom-color:var(--accent);}
-main{padding:14px;max-width:1020px;margin:0 auto 50px;}
-.tab{display:none;} .tab.active{display:block;}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;}
-label{display:block;font-weight:600;margin:10px 0 4px;font-size:14px;}
-select,input[type=text],input[type=search],textarea{width:100%;padding:11px;font-size:16px;
-border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--fg);font-family:inherit;}
-textarea{font-family:ui-monospace,monospace;font-size:12px;min-height:100px;}
-input[type=file]{width:100%;padding:8px 0;}
-button.primary{width:100%;padding:14px;font-size:17px;font-weight:700;color:#fff;background:var(--accent);
-border:0;border-radius:10px;cursor:pointer;margin-top:10px;}
-button.primary:disabled{opacity:.5;}
-button.ghost{padding:9px 16px;font-size:14px;border:1px solid var(--border);border-radius:8px;
-background:var(--card);color:var(--fg);cursor:pointer;}
-.badge{display:block;text-align:center;font-size:32px;font-weight:800;color:#fff;border-radius:12px;
-padding:18px 10px;margin:12px 0;}
-.badge.R{background:var(--red);} .badge.S{background:var(--green);} .badge.U{background:var(--gray);}
-.sept{font-family:ui-monospace,monospace;font-size:16px;text-align:center;background:var(--bg);
-border:1px dashed var(--border);border-radius:8px;padding:10px;margin:8px 0;word-break:break-all;}
-.bar{height:22px;border-radius:11px;overflow:hidden;display:flex;margin:8px 0;border:1px solid var(--border);}
-.bar .rb{background:var(--red);} .bar .sb{background:var(--green);}
-.legend{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);}
-.flag{background:#fff3cd;color:#664d03;border:1px solid #ffecb5;border-radius:8px;padding:8px 10px;
-margin:6px 0;font-size:14px;}
-@media (prefers-color-scheme:dark){.flag{background:#3a2f0b;color:#ffda6a;border-color:#6b5a1e;}}
-table{width:100%;border-collapse:collapse;font-size:13px;}
-th,td{padding:7px 6px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;}
-th{font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.4px;}
-td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
-.pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;color:#fff;}
-.pill.R{background:var(--red);} .pill.S{background:var(--green);}
-.pager{display:flex;gap:8px;align-items:center;justify-content:center;margin:12px 0;}
-.pager button{padding:9px 16px;font-size:15px;border:1px solid var(--border);border-radius:8px;
-background:var(--card);color:var(--fg);cursor:pointer;}
-.pager button:disabled{opacity:.4;}
-.filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-@media(min-width:700px){.filters{grid-template-columns:repeat(4,1fr);}}
-.small{font-size:13px;color:var(--muted);}
-.mono{font-family:ui-monospace,monospace;font-size:12px;word-break:break-all;}
-h2{font-size:19px;margin:4px 0 10px;} h3{font-size:16px;margin:14px 0 6px;}
-.wrap{overflow-x:auto;}
-a{color:var(--accent);}
-.genome-link{font-family:ui-monospace,monospace;font-size:12px;}
-.alias{font-size:11px;color:var(--muted);display:block;max-width:180px;overflow:hidden;text-overflow:ellipsis;}
-.chart{width:100%;height:auto;}
-.chart text{fill:var(--muted);font-size:10px;}
-.grid{display:grid;gap:12px;} @media(min-width:700px){.grid.two{grid-template-columns:1fr 1fr;}}
-details{margin-top:8px;} summary{cursor:pointer;font-weight:600;color:var(--accent);}
-code{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:13px;}
-pre{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;
-font-size:12px;}
-.spinner{text-align:center;padding:20px;color:var(--muted);}
-.checks{display:flex;gap:18px;margin:12px 0;}
-.checks label{display:flex;align-items:center;gap:8px;margin:0;font-size:16px;}
-.checks input{width:22px;height:22px;}
-.residues{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
-.residues input{text-align:center;font-size:20px;font-weight:700;text-transform:uppercase;padding:10px 2px;}
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="SeptaTyper predicts ciprofloxacin resistance in Enterobacterales from gyrA, parC, recN and qnr sequence, and hosts a curated repository of 2,734 genomes.">
+<title>SeptaTyper: ciprofloxacin resistance from sequence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Public+Sans:wght@400;500;600&family=Spectral:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div class="hero">
-  <h1>SeptaTyper</h1>
-  <p>Ciprofloxacin resistance prediction and isolate repository for Enterobacterales.
-  Seven markers, one septatype, one call.</p>
-  <div class="counter">
-    <div><b id="c-genomes">…</b><span>genomes</span></div>
-    <div><b id="c-species">4</b><span>species</span></div>
-    <div><b id="c-septa">…</b><span>septatypes</span></div>
-    <div><b id="c-countries">…</b><span>countries</span></div>
+<header class="top"><div class="top-in">
+  <a class="brand" href="#/">Septa<b>Typer</b></a>
+  <nav id="nav" aria-label="Main">
+    <a href="#/predict" data-p="predict">Predict</a>
+    <a href="#/browse" data-p="browse">Browse</a>
+    <a href="#/analytics" data-p="analytics">Analytics</a>
+    <a href="#/submit" data-p="submit">Submit</a>
+    <a href="#/theory" data-p="theory">Theory</a>
+    <a href="#/data" data-p="data">API and data</a>
+    <a href="#/about" data-p="about">About</a>
+  </nav>
+</div></header>
+
+<main id="main">
+
+<!-- HOME -->
+<section id="p-home" class="page">
+  <div class="hero"><div class="hero-in">
+    <h1>Read ciprofloxacin resistance from five codons and two genes.</h1>
+    <p>Upload a bacterial genome. SeptaTyper reads the GyrA, ParC and RecN positions and the qnr genes, builds the septatype and predicts the phenotype.</p>
+    <div class="cta-row">
+      <a class="btn primary" href="#/predict">Upload genome for septatyping</a>
+      <a class="btn ghost" href="#/browse">Browse the isolates</a>
+    </div>
+    <p class="counter">Currently hosting <b id="c-genomes">2,734</b> genomes across <b id="c-species">4</b> species, <b id="c-countries">28</b> countries and <b id="c-septa">64</b> septatypes.</p>
+    <p class="demo-label" id="demo-label">E. coli, same species, two septatypes</p>
+    <div class="tiles" id="demo-tiles" aria-live="polite"></div>
+    <div class="verdict"><span class="badge Susceptible" id="demo-badge">Susceptible</span><span id="demo-note" class="counter" style="margin:0"></span>
+      <button class="toggle" id="demo-toggle" type="button">Show the other septatype</button></div>
+  </div></div>
+
+  <div class="band">
+    <h2>How a call is made</h2>
+    <ol class="steps">
+      <li><b>Read the codons</b>BLAST finds gyrA, parC and recN in your sequence and reads GyrA-83, GyrA-87, ParC-80, ParC-84 and RecN-346 as codons, so synonymous changes are kept.</li>
+      <li><b>Find the qnr genes</b>qnrB and qnrS family genes count as present at 80% identity and 90% coverage.</li>
+      <li><b>Build the septatype</b>The seven values join into one string, for example L-N-I-E-L-0-0.</li>
+      <li><b>Call the phenotype</b>The majority phenotype among reference isolates with that septatype wins. A new septatype is called by the physicochemical grammar and sent for curation.</li>
+    </ol>
   </div>
-</div>
-<nav>
-  <button class="active" data-tab="predict">Predict</button>
-  <button data-tab="browse">Browse</button>
-  <button data-tab="charts">Charts</button>
-  <button data-tab="api">API</button>
-  <button data-tab="about">About</button>
-</nav>
-<main>
+  <div class="band">
+    <h2>Reference performance</h2>
+    <p class="muted">Accuracy of the majority rule on the founding isolates. The rules were built from these same isolates, so this describes the reference set and is not independent validation.</p>
+    <div class="scroll"><table id="home-stats"></table></div>
+  </div>
+  <div class="band modules">
+    <h2>Four modules</h2>
+    <a href="#/predict"><b>Predict</b><span>Upload or paste a sequence, or enter the residues, and get the septatype and phenotype.</span></a>
+    <a href="#/browse"><b>Browse</b><span>Filter the repository by species, site, ST, septatype, country and year. Compare lab, BV-BRC and SeptaTyper calls.</span></a>
+    <a href="#/submit"><b>Submit</b><span>Contribute an isolate. Curators check the lab result against the prediction before it goes live.</span></a>
+    <a href="#/theory"><b>Theory</b><span>The context-dependent grammar, an interactive view of the binding pocket and the validation figures.</span></a>
+  </div>
+</section>
 
 <!-- PREDICT -->
-<section class="tab active" id="tab-predict">
-  <div class="card">
-    <h2>SeptaTyper prediction engine</h2>
-    <label for="p-species">Species</label><select id="p-species"></select>
-    <label for="p-site">Isolation site</label><select id="p-site"></select>
-    <label for="p-file">Genome FASTA (assemblies or gene sequences, max 20 Mb)</label>
-    <input type="file" id="p-file" accept=".fasta,.fa,.fas,.fna,.txt">
-    <label for="p-paste">Or paste FASTA</label>
-    <textarea id="p-paste" placeholder=">my_isolate&#10;ATGCGAT..."></textarea>
-    <button class="primary" id="p-go">Predict phenotype</button>
-  </div>
-  <div id="p-out"></div>
-  <div class="card"><h3>No sequence handy?</h3>
-    <p class="small">Enter the 5 residues and qnr status manually:</p>
-    <div class="residues">
-      <div><input id="m0" maxlength="1" placeholder="83"><div class="small" style="text-align:center">GyrA-83</div></div>
-      <div><input id="m1" maxlength="1" placeholder="87"><div class="small" style="text-align:center">GyrA-87</div></div>
-      <div><input id="m2" maxlength="1" placeholder="80"><div class="small" style="text-align:center">ParC-80</div></div>
-      <div><input id="m3" maxlength="1" placeholder="84"><div class="small" style="text-align:center">ParC-84</div></div>
-      <div><input id="m4" maxlength="1" placeholder="346"><div class="small" style="text-align:center">RecN-346</div></div>
-    </div>
-    <div class="checks"><label><input type="checkbox" id="mB"> qnrB</label>
-    <label><input type="checkbox" id="mS"> qnrS</label></div>
-    <button class="primary" id="m-go">Predict from residues</button>
-    <div id="m-out"></div>
+<section id="p-predict" class="page">
+  <div class="page-head"><h2>Predict ciprofloxacin phenotype</h2><p>Genome assemblies and gene-level FASTA both work. The sequence is analysed and deleted. Nothing is stored.</p></div>
+  <div class="grid2">
+    <form class="band" id="pf" autocomplete="off">
+      <div class="row2">
+        <div><label for="sp">Species</label><select id="sp"></select></div>
+        <div><label for="hb">Isolation site</label><select id="hb"></select></div>
+      </div>
+      <div id="refwarn"></div>
+      <div class="seg" id="pmode" role="tablist">
+        <button type="button" data-m="file" class="on">Upload file</button>
+        <button type="button" data-m="paste">Paste sequence</button>
+        <button type="button" data-m="manual">Enter residues</button>
+      </div>
+      <div id="m-file">
+        <div class="drop" id="drop" tabindex="0" role="button">Choose a FASTA file or drop it here<br><span id="fname" class="muted">.fa .fasta .fna .gz, up to 60 MB</span></div>
+        <input type="file" id="file" hidden accept=".fa,.fasta,.fna,.fas,.txt,.gz">
+      </div>
+      <div id="m-paste" style="display:none"><label for="seq">Nucleotide FASTA</label><textarea id="seq" placeholder=">gyrA&#10;ATGAGCGAC..."></textarea></div>
+      <div id="m-gene">
+        <details><summary>Gene sequences only? Set the qnr status yourself</summary>
+          <p class="muted" style="font-size:.9rem">A gene-only file cannot show that a qnr gene is absent.</p>
+          <div class="row2">
+            <div><label for="qb">qnrB family</label><select id="qb"><option value="auto">Detect from sequence</option><option value="present">Present</option><option value="absent">Absent</option></select></div>
+            <div><label for="qs">qnrS family</label><select id="qs"><option value="auto">Detect from sequence</option><option value="present">Present</option><option value="absent">Absent</option></select></div>
+          </div>
+        </details>
+      </div>
+      <div id="m-manual" style="display:none">
+        <label>Residue at each position (one letter)</label>
+        <div class="res5">
+          <div><input id="r83" maxlength="1" placeholder="S" aria-label="GyrA 83"><small>GyrA-83</small></div>
+          <div><input id="r87" maxlength="1" placeholder="D" aria-label="GyrA 87"><small>GyrA-87</small></div>
+          <div><input id="r80" maxlength="1" placeholder="S" aria-label="ParC 80"><small>ParC-80</small></div>
+          <div><input id="r84" maxlength="1" placeholder="E" aria-label="ParC 84"><small>ParC-84</small></div>
+          <div><input id="r346" maxlength="1" placeholder="L" aria-label="RecN 346"><small>RecN-346</small></div>
+        </div>
+        <div class="checks"><label><input type="checkbox" id="mqb">qnrB present</label><label><input type="checkbox" id="mqs">qnrS present</label></div>
+        <div class="row2"><div><label for="mc">RecN-346 codon (optional)</label><select id="mc"><option value="">Not known</option><option>CTA</option><option>CTG</option><option>CTT</option><option>CTC</option><option>TTA</option><option>TTG</option><option>TTT</option><option>TTC</option></select></div>
+          <div style="align-self:end"><button class="btn line block" type="button" id="ex">Fill a resistant example</button></div></div>
+      </div>
+      <button class="btn solid block" id="go" type="submit" style="margin-top:14px">Predict phenotype</button>
+      <div id="perr"></div>
+      <p class="muted" style="font-size:.8rem;margin-top:12px">Research use only. Confirm with laboratory susceptibility testing.</p>
+    </form>
+    <div id="presult"><div class="band muted">The result appears here.</div></div>
   </div>
 </section>
 
 <!-- BROWSE -->
-<section class="tab" id="tab-browse">
-  <div class="card">
+<section id="p-browse" class="page">
+  <div class="page-head"><h2>Browse the repository</h2><p>Genome IDs link to BV-BRC. The isolate name sits under each ID.</p></div>
+  <div class="band">
     <div class="filters">
-      <div><label>Species</label><select id="f-species"><option value="">All</option></select></div>
-      <div><label>Site</label><select id="f-site"><option value="">All</option></select></div>
-      <div><label>Phenotype</label><select id="f-pheno"><option value="">All</option><option>Resistant</option><option>Susceptible</option></select></div>
-      <div><label>MLST</label><input type="text" id="f-mlst" placeholder="e.g. ST131"></div>
+      <div><label for="f-sp">Species</label><select id="f-sp"><option value="">All</option></select></div>
+      <div><label for="f-hb">Site</label><select id="f-hb"><option value="">All</option><option value="FECAL">Fecal</option><option value="URINE">Urine</option><option value="RESPIRATORY">Respiratory</option></select></div>
+      <div><label for="f-st">Sequence type</label><select id="f-st"><option value="">All</option></select></div>
+      <div><label for="f-country">Country</label><select id="f-country"><option value="">All</option></select></div>
+      <div><label for="f-sep">Septatype</label><input type="search" id="f-sep" placeholder="S-D-S-E-L-1-0"></div>
+      <div><label for="f-ph">Lab phenotype</label><select id="f-ph"><option value="">All</option><option>Resistant</option><option>Susceptible</option></select></div>
+      <div><label for="f-y1">Year from</label><input type="number" id="f-y1" min="1990" max="2100"></div>
+      <div><label for="f-y2">Year to</label><input type="number" id="f-y2" min="1990" max="2100"></div>
+      <div><label for="f-q">Search ID or name</label><input type="search" id="f-q"></div>
+      <div><label for="f-src">Source</label><select id="f-src"><option value="">All</option><option value="founding">Founding set</option><option value="community">Community</option></select></div>
     </div>
-    <div class="filters" style="margin-top:8px">
-      <div><label>Septatype</label><input type="text" id="f-sept" placeholder="e.g. L-N-I-E-L-0-0"></div>
-      <div><label>Country</label><input type="text" id="f-country" placeholder="e.g. India"></div>
-      <div style="grid-column:span 2"><label>Search</label><input type="search" id="f-q" placeholder="Genome ID, isolate name..."></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-      <button class="ghost" id="f-csv">Download CSV</button>
-      <button class="ghost" id="f-json">Download JSON</button>
-    </div>
-  </div>
-  <p class="small" id="b-count"></p>
-  <div class="wrap"><table id="b-table"><thead><tr>
-    <th>Genome ID</th><th>Phenotype</th><th>Septatype</th><th>Species</th><th>Site</th>
-    <th>MLST</th><th>Year</th><th>Country</th></tr></thead><tbody></tbody></table></div>
-  <div class="pager"><button id="b-prev">Prev</button><span id="b-info" class="small"></span><button id="b-next">Next</button></div>
-</section>
-
-<!-- CHARTS -->
-<section class="tab" id="tab-charts">
-  <div class="card"><h2>Septatype frequencies</h2>
-    <div class="filters"><div><label>Species</label><select id="ch-sp"><option value="">All</option></select></div>
-    <div><label>Site</label><select id="ch-site"><option value="">All</option></select></div></div>
-    <svg class="chart" id="ch-septa" viewBox="0 0 640 380" style="margin-top:10px"></svg>
-  </div>
-  <div class="card"><h2>Isolates by country</h2><svg class="chart" id="ch-geo" viewBox="0 0 640 380"></svg></div>
-  <div class="card"><h2>Accuracy check</h2>
-    <p class="small">Share of isolates matching their septatype majority call.</p>
-    <div class="wrap"><table id="ch-acc"><thead><tr><th>Group</th><th class="num">Isolates</th><th class="num">Accuracy %</th></tr></thead><tbody></tbody></table></div>
-    <p class="small">Measured on the same isolates that define the rules; not independent validation.</p>
+    <div class="checks" style="margin-top:0"><label><input type="checkbox" id="f-wins" disabled>Only where SeptaTyper is right and BV-BRC is wrong</label></div>
+    <div id="bv-note"></div>
+    <div class="toolbar"><span id="b-count" class="muted"></span>
+      <span><a class="btn line" id="dl-csv" href="#">Download CSV</a> <a class="btn line" id="dl-json" href="#">Download JSON</a> <button class="btn line" id="f-reset" type="button">Reset</button></span></div>
+    <div class="scroll"><table id="btable"></table></div>
+    <div class="pager"><button class="btn line" id="b-prev">Previous</button><span id="b-page" class="muted"></span><button class="btn line" id="b-next">Next</button></div>
   </div>
 </section>
 
-<!-- API -->
-<section class="tab" id="tab-api">
-  <div class="card"><h2>REST API</h2>
-    <p class="small">Query the database from Python or the command line. Base URL is this server.</p>
-    <h3>Isolates</h3>
-    <pre>GET /api/v1/isolates?species=E.%20coli&amp;site=urine&amp;phenotype=Resistant&amp;page=1&amp;per_page=50
-GET /api/v1/isolates/562.7710</pre>
-    <h3>Rules</h3><pre>GET /api/v1/rules?species=K.%20pneumoniae&amp;site=urine</pre>
-    <h3>Statistics</h3><pre>GET /api/v1/stats/septatypes?species=E.%20coli
-GET /api/v1/stats/geography
-GET /api/v1/stats/accuracy</pre>
-    <h3>Downloads</h3><pre>GET /api/v1/download/csv
-GET /api/v1/download/json</pre>
-    <h3>Prediction</h3><pre>curl -X POST -F "species=E. coli" -F "site=urine" \
-  -F "fasta=@genome.fasta" /api/v1/predict</pre>
-    <h3>Python example</h3>
-    <pre>import requests
-r = requests.get(base + "/api/v1/isolates",
-                 params={"septatype": "L-N-I-E-L-0-0", "per_page": 100})
-print(r.json()["total"])</pre>
+<!-- ANALYTICS -->
+<section id="p-analytics" class="page">
+  <div class="page-head"><h2>Analytics</h2><p>Septatype frequency by site and the geography of a clone or tetratype.</p></div>
+  <div class="band">
+    <h3>Septatype frequency by site</h3>
+    <div class="row2"><div><label for="a-sp">Species</label><select id="a-sp"></select></div></div>
+    <div class="legend"><span><i style="background:#1d4e89"></i>Fecal</span><span><i style="background:#4d9de0"></i>Urine</span><span><i style="background:#9cc4f5"></i>Respiratory</span></div>
+    <div id="a-bars"></div>
+  </div>
+  <div class="band">
+    <h3>Where is it found?</h3>
+    <div class="filters">
+      <div><label for="g-sp">Species</label><select id="g-sp"><option value="">All</option></select></div>
+      <div><label for="g-st">Sequence type</label><select id="g-st"><option value="">All</option></select></div>
+      <div><label for="g-tt">Tetratype</label><select id="g-tt"><option value="">All</option></select></div>
+      <div><label for="g-ph">Phenotype</label><select id="g-ph"><option value="">All</option><option selected>Resistant</option><option>Susceptible</option></select></div>
+    </div>
+    <div id="map"></div>
+    <div class="scroll"><table id="g-table"></table></div>
+  </div>
+</section>
+
+<!-- SUBMIT -->
+<section id="p-submit" class="page">
+  <div class="page-head"><h2>Submit an isolate</h2><p>Curators compare your laboratory phenotype with the SeptaTyper prediction before the isolate is added. Only the derived genotype is kept. The genome file is deleted after analysis.</p></div>
+  <div class="grid2">
+    <form class="band" id="sf" autocomplete="off">
+      <div class="row2">
+        <div><label for="s-sp">Species</label><select id="s-sp" required></select></div>
+        <div><label for="s-hb">Isolation site</label><select id="s-hb" required></select></div>
+      </div>
+      <label for="s-gid">BV-BRC genome ID (optional)</label>
+      <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" id="s-gid" placeholder="562.7710" inputmode="decimal"><button class="btn line" type="button" id="s-look">Look up</button></div>
+      <div id="s-name" class="muted" style="margin:-6px 0 10px;font-size:.9rem"></div>
+      <div class="row2">
+        <div><label for="s-country">Country</label><input type="text" id="s-country"></div>
+        <div><label for="s-year">Collection year</label><input type="text" id="s-year" inputmode="numeric" maxlength="4" placeholder="2024"></div>
+      </div>
+      <div class="row2">
+        <div><label for="s-src">Source or sample type</label><input type="text" id="s-src" placeholder="clean-catch urine"></div>
+        <div><label for="s-mic">Ciprofloxacin MIC (mg/L)</label><input type="text" id="s-mic"></div>
+      </div>
+      <div class="row2">
+        <div><label for="s-ph">Laboratory phenotype</label><select id="s-ph"><option value="">Not tested</option><option>Resistant</option><option>Susceptible</option></select></div>
+        <div><label for="s-email">Contact email (optional)</label><input type="email" id="s-email"></div>
+      </div>
+      <label for="s-file">Genome FASTA</label>
+      <input type="file" id="s-file" accept=".fa,.fasta,.fna,.fas,.txt,.gz" style="margin-bottom:12px">
+      <button class="btn solid block" id="s-go" type="submit">Submit for curation</button>
+      <div id="s-err"></div>
+    </form>
+    <div id="s-result"><div class="band muted">After you submit, the prediction and the status of your submission appear here. An isolate without a laboratory phenotype cannot be approved.</div></div>
+  </div>
+</section>
+
+<!-- THEORY -->
+<section id="p-theory" class="page">
+  <div class="page-head"><h2>Theory: the context-dependent grammar</h2>
+    <p>Ciprofloxacin binds through a water and Mg2+ bridge to a serine and an acidic residue in GyrA and ParC. A change at one position matters according to the others around it.</p></div>
+  <div class="band">
+    <h3>Explore a septatype</h3>
+    <div class="mech">
+      <div><svg class="pocket" id="pocket" viewBox="0 0 640 330" role="img" aria-label="Schematic of the ciprofloxacin binding pocket"></svg>
+        <p class="muted" style="font-size:.82rem;margin-top:6px">Schematic reading of the grammar, not a structure calculation. Compare with Figure 6 of the paper.</p></div>
+      <div>
+        <label for="t-sp">Species</label><select id="t-sp" style="margin-bottom:8px"></select>
+        <label>Common septatypes (tap one)</label><div class="pick" id="t-pick"></div>
+        <label for="t-custom">Or type four residues (GyrA-83, GyrA-87, ParC-80, ParC-84)</label>
+        <input type="text" id="t-custom" maxlength="4" placeholder="LNIE" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:12px">
+        <dl class="kv" id="t-kv"></dl>
+        <ul class="why" id="t-why"></ul>
+      </div>
+    </div>
+  </div>
+  <div class="band"><h3>Grammar rules</h3>
+    <div class="scroll"><table>
+      <tr><th>Position</th><th>Keeps susceptibility</th><th>Votes Resistant</th></tr>
+      <tr><td>GyrA-83</td><td>Hydroxyl residue (S, T, Y)</td><td>Hydrophobic or no hydroxyl</td></tr>
+      <tr><td>GyrA-87</td><td>Acidic residue (D, E)</td><td>Polar, uncharged or other</td></tr>
+      <tr><td>ParC-80</td><td>Hydroxyl residue (S, T, Y)</td><td>Hydrophobic or no hydroxyl</td></tr>
+      <tr><td>ParC-84</td><td>Acidic residue (E, D)</td><td>Not acidic, or acidic next to a hydrophobic ParC-80</td></tr>
+    </table></div>
+    <p style="margin-top:12px">Two or more votes mean Resistant and none means Susceptible. One vote is settled by the combined mean hydrophobicity &lt;H&gt; of the four residues against 0.0 (Eisenberg scale). Overrides on a susceptible baseline: a qnr gene present gives Resistant, <i>S. sonnei</i> with RecN-346 F gives Resistant, <i>S. enterica</i> F-D-S-E with the ctg codon gives Resistant, and a single GyrA-83 or GyrA-87 change in <i>S. sonnei</i> gives Resistant.</p>
+    <p class="muted">The grammar is only used for septatypes not seen in the reference isolates. Residue classes marked as assumptions (for example G, P and C counted as hydrophobic) are set in <code>app/grammar.py</code>.</p>
+  </div>
+  <div class="band"><h3>Performance validation</h3><div id="t-valid"></div></div>
+  <div class="band"><h3>Amino acid hydrophobicity (Eisenberg normalised consensus)</h3><div class="scroll"><table id="t-aa"></table></div></div>
+</section>
+
+<!-- DATA -->
+<section id="p-data" class="page">
+  <div class="page-head"><h2>API and data</h2><p>Everything on this site is available programmatically. Interactive documentation is at <a href="/docs">/docs</a>.</p></div>
+  <div class="band"><h3>Download the database</h3>
+    <p>The full isolate table with genotypes, septatypes and calls.</p>
+    <p><a class="btn solid" href="/api/v1/download/csv">Download CSV</a> <a class="btn line" href="/api/v1/download/json">Download JSON</a></p></div>
+  <div class="band"><h3>Endpoints</h3>
+    <div class="scroll"><table>
+      <tr><th>Method and path</th><th>Purpose</th></tr>
+      <tr><td class="mono">GET /api/v1/isolates</td><td>Filter by species, habitat, st, country, septatype, tetratype, phenotype, year_from, year_to, wins, q. Paged with page and per_page.</td></tr>
+      <tr><td class="mono">GET /api/v1/isolates/{genome_id}</td><td>One isolate, with its BV-BRC link.</td></tr>
+      <tr><td class="mono">GET /api/v1/rules</td><td>Rules table for a species and habitat.</td></tr>
+      <tr><td class="mono">GET /api/v1/stats/accuracy</td><td>Accuracy, benchmark against BV-BRC and edge cases.</td></tr>
+      <tr><td class="mono">GET /api/v1/stats/geography</td><td>Counts per country.</td></tr>
+      <tr><td class="mono">GET /api/v1/stats/septatypes</td><td>Septatype frequency by site.</td></tr>
+      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence.</td></tr>
+      <tr><td class="mono">POST /api/v1/predict/manual</td><td>JSON with the five residues and qnr flags.</td></tr>
+      <tr><td class="mono">POST /api/v1/submissions</td><td>Community submission (enters the curation queue).</td></tr>
+    </table></div>
+    <h3 style="margin-top:18px">Command line</h3>
+<pre id="ex-curl"></pre>
+    <h3>Python</h3>
+<pre id="ex-py"></pre>
   </div>
 </section>
 
 <!-- ABOUT -->
-<section class="tab" id="tab-about">
-  <div class="card"><h2>Method</h2>
-    <p>A <b>septatype</b> is 7 values joined by dashes: the amino acid at GyrA-83, GyrA-87,
-    ParC-80, ParC-84 and RecN-346, then qnrB present (1) or absent (0), then qnrS present (1)
-    or absent (0). Example: <span class="mono">L-N-I-E-L-0-0</span>.</p>
-    <p>For each species and isolation site, 2,734 reference isolates are grouped by septatype.
-    The majority phenotype is the call: <b>Resistant</b> if resistant isolates outnumber
-    susceptible ones, otherwise <b>Susceptible</b> (ties go to Susceptible). A septatype never
-    seen for that species and site returns <b>Unknown</b>; no call is forced.</p>
-    <p>From sequence: BLAST+ finds gyrA, parC, recN and qnr genes against verified NCBI
-    references; codons at the 5 positions are read from the alignment; qnr counts as present
-    at 80% identity and 90% coverage.</p>
-    <h3>Reference sequences</h3>
-    <p class="small mono">gyrA/parC/recN: E. coli K-12 MG1655 NC_000913.3 (proteins NP_416734.1, NP_417491.1, YP_026172.1)<br>
-    qnrB: DQ351241.1 &nbsp; qnrS: LC909223.1</p>
+<section id="p-about" class="page">
+  <div class="page-head"><h2>About SeptaTyper</h2></div>
+  <div class="band">
+    <h3>Method</h3>
+    <p>The septatype combines the residues at GyrA-83, GyrA-87, ParC-80, ParC-84 and RecN-346 with the presence or absence of qnrB and qnrS family genes. Residues are read from codons so that synonymous changes, such as the RecN-346 cta and ctg codons in <i>Salmonella</i>, are kept. Genes are located with BLAST+ against E. coli K-12 MG1655 reference genes, then aligned to the reference to read each codon.</p>
+    <h3>What the numbers mean</h3>
+    <p>Reference accuracy is calculated on the 2,734 founding isolates that also define the rules. It is not independent validation. The grammar accuracy is also scored on these isolates, with rules written while looking at them.</p>
     <h3>Limits</h3>
-    <ul class="small"><li>Accuracy is measured on the same isolates that define the rules; not independent validation.</li>
-    <li>Statistical prediction, not a substitute for laboratory testing.</li>
-    <li><b>Research use only.</b></li></ul>
+    <ul>
+      <li>Four species only: <i>E. coli</i>, <i>S. sonnei</i>, <i>S. enterica</i> subsp. I and <i>K. pneumoniae</i>. Choose the species yourself. <i>E. coli</i> and <i>S. sonnei</i> cannot be told apart from these genes.</li>
+      <li>A qnr gene found in sequence does not prove it is expressed. Some qnr-positive isolates in the data are susceptible.</li>
+      <li>The result is a prediction. Confirm with laboratory susceptibility testing. Research use only.</li>
+      <li>Raw sequencing reads are not supported yet. Upload assembled sequence.</li>
+    </ul>
+    <h3>Privacy</h3>
+    <p>Uploaded sequence is analysed in a temporary folder and deleted. Submissions keep only the derived genotype, the metadata you enter and the result.</p>
+    <p id="about-build" class="muted"></p>
   </div>
 </section>
+
+<!-- CURATE -->
+<section id="p-curate" class="page">
+  <div class="page-head"><h2>Curation queue</h2><p>Approving adds the isolate to the repository and updates the rules for its septatype.</p></div>
+  <div class="band">
+    <div class="row3"><div><label for="c-token">Curator token</label><input type="password" id="c-token" autocomplete="off"></div>
+      <div><label for="c-status">Status</label><select id="c-status"><option value="">All</option><option value="needs_review">Needs review</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></div>
+      <div style="align-self:end"><button class="btn solid block" id="c-load">Load queue</button></div></div>
+    <div id="c-err"></div>
+    <div class="scroll"><table id="c-table"></table></div>
+  </div>
+</section>
+
 </main>
-<script>
-"use strict";
-var $=function(id){return document.getElementById(id);};
-var SITES={};
-document.querySelectorAll("nav button").forEach(function(b){b.addEventListener("click",function(){
-  document.querySelectorAll("nav button").forEach(function(x){x.classList.remove("active");});
-  document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active");});
-  b.classList.add("active"); $("tab-"+b.dataset.tab).classList.add("active");
-  if(b.dataset.tab==="charts") drawCharts();
-});});
-function api(p){return fetch("api/v1/"+p).then(function(r){return r.json();});}
-// counters
-api("isolates?per_page=1").then(function(d){$("c-genomes").textContent=d.total.toLocaleString();});
-api("rules").then(function(d){$("c-septa").textContent=d.rules.length;});
-api("stats/geography").then(function(d){$("c-countries").textContent=d.countries.length;});
-// species selects
-api("species").then(function(d){
-  ["p-species","f-species","ch-sp"].forEach(function(id){
-    var s=$(id); d.species.forEach(function(x){var o=document.createElement("option");o.value=x.name;o.textContent=x.name;s.appendChild(o);});
-    SITES[id]=d.species;
-  });
-  fillPSites();
-});
-function sitesFor(name){var f=SITES["p-species"]||[];for(var i=0;i<f.length;i++)if(f[i].name===name)return f[i].sites;return[];}
-function fillPSites(){var s=$("p-site");s.innerHTML="";sitesFor($("p-species").value).forEach(function(x){
-  var o=document.createElement("option");o.value=x;o.textContent=x[0].toUpperCase()+x.slice(1);s.appendChild(o);});
-  var o=document.createElement("option");o.value="unknown";o.textContent="Unknown site";s.appendChild(o);}
-$("p-species").addEventListener("change",fillPSites);
-(function(){var s=$("f-site");["fecal","urine","respiratory"].forEach(function(x){var o=document.createElement("option");o.value=x;o.textContent=x[0].toUpperCase()+x.slice(1);s.appendChild(o);});})();
-// predict from file
-$("p-go").addEventListener("click",function(){
-  var fd=new FormData();fd.append("species",$("p-species").value);fd.append("site",$("p-site").value);
-  var f=$("p-file").files[0],pt=$("p-paste").value.trim();
-  if(f)fd.append("fasta",f);else if(pt)fd.append("fasta",new Blob([pt],{type:"text/plain"}),"p.fasta");
-  else{$("p-out").innerHTML='<div class="flag">Choose a FASTA file or paste sequences.</div>';return;}
-  var b=$("p-go");b.disabled=true;b.textContent="Analyzing...";
-  $("p-out").innerHTML='<div class="spinner">Running BLAST+ ...</div>';
-  fetch("api/v1/predict",{method:"POST",body:fd}).then(function(r){
-    if(!r.ok)return r.json().then(function(j){throw new Error(j.detail||("Error "+r.status));});return r.json();})
-  .then(function(d){showPred($("p-out"),d);}).catch(function(e){$("p-out").innerHTML='<div class="flag">'+e.message+"</div>";})
-  .finally(function(){b.disabled=false;b.textContent="Predict phenotype";});
-});
-// manual residues -> direct rules lookup via isolates? use predict with synthetic? simpler: local rules fetch
-var RULES_CACHE={};
-function getRules(sp,site){var k=sp+"|"+site;
-  if(RULES_CACHE[k])return Promise.resolve(RULES_CACHE[k]);
-  return api("rules?species="+encodeURIComponent(sp)+"&site="+encodeURIComponent(site)).then(function(d){
-    var m={};d.rules.forEach(function(r){m[r.septatype]=r;});RULES_CACHE[k]=m;return m;});}
-["m0","m1","m2","m3","m4"].forEach(function(id){$(id).addEventListener("input",function(){this.value=this.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,1);});});
-$("m-go").addEventListener("click",function(){
-  var r=["m0","m1","m2","m3","m4"].map(function(id){return $(id).value;});
-  if(r.some(function(x){return !x;})){$("m-out").innerHTML='<div class="flag">Enter all 5 residues.</div>';return;}
-  var st=r.join("-")+"-"+($("mB").checked?1:0)+"-"+($("mS").checked?1:0);
-  var sp=$("p-species").value,site=$("p-site").value;
-  function render(call,n,nr,ns,extra){
-    var h='<div class="sept">'+st+'</div>';
-    if(call==="U"){h+='<div class="badge U">Unknown</div><p>Septatype not seen for this group.</p>';}
-    else{var cls=call==="R"?"R":"S";
-      h+='<div class="badge '+cls+'">'+(call==="R"?"Resistant":"Susceptible")+"</div>";
-      var pr=nr/n*100;h+='<div class="bar"><div class="rb" style="width:'+pr+'%"></div><div class="sb" style="width:'+(100-pr)+'%"></div></div>';
-      h+='<div class="legend"><span>'+nr+' resistant</span><span>'+n+' isolates</span><span>'+ns+' susceptible</span></div>';
-      if(n<5)h+='<div class="flag">Low support: fewer than 5 isolates.</div>';
-      if(Math.max(nr,ns)/n*100<80)h+='<div class="flag">Mixed result: majority below 80%.</div>';}
-    $("m-out").innerHTML=h+(extra||"");
-  }
-  if(site==="unknown"){
-    var sites=sitesFor(sp),pros=sites.map(function(s){return getRules(sp,s);});
-    Promise.all(pros).then(function(ms){
-      var tot={n:0,nr:0,ns:0},calls={};
-      sites.forEach(function(s,i){var r=ms[i][st];if(r){tot.n+=r.n;tot.nr+=r.n_res;tot.ns+=r.n_sus;calls[s]=r.call;}});
-      if(!tot.n){render("U");return;}
-      var call=tot.nr>tot.ns?"R":"S",per=Object.keys(calls).map(function(s){
-        return s+' <span class="pill '+calls[s]+'">'+(calls[s]==="R"?"Resistant":"Susceptible")+"</span>";}).join(" &nbsp; ");
-      render(call,tot.n,tot.nr,tot.ns,'<p class="small">Per-site: '+per+"</p>"+
-        (new Set(Object.values(calls)).size>1?'<div class="flag">Site disagreement.</div>':""));
-    });
-  }else getRules(sp,site).then(function(m){var r=m[st];if(!r)render("U");else render(r.call,r.n,r.n_res,r.n_sus);});
-});
-function showPred(el,d){
-  var h="";
-  if(d.call==="Unknown"){h+='<div class="badge U">Unknown</div><p>'+(d.reason||"Septatype not seen. No call made.")+"</p>";
-    if(d.septatype)h+='<div class="sept">'+d.septatype+"</div>";
-    if(d.four_combos)h+='<p class="mono small">'+d.four_combos.join(", ")+"</p>";
-  }else{var cls=d.call==="Resistant"?"R":"S";h+='<div class="badge '+cls+'">'+d.call+"</div>";
-    h+='<div class="sept">'+d.septatype+"</div>";
-    h+='<p style="text-align:center">Confidence '+d.confidence+'% ('+d.n+' reference isolates)</p>';
-    var pr=d.n_res/d.n*100;h+='<div class="bar"><div class="rb" style="width:'+pr+'%"></div><div class="sb" style="width:'+(100-pr)+'%"></div></div>';
-    h+='<div class="legend"><span>'+d.n_res+' resistant</span><span>'+d.n_sus+' susceptible</span></div>';
-    if(d.low_support)h+='<div class="flag">Low support: fewer than 5 reference isolates.</div>';
-    if(d.mixed)h+='<div class="flag">Mixed result: majority below 80%.</div>';
-    if(d.site_disagreement)h+='<div class="flag">Site disagreement: the call differs between sites.</div>';
-    if(d.per_site)h+='<p class="small">Per-site: '+Object.keys(d.per_site).map(function(s){
-      var c=d.per_site[s]==="Resistant"?"R":"S";return s+' <span class="pill '+c+'">'+d.per_site[s]+"</span>";}).join(" &nbsp; ")+"</p>";}
-  if(d.analysis){var a=d.analysis,r=a.residues;h+='<details><summary>Residues and genes found</summary><table>';
-    [["GyrA-83","gyrA"],["GyrA-87","gyrA"],["ParC-80","parC"],["ParC-84","parC"],["RecN-346","recN"]].forEach(function(x){
-      var det=a.details[x[1]][x[0]];h+="<tr><td>"+x[0]+'</td><td class="mono">'+(det?det.codon:"?")+"</td><td><b>"+r[x[0]]+"</b></td></tr>";});
-    h+="<tr><td>qnrB</td><td colspan=2>"+(a.qnr.qnrB?"present":"absent")+"</td></tr>";
-    h+="<tr><td>qnrS</td><td colspan=2>"+(a.qnr.qnrS?"present":"absent")+"</td></tr></table></details>";}
-  el.innerHTML=h;el.scrollIntoView({behavior:"smooth",block:"nearest"});
-}
-// browse
-var BP=50,bpage=0,btotal=0;
-function bQuery(page){var p={page:page,per_page:BP};
-  [["f-species","species"],["f-site","site"],["f-pheno","phenotype"],["f-mlst","mlst"],["f-sept","septatype"],["f-country","country"],["f-q","q"]].forEach(function(x){
-    var v=$(x[0]).value.trim();if(v)p[x[1]]=v;});
-  return Object.keys(p).map(function(k){return encodeURIComponent(k)+"="+encodeURIComponent(p[k]);}).join("&");}
-function bLoad(){api("isolates?"+bQuery(bpage+1)).then(function(d){
-  btotal=d.total;var tb=$("b-table").querySelector("tbody");tb.innerHTML="";
-  d.isolates.forEach(function(a){var tr=document.createElement("tr");
-    tr.innerHTML='<td><a class="genome-link" href="'+a.bvbrc_url+'" target="_blank" rel="noopener">'+a.genome_id+'</a><span class="alias">'+a.isolate_name+"</span></td>"+
-    '<td><span class="pill '+(a.phenotype==="Resistant"?"R":"S")+'">'+a.phenotype+"</span></td>"+
-    '<td class="mono">'+a.septatype+"</td><td>"+a.species+"</td><td>"+a.site+"</td><td>"+a.mlst+"</td><td>"+a.year+"</td><td>"+a.country+"</td>";
-    tb.appendChild(tr);});
-  var pages=Math.max(1,Math.ceil(btotal/BP));
-  $("b-count").textContent=btotal.toLocaleString()+" isolates";
-  $("b-info").textContent="Page "+(bpage+1)+" of "+pages;
-  $("b-prev").disabled=bpage<=0;$("b-next").disabled=bpage>=pages-1;});}
-["f-species","f-site","f-pheno","f-mlst","f-sept","f-country","f-q"].forEach(function(id){
-  $(id).addEventListener("input",function(){bpage=0;bLoad();});$(id).addEventListener("change",function(){bpage=0;bLoad();});});
-$("b-prev").addEventListener("click",function(){if(bpage>0){bpage--;bLoad();}});
-$("b-next").addEventListener("click",function(){bpage++;bLoad();});
-$("f-csv").addEventListener("click",function(){window.location="api/v1/download/csv";});
-$("f-json").addEventListener("click",function(){window.location="api/v1/download/json";});
-bLoad();
-// charts
-var drawn=false;
-function barSVG(svg,data,label){var W=640,H=380,pad={l:150,r:20,t:10,b:60};
-  var max=Math.max.apply(null,data.map(function(d){return d.n;}));
-  var bw=(H-pad.t-pad.b)/data.length;
-  var shtml="";
-  data.forEach(function(d,i){var y=pad.t+i*bw,w=(W-pad.l-pad.r)*d.n/max;
-    var pr=d.n_res/d.n*100;
-    shtml+='<text x="'+(pad.l-6)+'" y="'+(y+bw/2+4)+'" text-anchor="end">'+d.septatype+"</text>";
-    shtml+='<rect x="'+pad.l+'" y="'+(y+2)+'" width="'+(w*pr/100)+'" height="'+(bw-4)+'" fill="var(--red)"/>';
-    shtml+='<rect x="'+(pad.l+w*pr/100)+'" y="'+(y+2)+'" width="'+(w*(100-pr)/100)+'" height="'+(bw-4)+'" fill="var(--green)"/>';
-    shtml+='<text x="'+(pad.l+w+6)+'" y="'+(y+bw/2+4)+'">'+d.n+"</text>";});
-  svg.setAttribute("viewBox","0 0 "+W+" "+H);svg.innerHTML=shtml;}
-function drawCharts(){if(drawn)return;drawn=true;
-  var sp=$("ch-sp").value,si=$("ch-site").value,q="top=15"+(sp?"&species="+encodeURIComponent(sp):"")+(si?"&site="+encodeURIComponent(si):"");
-  api("stats/septatypes?"+q).then(function(d){barSVG($("ch-septa"),d.septatypes);});
-  api("stats/geography").then(function(d){var top=d.countries.slice(0,15).map(function(c){return{septatype:c.country,n:c.n,n_res:c.n,n_sus:0};});barSVG($("ch-geo"),top);});
-  api("stats/accuracy").then(function(d){var tb=$("ch-acc").querySelector("tbody");tb.innerHTML="";
-    d.accuracy.forEach(function(a){var tr=document.createElement("tr");
-      tr.innerHTML="<td>"+a.group+'</td><td class="num">'+a.n+'</td><td class="num">'+a.accuracy.toFixed(1)+"</td>";tb.appendChild(tr);});});}
-["ch-sp","ch-site"].forEach(function(id){$(id).addEventListener("change",function(){drawn=false;drawCharts();});});
-</script>
+<footer>SeptaTyper. Research use only. <a href="#/curate">Curator sign in</a></footer>
+<script src="/static/app.js"></script>
 </body>
 </html>
