@@ -276,14 +276,21 @@ async function loadBrowse() {
     $$("#btable th.sort").forEach(h => h.onclick = () => { BS.desc = BS.sort === h.dataset.k ? !BS.desc : false; BS.sort = h.dataset.k; BS.page = 1; loadBrowse(); });
   } catch (e) { $("#btable").innerHTML = `<tr><td class="err">${esc(e.message)}</td></tr>`; }
 }
+async function bvNote() {
+  let st; try { st = await api("/api/v1/bvbrc-status"); } catch (e) { st = { loaded: false }; }
+  META.bvLoaded = st.loaded; $("#f-wins").disabled = !st.loaded;
+  const n = $("#bv-note");
+  if (st.loaded) { n.innerHTML = ""; return; }
+  if (st.running) { n.innerHTML = `<div class="info">Fetching BV-BRC predictions: ${st.done} of ${st.total} genomes. This table updates when it finishes.</div>`; setTimeout(async () => { await bvNote(); if (META.bvLoaded) loadBrowse(); }, 6000); }
+  else if (st.error) n.innerHTML = `<div class="info">The BV-BRC comparison is not available right now (${esc(st.error)}). It retries when the server restarts.</div>`;
+  else n.innerHTML = `<div class="info">The BV-BRC comparison is being prepared and will appear here soon.</div>`;
+}
 INIT.browse = async () => {
   const f = META.facets;
   $("#f-sp").innerHTML = opts(Object.entries(SP), "All");
   $("#f-st").innerHTML = opts(f.st.slice(0, 60).map(x => [x, x]), "All");
   $("#f-country").innerHTML = opts(f.country.map(x => [x, x]), "All");
-  try { const s = await api("/api/v1/stats/accuracy"); META.bvLoaded = s.benchmark.loaded; } catch (e) { META.bvLoaded = false; }
-  if (META.bvLoaded) $("#f-wins").disabled = false;
-  else $("#bv-note").innerHTML = `<div class="info">BV-BRC computational predictions have not been loaded on this server yet. The BV-BRC column fills in after the administrator runs <code>scripts/fetch_bvbrc.py</code>.</div>`;
+  bvNote();
   let t; const reload = () => { BS.page = 1; loadBrowse(); };
   $$("#p-browse select, #p-browse input[type=number], #f-wins").forEach(e => e.onchange = reload);
   $$("#p-browse input[type=search]").forEach(e => e.oninput = () => { clearTimeout(t); t = setTimeout(reload, 350); });
@@ -403,7 +410,7 @@ INIT.theory = async () => {
     let h = `<h3 style="font-size:1rem">Majority rule and grammar against laboratory phenotype</h3><div class="scroll"><table><tr><th>Species</th><th>Site</th><th>Isolates</th><th>Majority rule</th><th>Grammar only</th></tr>${rows.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${esc(SITE[x.habitat])}</td><td class="stat">${fmt(x.n_isolates)}</td><td class="stat">${x.accuracy}%</td><td class="stat">${x.grammar_accuracy}%</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">Both are scored on the founding isolates the rules were built from. They describe the reference set, not independent performance. The grammar only calls septatypes missing from the database.</p>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Head to head with BV-BRC computational predictions</h3>`;
     if (b.loaded) h += `<p class="stat">${fmt(b.compared)} isolates have a BV-BRC computational prediction. SeptaTyper matches the lab result in ${fmt(b.septatyper_ok)} (${(100 * b.septatyper_ok / b.compared).toFixed(1)}%) and BV-BRC in ${fmt(b.bvbrc_ok)} (${(100 * b.bvbrc_ok / b.compared).toFixed(1)}%). SeptaTyper is right and BV-BRC wrong in ${fmt(b.wins)}. The reverse happens in ${fmt(b.losses)}.</p><div class="scroll"><table><tr><th>Genome</th><th>Septatype</th><th>Lab</th><th>BV-BRC</th><th>SeptaTyper</th></tr>${b.examples.map(x => `<tr><td>${esc(x.genome_id)}<span class="alias">${esc(x.isolate_name)}</span></td><td class="mono">${esc(x.septatype)}</td><td>${badge(x.lab_phenotype, 1)}</td><td>${badge(x.bvbrc_call, 1)}</td><td>${badge(x.septatyper_call, 1)}</td></tr>`).join("")}</table></div>`;
-    else h += `<div class="info">BV-BRC predictions have not been loaded yet, so the head-to-head comparison is empty. Run <code>scripts/fetch_bvbrc.py</code> on the server to fill it.</div>`;
+    else h += `<div class="info">BV-BRC predictions have not been loaded yet, so the head-to-head comparison is empty. They load automatically when the server can reach BV-BRC.</div>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Susceptible tetratype S-D-S-E, split by qnr</h3><div class="scroll"><table><tr><th>Species</th><th>qnrB</th><th>qnrS</th><th>Isolates</th><th>Resistant</th></tr>${s.edgecases.wildtype_tetratype_by_qnr.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${x.qnrB2 ? "yes" : "no"}</td><td>${x.qnrS1 ? "yes" : "no"}</td><td class="stat">${x.n}</td><td class="stat">${x.res} (${Math.round(100 * x.res / x.n)}%)</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">A qnr gene on a susceptible baseline is usually resistant, but not always. A gene found in sequence may not be expressed.</p>`;
     $("#t-valid").innerHTML = h;
     $("#t-aa").innerHTML = `<tr><th>Residue</th><th>Name</th><th>Hydrophobicity</th><th>Class</th></tr>` + aa.rows.sort((a, b) => b.hydrophobicity - a.hydrophobicity).map(x => `<tr><td class="mono">${x.aa}</td><td>${esc(x.name)}</td><td class="stat">${x.hydrophobicity.toFixed(2)}</td><td>${esc(x.class)}</td></tr>`).join("");
@@ -419,11 +426,18 @@ INIT.data = () => {
 INIT.about = () => { $("#about-build").textContent = `Rules built ${META.build.built || ""} from ${META.build.source || ""} (${META.build.n_isolates || ""} isolates).`; };
 
 /* ----------------------------------------------------------------- curation */
+const tokenOk = () => {
+  const t = $("#c-token").value.trim();
+  if (!t) { $("#c-err").innerHTML = `<div class="err">Type the curator token first.</div>`; return null; }
+  if (!/^[\x20-\x7E]+$/.test(t)) { $("#c-err").innerHTML = `<div class="err">The token has a character the browser cannot send. Use plain letters and numbers.</div>`; return null; }
+  return t;
+};
 INIT.curate = () => {
+  if (!META.curation_enabled) $("#c-err").innerHTML = `<div class="note">Curation is not switched on for this server. In Render, open the service, then Environment, add ADMIN_TOKEN with a value, save, and wait for the redeploy.</div>`;
   const load = async () => {
-    $("#c-err").innerHTML = "";
+    $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
     try {
-      const d = await api("/api/v1/admin/queue?status=" + $("#c-status").value, { headers: { "X-Admin-Token": $("#c-token").value } });
+      const d = await api("/api/v1/admin/queue?status=" + $("#c-status").value, { headers: { "X-Admin-Token": tk } });
       $("#c-table").innerHTML = `<tr><th>Submission</th><th>Isolate</th><th>Septatype</th><th>Prediction</th><th>Lab</th><th>Status</th><th>Decision</th></tr>` +
         (d.rows.length ? d.rows.map(r => `<tr><td class="nw">${esc(r.job_id)}<span class="alias">${esc(r.created)}</span></td>
           <td>${esc(r.genome_id || "no ID")}<span class="alias">${esc(SHORT[r.species])}, ${esc(SITE[r.habitat])}, ${esc(r.country || "-")} ${esc(r.year || "")}</span></td>
@@ -435,13 +449,19 @@ INIT.curate = () => {
           : `<tr><td colspan="7" class="muted">The queue is empty.</td></tr>`);
       $$("#c-table button[data-a]").forEach(b => b.onclick = async () => {
         try {
-          await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value }, body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "" }) });
+          await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value.trim() }, body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "" }) });
           LOADED.browse = false; META.counts.genomes += b.dataset.a === "approve" ? 1 : 0; load();
         } catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
       });
     } catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
   $("#c-load").onclick = load;
+  $("#c-bv").onclick = async () => {
+    $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
+    try { const s = await api("/api/v1/admin/bvbrc/load", { method: "POST", headers: { "X-Admin-Token": tk } });
+      $("#c-bvs").textContent = s.loaded ? "Already loaded." : "Started. Check the Browse page in a minute."; }
+    catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
 };
 
 /* -------------------------------------------------------------------- start */

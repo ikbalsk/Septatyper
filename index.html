@@ -285,9 +285,10 @@
 <section id="p-curate" class="page">
   <div class="page-head"><h2>Curation queue</h2><p>Approving adds the isolate to the repository and updates the rules for its septatype.</p></div>
   <div class="band">
-    <div class="row3"><div><label for="c-token">Curator token</label><input type="password" id="c-token" autocomplete="off"></div>
+    <div class="row3"><div><label for="c-token">Curator token</label><input type="password" id="c-token" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
       <div><label for="c-status">Status</label><select id="c-status"><option value="">All</option><option value="needs_review">Needs review</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></div>
       <div style="align-self:end"><button class="btn solid block" id="c-load">Load queue</button></div></div>
+    <div class="toolbar" style="margin-top:14px"><button class="btn line" id="c-bv" type="button">Load BV-BRC data now</button><span id="c-bvs" class="muted"></span></div>
     <div id="c-err"></div>
     <div class="scroll"><table id="c-table"></table></div>
   </div>

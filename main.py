@@ -9,6 +9,7 @@ import csv
 import hmac
 import io
 import json
+import os
 import re
 import tempfile
 import threading
@@ -21,7 +22,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import grammar, rules, septatype
+from . import bvbrc, grammar, rules, septatype
 from .config import ADMIN_TOKEN, HABITATS, MAX_UPLOAD_MB, SPECIES
 
 app = FastAPI(title="SeptaTyper API", version="2.0",
@@ -92,8 +93,26 @@ def _result(species, habitat, analysis, sep):
 def admin(x_admin_token: str = Header(default="")):
     if not ADMIN_TOKEN:
         raise HTTPException(503, "Curation is disabled: set the ADMIN_TOKEN environment variable on the server.")
-    if not hmac.compare_digest(x_admin_token, ADMIN_TOKEN):
-        raise HTTPException(401, "Wrong curator token.")
+    if not hmac.compare_digest(x_admin_token.strip().encode("utf-8"), ADMIN_TOKEN.encode("utf-8")):
+        raise HTTPException(401, "Wrong curator token. Check it matches ADMIN_TOKEN in Render exactly.")
+
+
+@app.on_event("startup")
+def _startup():
+    rules.ensure_db()
+    if os.environ.get("BVBRC_AUTOLOAD", "1") != "0" and not bvbrc.is_loaded():
+        bvbrc.start()
+
+
+@app.get("/api/v1/bvbrc-status")
+def bvbrc_status():
+    return bvbrc.status()
+
+
+@app.post("/api/v1/admin/bvbrc/load", dependencies=[Depends(admin)])
+def bvbrc_load():
+    started = bvbrc.start() if not bvbrc.STATE["running"] else None
+    return bvbrc.status() | {"started": not bvbrc.STATE["running"] or started is None}
 
 
 # --------------------------------------------------------------------- meta
