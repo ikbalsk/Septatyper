@@ -22,7 +22,7 @@ from .config import BLAST_TIMEOUT_S, POSITIONS, REFS_DIR, WILD
 # (>=80% identity, >=90% gene-length coverage). The chromosomal ones are
 # practical guards, not taken from the paper.
 MIN_ID_CHROM = 75.0
-WARN_ID_CHROM = 82.0
+WARN_ID_CHROM = 92.0
 MIN_COV = 0.90
 QNR_MIN_ID = 80.0
 QNR_MIN_COV = 0.90
@@ -38,37 +38,48 @@ class RefsMissing(RuntimeError):
 
 
 # ---------------------------------------------------------------- references
-SHARED = {"gyrA": "gyrA_cds_ref.fasta", "parC": "parC_cds_ref.fasta", "recN": "recN_cds_ref.fasta",
-          "qnrB": "qnrB_ref.fasta", "qnrS": "qnrS_ref.fasta"}
+# refs/gyrA.fasta, parC.fasta, recN.fasta hold one record per species (header: gene|Species name|accession).
+# refs/qnrB2.fasta and qnrS1.fasta hold the qnr reference alleles.
+REF_SPECIES = {"ecoli": "Escherichia coli", "ssonnei": "Shigella sonnei", "senterica": "Salmonella enterica",
+               "kpneumoniae": "Klebsiella pneumoniae"}
 
 
-def ref_files(species: str) -> dict[str, Path]:
-    """One shared reference set; refs/<species>/<gene>.fasta overrides it if present."""
-    out = {}
-    for g in ("gyrA", "parC", "recN"):
-        own = REFS_DIR / species / f"{g}.fasta"
-        out[g] = own if own.exists() else REFS_DIR / SHARED[g]
-    for q in ("qnrB", "qnrS"):
-        fam = REFS_DIR / f"{q}_family.fasta"
-        out[q] = fam if fam.exists() else REFS_DIR / SHARED[q]
+def ref_files(species: str = "") -> dict[str, Path]:
+    out = {g: REFS_DIR / f"{g}.fasta" for g in ("gyrA", "parC", "recN")}
+    out["qnrB"], out["qnrS"] = REFS_DIR / "qnrB2.fasta", REFS_DIR / "qnrS1.fasta"
     return out
+
+
+def _species_record(path: Path, species: str):
+    want = REF_SPECIES[species].lower()
+    for rec in SeqIO.parse(path, "fasta"):
+        if want in rec.description.lower():
+            return rec
+    return None
 
 
 def refs_status() -> dict:
     from .config import SPECIES
-    out = {}
+    f, out = ref_files(), {}
     for sp in SPECIES:
-        missing = [k for k, p in ref_files(sp).items() if not p.exists()]
+        missing = [p.name for p in f.values() if not p.exists()]
+        if not missing:
+            missing = [f"{g}.fasta has no {REF_SPECIES[sp]} record" for g in ("gyrA", "parC", "recN") if _species_record(f[g], sp) is None]
         out[sp] = {"ready": not missing, "missing": missing}
     return out
 
 
 def _load_refs(species: str):
-    f = ref_files(species)
+    f = ref_files()
     missing = [p.name for p in f.values() if not p.exists()]
     if missing:
         raise RefsMissing("Reference sequences not installed: " + ", ".join(missing))
-    chrom = {g: next(SeqIO.parse(f[g], "fasta")) for g in ("gyrA", "parC", "recN")}
+    chrom = {}
+    for g in ("gyrA", "parC", "recN"):
+        rec = _species_record(f[g], species)
+        if rec is None:
+            raise RefsMissing(f"{g}.fasta has no record for {REF_SPECIES[species]}.")
+        chrom[g] = rec
     return chrom, f["qnrB"], f["qnrS"]
 
 
@@ -214,7 +225,7 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
                     warnings.append(f"{g}: only {info['coverage']}% of the reference gene was covered (partial gene or contig break).")
                 if best["pident"] < WARN_ID_CHROM:
                     warnings.append(f"{g}: identity to the {species} reference is {info['identity']}%. "
-                                    "The gene is divergent from the reference: check the species and the assembly.")
+                                    f"identity to the {REF_SPECIES[species]} reference is lower than expected. Check the selected species and the assembly.")
                 region = _extract_region(seqs[best["sseqid"]], best)
                 gmap = _ref_to_region_map(region, ref)
             else:

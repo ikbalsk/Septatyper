@@ -9,7 +9,7 @@ COPY main.py rules.py septatype.py grammar.py config.py bvbrc.py app/
 COPY index.html style.css app.js app/static/
 COPY build_db.py fetch_bvbrc.py scripts/
 COPY Table_S1.xlsx data/
-COPY gyrA_cds_ref.fasta parC_cds_ref.fasta recN_cds_ref.fasta qnrB_ref.fasta qnrS_ref.fasta refs/
+COPY gyrA.fasta parC.fasta recN.fasta qnrB2.fasta qnrS1.fasta refs/
 RUN python scripts/build_db.py
 ENV PORT=8000 DATA_DIR=/srv/data
 EXPOSE 8000
