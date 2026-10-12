@@ -5,7 +5,7 @@ Ciprofloxacin resistance prediction and a curated repository of 2,734 Enterobact
 
 | Module | What it does |
 |---|---|
-| A Predict | Upload or paste FASTA (or enter residues). BLAST finds gyrA, parC, recN and the qnr genes, codons are read, the septatype is built and the phenotype called. Shows RecN-346 codon (cta/ctg flag), combined mean hydrophobicity <H>, and a plain-language reason. |
+| A Predict | Upload or paste FASTA (or enter residues). BLAST finds gyrA, parC, recN and the qnr genes, codons are read, the septatype is built and the phenotype called. Shows the sample's MLST sequence type, the STs of the reference isolates behind the majority-rule call, the RecN-346 codon (cta/ctg flag), combined mean hydrophobicity <H>, and a plain-language reason. |
 | B Browse | Filter by species, site, ST, septatype, country, year. Dual-display Genome ID (BV-BRC link) with isolate name beneath. Lab, BV-BRC and SeptaTyper columns with a star where SeptaTyper is right and BV-BRC is wrong. CSV/JSON download. Septatype-by-site bars and a country map. |
 | C Submit | Community form with BV-BRC name lookup. Submissions wait in a curation queue. New septatypes and phenotype/prediction disagreements are flagged. A curator approves or rejects. |
 | D Theory | The context-dependent grammar, an interactive schematic of the Mg2+ bridge, validation tables, edge cases. |
@@ -57,8 +57,18 @@ against the live database (`--db /srv/data/septatype.db`) from the server shell 
 - **Accuracy is resubstitution accuracy.** Rules and scores use the same 2,734 isolates. The grammar was written
   while looking at the same data. Only the 23 in-house *Shigella* isolates in the paper are independent.
 - **Assumptions to confirm:** `<H>` is the mean Eisenberg value of the four GyrA/ParC residues; G, P, C count as
-  hydrophobic; the cutoff is 0.0; one shared *E. coli* K-12 reference set is used for all species.
+  hydrophobic; the cutoff is 0.0; references are one gene record per species (refs/gyrA.fasta, parC.fasta, recN.fasta) plus single qnrB2 and qnrS1 alleles, so qnr family members below 80% identity to those alleles would be missed.
 - **Not built:** raw-read input, Mol* 3D structures (a labelled schematic is used instead), user accounts, Celery job queue.
 - The Theory schematic is a reading of the grammar, not a structure. Align its wording with Figure 6.
 - Fonts and the map library load from CDNs. The site works without them (fallback fonts, table instead of map).
 - Declare AI-assisted code in the manuscript as required by the journal, and add a data licence.
+
+## Sequence types (MLST)
+
+`app/mlst.py` types the uploaded sequence with PubMLST schemes: Achtman for *E. coli*, *S. sonnei* and *S. enterica*,
+Diancourt for *K. pneumoniae*. Alleles and profiles are in `refs/mlst_<scheme>.fasta` and `.txt` (taken from the
+tseemann/mlst database, downloaded 2026-03-11; cite PubMLST, Jolley et al. 2018, Wellcome Open Res 3:124).
+An ST is reported only when all seven alleles match exactly and the profile exists. Otherwise the nearest alleles
+are shown. Gene-only uploads cannot be typed. The reference STs shown for a majority-rule call are the `st`
+values of Table S1 for the isolates that carry the same septatype. Refresh the scheme files from the tseemann/mlst
+repository when PubMLST adds new alleles.

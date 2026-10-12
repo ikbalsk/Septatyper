@@ -42,6 +42,22 @@ def _label(p: str) -> str:
     return "Resistant" if p == "R" else "Susceptible"
 
 
+def reference_sts(db, species: str, habitat: str, sep: str, top: int = 10) -> list[dict]:
+    """Sequence types of the reference isolates that carry this septatype (the isolates behind a majority-rule call)."""
+    where, args = "species=? AND septatype=?", [species, sep]
+    if habitat != "ALL":
+        where += " AND habitat=?"
+        args.append(habitat)
+    rows = db.execute(f"""SELECT COALESCE(st,'ST not recorded') st, COUNT(*) n, SUM(lab_phenotype='Resistant') r
+                          FROM isolates WHERE {where} GROUP BY 1 ORDER BY n DESC, st""", args).fetchall()
+    out = [{"st": r["st"], "n": r["n"], "n_resistant": r["r"], "n_susceptible": r["n"] - r["r"]} for r in rows[:top]]
+    rest = rows[top:]
+    if rest:
+        n, r = sum(x["n"] for x in rest), sum(x["r"] for x in rest)
+        out.append({"st": f"{len(rest)} other STs", "n": n, "n_resistant": r, "n_susceptible": n - r})
+    return out
+
+
 # ---------------------------------------------------------------- prediction
 def _rule(db, species, habitat, sep):
     return db.execute("SELECT * FROM septatypes WHERE species=? AND habitat=? AND septatype=?",
@@ -69,6 +85,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
             n, r, s = use["n_isolates"], use["n_resistant"], use["n_susceptible"]
             out.update(call=_label(use["predicted"]), tier="database", known=True, n_isolates=n, n_resistant=r,
                        n_susceptible=s, confidence=round(use["confidence"], 3))
+            out["reference_sts"] = reference_sts(db, species, "ALL" if pooled else habitat, sep)
             if pooled:
                 out["tier"] = "database_other_site"
                 flags.append("Not seen at this isolation site. The call uses isolates of this species from all sites.")
@@ -82,7 +99,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                 flags.append(f"The physicochemical grammar would call this {g['call']}. The database majority is used.")
         else:
             out.update(call=g["call"], tier="grammar", known=False, novel=True, n_isolates=0, n_resistant=0,
-                       n_susceptible=0, confidence=None)
+                       n_susceptible=0, confidence=None, reference_sts=[])
             flags.append("New septatype: never seen in the reference isolates for this species. "
                          "The call comes from the physicochemical grammar and is less certain. It is flagged for curation.")
             rows = db.execute("SELECT septatype,n_isolates,n_resistant,n_susceptible,predicted FROM septatypes "
@@ -308,9 +325,13 @@ def decide(job_id: str, action: str, note: str = "") -> dict:
             r = db.execute("SELECT iso3 FROM isolates WHERE country=? AND iso3 IS NOT NULL LIMIT 1", (country,)).fetchone()
             iso3 = r[0] if r else None
         ys = int(s["year"]) if s["year"] and str(s["year"]).isdigit() else None
+        try:
+            mst = ((json.loads(s["result_json"]).get("analysis") or {}).get("mlst") or {}).get("st")
+        except (TypeError, ValueError):
+            mst = None
         db.execute(f"INSERT INTO isolates ({','.join(ISO_COLS)}) VALUES ({','.join('?'*len(ISO_COLS))})",
                    (gid, s["genome_name"], s["genome_name"] or gid, s["species"], s["habitat"], s["lab_phenotype"],
-                    s["year"], ys, ys, country, iso3, None, aas[0], aas[1], aas[2], aas[3], aas[4], int(aas[5]),
+                    s["year"], ys, ys, country, iso3, mst, aas[0], aas[1], aas[2], aas[3], aas[4], int(aas[5]),
                     int(aas[6]), s["septatype"], "-".join(aas[:4]), s["call"], None, None, "community", _now()))
         # the approved isolate joins the rules table, so a new septatype becomes a known one
         for hab in {s["habitat"], "ALL"}:

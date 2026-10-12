@@ -88,6 +88,8 @@ function flat(res, name, error) {
   const p = (res && res.prediction) || {}, a = (res && res.analysis) || {}, pos = a.positions || {}, cd = k => (pos[k] || {}).codon || "";
   return { file: name, species: res ? res.species_name : "", site: res ? res.habitat : "", septatype: (res && res.septatype) || "",
     call: error ? "Error" : (p.call || "No call"), basis: p.tier || "", n_isolates: p.n_isolates ?? "", n_resistant: p.n_resistant ?? "", n_susceptible: p.n_susceptible ?? "",
+    sample_st: ((a.mlst || {}).st) || "", mlst_status: ((a.mlst || {}).status) || "",
+    reference_sts: (p.reference_sts || []).map(x => `${x.st}:${x.n} (R ${x.n_resistant}, S ${x.n_susceptible})`).join("; "),
     mean_H: p.mean_h ?? "", gyrA83_codon: cd("gyrA83"), gyrA87_codon: cd("gyrA87"), parC80_codon: cd("parC80"), parC84_codon: cd("parC84"), recN346_codon: cd("recN346"),
     notes: error || ((res && res.warnings) || []).join(" | ") };
 }
@@ -102,13 +104,13 @@ function printNow() {
 const TIER = { database: "Database", database_other_site: "Database (other site)", grammar: "Grammar (new)" };
 function drawBatch(done, total) {
   const rows = BATCH.map((x, i) => {
-    if (x.error) return `<tr><td>${esc(x.name)}</td><td colspan="4" class="muted">${esc(x.error)}</td></tr>`;
+    if (x.error) return `<tr><td>${esc(x.name)}</td><td colspan="5" class="muted">${esc(x.error)}</td></tr>`;
     const p = x.res.prediction;
-    return `<tr class="clk" data-act="detail" data-i="${i}"><td>${esc(x.name)}</td><td class="mono nw">${p ? mutSep(x.res.septatype) : "-"}</td><td>${p ? badge(p.call, 1) : "No call"}</td><td>${p ? esc(TIER[p.tier] || p.tier) : "-"}</td><td class="stat">${p && p.known ? p.n_resistant + " of " + p.n_isolates + " resistant" : "-"}</td></tr>`;
+    return `<tr class="clk" data-act="detail" data-i="${i}"><td>${esc(x.name)}</td><td class="mono nw">${p ? mutSep(x.res.septatype) : "-"}</td><td class="nw">${esc(((x.res.analysis || {}).mlst || {}).st || "-")}</td><td>${p ? badge(p.call, 1) : "No call"}</td><td>${p ? esc(TIER[p.tier] || p.tier) : "-"}</td><td class="stat">${p && p.known ? p.n_resistant + " of " + p.n_isolates + " resistant" : "-"}</td></tr>`;
   }).join("");
   const working = done < total;
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing file ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
-    <div class="scroll"><table><tr><th>File</th><th>Septatype</th><th>Call</th><th>Basis</th><th>Support</th></tr>${rows}</table></div>
+    <div class="scroll"><table><tr><th>File</th><th>Septatype</th><th>ST</th><th>Call</th><th>Basis</th><th>Support</th></tr>${rows}</table></div>
     ${working ? "" : `<div class="actions no-print"><button class="btn solid" data-act="bcsv" type="button">Download CSV</button><button class="btn line" data-act="print" type="button">Print or save as PDF</button></div><p class="muted" style="font-size:.85rem">Tap a row for the full result.</p>`}
     <p class="print-only">SeptaTyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
 }
@@ -152,8 +154,18 @@ function renderResult(r, extra) {
     }).join("")}</div>`;
     if (r.species === "senterica" && (a && a.recN_syn === "ctg" || String(codon).toUpperCase() === "CTG"))
       h += `<div class="info">RecN-346 uses the ctg codon for leucine, a high-usage synonymous change flagged in <i>S. enterica</i>.</div>`;
+    const ml = a && a.mlst;
+    if (ml) {
+      h += `<h3>Sample sequence type</h3><p>${ml.st ? `<b class="mono">${esc(ml.st)}</b>${ml.cc ? `, clonal complex ${esc(ml.cc)}` : ""}` : `<span class="muted">${esc(ml.note || "Not typed")}</span>`} <span class="muted">${esc(ml.scheme_name || "")} MLST${ml.loci_total ? `, ${ml.loci_exact} of ${ml.loci_total} loci exact` : ""}</span></p>`;
+      if (ml.alleles) h += `<details><summary>MLST alleles</summary><div class="scroll"><table><tr>${Object.keys(ml.alleles).map(k => `<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(ml.alleles).map(v => `<td class="mono">${esc(v)}</td>`).join("")}</tr></table></div></details>`;
+    }
     if (p.known) {
       h += `<p class="stat">${fmt(p.n_resistant)} resistant and ${fmt(p.n_susceptible)} susceptible among reference isolates with this septatype.</p>${bar(p.n_resistant, p.n_susceptible)}`;
+      if (p.reference_sts && p.reference_sts.length) {
+        const mine = ml && ml.st;
+        h += `<h3>Reference isolates with this septatype, by ST</h3><div class="scroll"><table><tr><th>ST</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th></th></tr>${p.reference_sts.map(x => `<tr><td class="mono">${esc(x.st)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${mine && x.st === mine ? "<b>your genome</b>" : ""}</td></tr>`).join("")}</table></div>`;
+        if (mine && !p.reference_sts.some(x => x.st === mine)) h += `<p class="muted" style="font-size:.9rem">Your genome (${esc(mine)}) is not among the STs of the reference isolates with this septatype.</p>`;
+      }
     } else if (p.similar && p.similar.length) {
       h += `<p class="muted" style="margin-top:12px">Known septatypes with the same GyrA/ParC tetratype:</p><div class="scroll"><table><tr><th>Septatype</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th></tr>${p.similar.map(x => `<tr><td class="mono">${esc(x.septatype)}</td><td>${x.n_isolates}</td><td>${x.n_resistant}</td><td>${x.n_susceptible}</td></tr>`).join("")}</table></div>`;
     }

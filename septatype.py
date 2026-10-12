@@ -16,6 +16,7 @@ from Bio import SeqIO
 from Bio.Align import PairwiseAligner
 from Bio.Seq import Seq
 
+from . import mlst
 from .config import BLAST_TIMEOUT_S, POSITIONS, REFS_DIR, WILD
 
 # thresholds. QNR values are the ones stated in the manuscript Methods
@@ -107,10 +108,11 @@ def read_fasta(path: Path):
 
 # --------------------------------------------------------------------- BLAST
 def _blast(query: Path, asm: Path, workdir: Path, tag: str) -> list[dict]:
-    db = workdir / f"db_{tag}"
+    db = workdir / "asm_db"
     try:
-        subprocess.run(["makeblastdb", "-in", str(asm), "-dbtype", "nucl", "-parse_seqids", "-out", str(db)],
-                       check=True, capture_output=True, timeout=BLAST_TIMEOUT_S)
+        if not (workdir / "asm_db.nhr").exists():
+            subprocess.run(["makeblastdb", "-in", str(asm), "-dbtype", "nucl", "-parse_seqids", "-out", str(db)],
+                           check=True, capture_output=True, timeout=BLAST_TIMEOUT_S)
         fmt = "6 qseqid sseqid pident length qlen qstart qend sstart send evalue bitscore"
         res = subprocess.run(
             ["blastn", "-task", "blastn", "-query", str(query), "-db", str(db), "-outfmt", fmt,
@@ -269,6 +271,15 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
             warnings.append("The input is smaller than a bacterial genome. qnr 'absent' only means no qnr "
                             "sequence was in the file. Set qnrB/qnrS manually if you know them.")
 
+        # MLST: never lets a typing problem break the prediction
+        ms = None
+        try:
+            qp = mlst.query_path(species)
+            if qp:
+                ms = mlst.type_hits(species, _blast(qp, asm, td, "mlst"))
+        except Exception as e:  # noqa: BLE001
+            ms = {"st": None, "status": "error", "note": f"MLST could not be run ({type(e).__name__})."}
+
     aas = [positions[f"{g}{p}"]["aa"] for g, p in POSITIONS]
     complete = all(a and a not in ("X", "*") for a in aas)
     sep = septatype_string(aas, qnr["qnrB2"]["present"], qnr["qnrS1"]["present"]) if complete else None
@@ -276,5 +287,5 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
             "recN_codon": positions["recN346"]["codon"],
             "recN_syn": ({"CTA": "cta", "CTG": "ctg"}.get(positions["recN346"]["codon"] or "", "other")
                          if positions["recN346"]["aa"] == "L" else None),
-            "warnings": warnings,
+            "warnings": warnings, "mlst": ms,
             "input": {"records": len(seqs), "total_bp": total}}
