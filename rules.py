@@ -79,6 +79,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                "mechanism": grammar.mechanism(aas), "novel": False}
         g = grammar.predict(species, aas, qb, qs, recn_codon)
         out["grammar"] = {"call": g["call"], "rule": g["rule"], "votes": g["votes"]}
+        out["criteria"] = grammar.explain(species, aas, g)
         pooled = None if rule or habitat == "ALL" else _rule(db, species, "ALL", sep)
         use = rule or pooled
         if use:
@@ -173,14 +174,17 @@ def benchmark() -> dict:
     return res
 
 
-def geography(species="", st="", tetratype="", phenotype="") -> list[dict]:
-    where, args = ["iso3 IS NOT NULL"], []
+def geography(species="", st="", tetratype="", phenotype="", missing=False):
+    """Counts per country. With missing=True, returns how many matching isolates have no country."""
+    where, args = ["iso3 IS NULL" if missing else "iso3 IS NOT NULL"], []
     for col, val in (("species", species), ("st", st), ("tetratype", tetratype), ("lab_phenotype", phenotype)):
         if val:
             where.append(f"{col}=?")
             args.append(val)
     db = conn()
     try:
+        if missing:
+            return db.execute(f"SELECT COUNT(*) FROM isolates WHERE {' AND '.join(where)}", args).fetchone()[0]
         rows = db.execute(f"""SELECT iso3, country, COUNT(*) n, SUM(lab_phenotype='Resistant') res FROM isolates
                               WHERE {' AND '.join(where)} GROUP BY iso3, country ORDER BY n DESC""", args).fetchall()
     finally:
@@ -205,11 +209,13 @@ def septatype_freq(species: str, top: int = 12) -> dict:
 
 
 def facets() -> dict:
+    """Every value with its isolate count, most frequent first, for the filter lists."""
     db = conn()
     try:
-        f = {"st": [r[0] for r in db.execute("SELECT st FROM isolates WHERE st IS NOT NULL GROUP BY st ORDER BY COUNT(*) DESC")],
-             "country": [r[0] for r in db.execute("SELECT country FROM isolates WHERE country IS NOT NULL GROUP BY country ORDER BY COUNT(*) DESC")],
-             "tetratype": [r[0] for r in db.execute("SELECT tetratype FROM isolates GROUP BY tetratype ORDER BY COUNT(*) DESC")],
+        q = lambda sql: [[r[0], r[1]] for r in db.execute(sql)]  # noqa: E731
+        f = {"st": q("SELECT st, COUNT(*) FROM isolates WHERE st IS NOT NULL GROUP BY st ORDER BY COUNT(*) DESC, st"),
+             "country": q("SELECT country, COUNT(*) FROM isolates WHERE country IS NOT NULL GROUP BY country ORDER BY COUNT(*) DESC, country"),
+             "tetratype": q("SELECT tetratype, COUNT(*) FROM isolates GROUP BY tetratype ORDER BY COUNT(*) DESC, tetratype"),
              "year": [r[0] for r in db.execute("SELECT MIN(year_start), MAX(COALESCE(year_end,year_start)) FROM isolates")]}
     finally:
         db.close()
@@ -352,3 +358,38 @@ def decide(job_id: str, action: str, note: str = "") -> dict:
         return {"status": "approved", "genome_id": gid}
     finally:
         db.close()
+
+
+def cutoff_stats() -> dict:
+    """How well mean hydrophobicity separates resistant from susceptible isolates, from the founding data."""
+    db = conn()
+    try:
+        rows = db.execute("""SELECT tetratype, SUM(lab_phenotype='Resistant') r, SUM(lab_phenotype='Susceptible') s
+                             FROM isolates WHERE source='founding' GROUP BY tetratype""").fetchall()
+    finally:
+        db.close()
+    groups = []
+    for t in rows:
+        a = t["tetratype"].split("-")
+        groups.append((grammar.mean_h(a), sum(1 for v in grammar.votes(*a) if v["vote"]), t["r"], t["s"]))
+    n_r, n_s = sum(g[2] for g in groups), sum(g[3] for g in groups)
+
+    def table(sub):
+        tot = sum(g[2] + g[3] for g in sub)
+        out = []
+        for c10 in range(-10, 11):
+            c = c10 / 10
+            ok = sum((g[2] if g[0] > c else g[3]) for g in sub)
+            out.append({"cutoff": c, "accuracy": round(100 * ok / tot, 1) if tot else None})
+        return out, tot
+
+    allt, tot_all = table(groups)
+    one = [g for g in groups if g[1] == 1]
+    onet, tot_one = table(one)
+    best = lambda t: max(t, key=lambda x: (x["accuracy"], -abs(x["cutoff"])))  # noqa: E731
+    return {"n_isolates": n_r + n_s,
+            "mean_resistant": round(sum(g[0] * g[2] for g in groups) / n_r, 3),
+            "mean_susceptible": round(sum(g[0] * g[3] for g in groups) / n_s, 3),
+            "all": allt, "best_all": best(allt), "n_single_vote": tot_one,
+            "single_vote": onet, "best_single_vote": best(onet) if one else None,
+            "single_vote_resistant": sum(g[2] for g in one)}

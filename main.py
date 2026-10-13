@@ -41,15 +41,27 @@ def _check(species: str, habitat: str):
         raise HTTPException(400, f"Site '{habitat}' is not available for {SPECIES[species]}.")
 
 
+_CACHE: dict = {}          # (sha256, species, qnr overrides) -> analysis; the same file is never analysed twice
+_CACHE_MAX = 32
+
+
 def _analyse_text(text: str, species: str, qnr: dict, name: str = "pasted"):
     """Write FASTA text or bytes to a temp file, run the pipeline, delete the file."""
+    import hashlib
+    key = (hashlib.sha256(text.encode()).hexdigest(), species, qnr.get("qnrB2"), qnr.get("qnrS1"))
+    if key in _CACHE:
+        return _CACHE[key]
     if not BLAST_SLOTS.acquire(blocking=False):
         raise HTTPException(429, "The server is busy with other analyses. Try again in a minute.")
     try:
         with tempfile.TemporaryDirectory() as td:
             path = Path(td) / "input.fa"
             path.write_text(text)
-            return septatype.analyse(path, species, qnr)
+            res = septatype.analyse(path, species, qnr)
+            if len(_CACHE) >= _CACHE_MAX:
+                _CACHE.pop(next(iter(_CACHE)))
+            _CACHE[key] = res
+            return res
     except septatype.InputError as e:
         raise HTTPException(400, str(e))
     except septatype.RefsMissing as e:
@@ -228,7 +240,8 @@ def stats_accuracy():
 
 @app.get("/api/v1/stats/geography")
 def stats_geo(species: str = "", st: str = "", tetratype: str = "", phenotype: str = ""):
-    return {"rows": rules.geography(species, st, tetratype, phenotype)}
+    return {"rows": rules.geography(species, st, tetratype, phenotype),
+            "no_country": rules.geography(species, st, tetratype, phenotype, missing=True)}
 
 
 @app.get("/api/v1/stats/septatypes")
@@ -236,6 +249,22 @@ def stats_sep(species: str, top: int = Query(12, ge=1, le=40)):
     if species not in SPECIES:
         raise HTTPException(400, "Unknown species.")
     return rules.septatype_freq(species, top)
+
+
+@app.get("/api/v1/stats/cutoff")
+def stats_cutoff():
+    return rules.cutoff_stats()
+
+
+@app.get("/api/v1/grammar")
+def grammar_explain(residues: str, species: str = "ecoli"):
+    """Worked grammar for four residues (GyrA-83, GyrA-87, ParC-80, ParC-84). Used by the calculation page."""
+    r = residues.strip().upper()
+    if species not in SPECIES or len(r) != 4 or any(a not in AA for a in r):
+        raise HTTPException(400, "Give four amino-acid letters, for example LNIE, and a valid species.")
+    aas = list(r) + ["L"]
+    g = grammar.predict(species, aas, False, False)
+    return grammar.explain(species, aas, g)
 
 
 @app.get("/api/v1/aminoacids")

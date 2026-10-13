@@ -274,9 +274,8 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
         # MLST: never lets a typing problem break the prediction
         ms = None
         try:
-            qp = mlst.query_path(species)
-            if qp:
-                ms = mlst.type_hits(species, _blast(qp, asm, td, "mlst"))
+            if mlst.query_path(species):
+                ms = mlst.type_genome(species, seqs, lambda qp, tag: _blast(qp, asm, td, tag), td)
         except Exception as e:  # noqa: BLE001
             ms = {"st": None, "status": "error", "note": f"MLST could not be run ({type(e).__name__})."}
 

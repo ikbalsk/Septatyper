@@ -26,6 +26,8 @@ const callName = c => c === "Resistant" ? "Resistant (Cres)" : c === "Susceptibl
 const badge = (c, sm) => `<span class="badge ${esc(c)} ${sm ? "sm" : ""}">${esc(sm ? c : callName(c))}</span>`;
 const bar = (r, s) => { const t = r + s || 1, p = Math.round(100 * r / t); return `<div class="bar" title="${r} resistant, ${s} susceptible"><i class="r" style="width:${p}%"></i><i class="s" style="width:${100 - p}%"></i></div>`; };
 const mutSep = sep => (sep || "").split("-").map((v, i) => i < 5 ? (v !== WILD[i] ? `<span class="mut">${esc(v)}</span>` : esc(v)) : (v === "1" ? `<span class="mut">1</span>` : esc(v))).join("-");
+const withN = arr => arr.map(([v, n]) => [v, `${v} (${fmt(n)})`]);
+const dl = arr => arr.map(([v, n]) => `<option value="${esc(v)}" label="${fmt(n)} isolates"></option>`).join("");
 const opts = (arr, first) => (first ? `<option value="">${first}</option>` : "") + arr.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
 function setSites(sel, sp, withAll) {
   const list = (META.habitats[sp] || []).filter(h => withAll || h !== "ALL");
@@ -34,12 +36,17 @@ function setSites(sel, sp, withAll) {
 }
 
 /* ------------------------------------------------------------------ router */
-const PAGES = ["home", "predict", "browse", "analytics", "submit", "theory", "data", "about", "curate"];
+const PAGES = ["home", "predict", "browse", "analytics", "submit", "theory", "data", "about", "curate", "calc"];
 function route() {
   const p = (location.hash.replace(/^#\/?/, "") || "home").split("?")[0];
   const page = PAGES.includes(p) ? p : "home";
   $$(".page").forEach(e => e.classList.toggle("on", e.id === "p-" + page));
   $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === page));
+  if (page === "calc") {
+    $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === "theory"));
+    if (META) INIT.calc();
+    return;
+  }
   window.scrollTo(0, 0);
   if (META && !LOADED[page]) { LOADED[page] = true; (INIT[page] || (() => {}))(); }
 }
@@ -101,6 +108,11 @@ function printNow() {
   const ds = $$("details"), was = ds.map(d => d.open); ds.forEach(d => d.open = true);
   window.print(); ds.forEach((d, i) => d.open = was[i]);
 }
+async function maybeGzip(f) {      // smaller upload on a phone connection; the server accepts .gz
+  if (!("CompressionStream" in window) || /\.gz$/i.test(f.name) || f.size < 500000) return f;
+  try { const b = await new Response(f.stream().pipeThrough(new CompressionStream("gzip"))).blob(); return new File([b], f.name + ".gz", { type: "application/gzip" }); }
+  catch (e) { return f; }
+}
 const TIER = { database: "Database", database_other_site: "Database (other site)", grammar: "Grammar (new)" };
 function drawBatch(done, total) {
   const rows = BATCH.map((x, i) => {
@@ -120,7 +132,7 @@ async function runBatch(species, habitat) {
   for (let i = 0; i < PFILES.length; i++) {
     drawBatch(i, PFILES.length);
     const f = PFILES[i], fd = new FormData();
-    fd.append("species", species); fd.append("habitat", habitat); fd.append("qnrB2", "auto"); fd.append("qnrS1", "auto"); fd.append("file", f);
+    fd.append("species", species); fd.append("habitat", habitat); fd.append("qnrB2", "auto"); fd.append("qnrS1", "auto"); fd.append("file", await maybeGzip(f));
     try { const res = await api("/api/v1/predict", { method: "POST", body: fd }); res._name = f.name; BATCH.push({ name: f.name, res }); }
     catch (e) { BATCH.push({ name: f.name, error: e.message }); }
   }
@@ -136,6 +148,27 @@ document.addEventListener("click", e => {
   else if (act === "detail") { const x = BATCH[+b.dataset.i]; if (x && x.res) { $("#bdetail").innerHTML = renderResult(x.res); $("#bdetail").scrollIntoView({ behavior: "smooth" }); } }
 });
 
+function critTable(positions) {
+  return `<div class="scroll"><table><tr><th>Position</th><th>Residue</th><th>Susceptible</th><th>Resistant</th></tr>${positions.map(x => {
+    const s = x.column === "susceptible", note = x.note ? `<span class="alias">${esc(x.note)}</span>` : "";
+    return `<tr><td><b>${esc(x.position)}</b></td><td class="mono">${esc(x.residue)}</td><td class="${s ? "hit-s" : ""}">${esc(x.susceptible)}${s ? note : ""}</td><td class="${s ? "" : "hit-r"}">${esc(x.resistant)}${s ? "" : note}</td></tr>`;
+  }).join("")}</table></div>`;
+}
+function whyBlock(p) {
+  const c = p.criteria; if (!c) return "";
+  const dec = c.decided_by, hy = c.hydrophobicity, res = c.positions.map(x => x.residue).join("");
+  const terms = hy.values.map(v => `${esc(v.residue)} ${v.h}`).join(" + ");
+  const basis = p.tier === "grammar" ? "The call comes from the grammar below." : `The call comes from the database majority rule. The grammar below explains the residue pattern${c.grammar_call !== p.call ? ` (on its own it would say ${esc(c.grammar_call)})` : ""}.`;
+  const nR = c.n_resistant_positions;
+  let h = `<h3>Why ${esc(p.call)}</h3><p class="muted" style="font-size:.9rem">${basis} The highlighted parts apply to this sample.</p>`;
+  h += `<div class="crit ${dec === "votes" ? "hit" : "dim"}"><h4>1. Residue class at each position <span class="tag">${dec === "votes" ? "decides this sample" : "context"}</span></h4>${critTable(c.positions)}<p style="margin:8px 0 0;font-size:.92rem">${nR} of 4 positions are in the Resistant column. Two or more gives Resistant, none gives Susceptible, exactly one goes to criterion 2.</p></div>`;
+  h += `<div class="crit ${dec === "hydrophobicity" ? "hit" : "dim"}"><h4>2. Mean hydrophobicity &lt;H&gt; against the cutoff <span class="tag">${dec === "hydrophobicity" ? "decides this sample" : nR === 1 ? "context" : "not needed here"}</span></h4>
+    <div class="formula">&lt;H&gt; = (${terms}) / 4 = ${hy.sum} / 4 = <b>${hy.mean}</b></div>
+    <p style="margin:8px 0 0;font-size:.92rem">Cutoff <b>${hy.cutoff}</b>. &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} the cutoff, which points to ${hy.side === "above" ? "Resistant" : "Susceptible"}. It only decides when exactly one position is in the Resistant column.
+    <a class="calc-link" href="#/calc?r=${esc(res)}">How is &lt;H&gt; calculated?</a> <a class="calc-link" href="#/calc?r=${esc(res)}&s=cutoff">Where does ${hy.cutoff} come from?</a></p></div>`;
+  h += `<div class="crit ${dec === "override" ? "hit" : "dim"}"><h4>3. Septatype overrides <span class="tag">${dec === "override" ? "decides this sample" : "not applied"}</span></h4><ul style="margin:0;padding-left:20px;font-size:.92rem">${c.overrides.map(o => `<li class="${o.fired ? "ovr-hit" : ""}">${esc(o.text)}${o.fired ? ": applied, call is Resistant" : ""}</li>`).join("")}</ul></div>`;
+  return h;
+}
 function renderResult(r, extra) {
   const p = r.prediction, a = r.analysis;
   LAST = r;
@@ -156,7 +189,7 @@ function renderResult(r, extra) {
       h += `<div class="info">RecN-346 uses the ctg codon for leucine, a high-usage synonymous change flagged in <i>S. enterica</i>.</div>`;
     const ml = a && a.mlst;
     if (ml) {
-      h += `<h3>Sample sequence type</h3><p>${ml.st ? `<b class="mono">${esc(ml.st)}</b>${ml.cc ? `, clonal complex ${esc(ml.cc)}` : ""}` : `<span class="muted">${esc(ml.note || "Not typed")}</span>`} <span class="muted">${esc(ml.scheme_name || "")} MLST${ml.loci_total ? `, ${ml.loci_exact} of ${ml.loci_total} loci exact` : ""}</span></p>`;
+      h += `<h3>Sample sequence type</h3><p>${ml.st ? `<b class="mono">${esc(ml.st)}</b>` : `<span class="muted">${esc(ml.note || "Not typed")}</span>`} <span class="muted">${esc(ml.scheme_name || "")} MLST${ml.loci_total ? `, ${ml.loci_exact} of ${ml.loci_total} loci exact` : ""}</span></p>`;
       if (ml.alleles) h += `<details><summary>MLST alleles</summary><div class="scroll"><table><tr>${Object.keys(ml.alleles).map(k => `<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(ml.alleles).map(v => `<td class="mono">${esc(v)}</td>`).join("")}</tr></table></div></details>`;
     }
     if (p.known) {
@@ -169,8 +202,8 @@ function renderResult(r, extra) {
     } else if (p.similar && p.similar.length) {
       h += `<p class="muted" style="margin-top:12px">Known septatypes with the same GyrA/ParC tetratype:</p><div class="scroll"><table><tr><th>Septatype</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th></tr>${p.similar.map(x => `<tr><td class="mono">${esc(x.septatype)}</td><td>${x.n_isolates}</td><td>${x.n_resistant}</td><td>${x.n_susceptible}</td></tr>`).join("")}</table></div>`;
     }
-    h += `<h3>Why</h3><p class="stat">Combined mean hydrophobicity &lt;H&gt; of GyrA-83, GyrA-87, ParC-80 and ParC-84: <b>${p.mean_h}</b> (Eisenberg scale, cutoff 0.0).</p><ul class="why">` +
-      p.mechanism.map(m => `<li><span class="dot ${esc(m.effect)}"></span><span><b>${esc(m.position)} ${esc(m.residue)}</b>. ${esc(m.text)}</span></li>`).join("") + `</ul>`;
+    h += whyBlock(p);
+    h += `<details><summary>Structural reading (schematic)</summary><ul class="why">${p.mechanism.map(m => `<li><span class="dot ${esc(m.effect)}"></span><span><b>${esc(m.position)} ${esc(m.residue)}</b>. ${esc(m.text)}</span></li>`).join("")}</ul></details>`;
     h += `<details><summary>Grammar votes: ${esc(p.grammar.call)} (${esc(p.grammar.rule)})</summary><div class="scroll"><table><tr><th>Position</th><th>Residue</th><th>Votes Resistant</th><th>Reason</th></tr>${p.grammar.votes.map(v => `<tr><td>${esc(v.position)}</td><td class="mono">${esc(v.residue)}</td><td>${v.vote ? "Yes" : "No"}</td><td>${esc(v.why)}</td></tr>`).join("")}</table></div></details>`;
   }
   if (r.warnings && r.warnings.length) h += `<div class="note"><ul>${r.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
@@ -230,7 +263,7 @@ INIT.predict = () => {
       finally { btn.disabled = false; btn.textContent = old; }
       return;
     }
-    $("#presult").innerHTML = `<div class="band muted">${PMODE === "manual" ? "Looking up the septatype" : "Reading the sequence. A full genome takes up to a minute."}</div>`;
+    $("#presult").innerHTML = `<div class="band muted">${PMODE === "manual" ? "Looking up the septatype" : "Compressing, uploading and reading the sequence. Usually a few seconds."}</div>`;
     try {
       let res;
       const species = $("#sp").value, habitat = $("#hb").value;
@@ -241,7 +274,7 @@ INIT.predict = () => {
       } else {
         const fd = new FormData();
         fd.append("species", species); fd.append("habitat", habitat); fd.append("qnrB2", $("#qb").value); fd.append("qnrS1", $("#qs").value);
-        if (PMODE === "file") { if (!PFILE) throw new Error("Choose a FASTA file first."); if (PFILE.size > META.max_upload_mb * 1048576) throw new Error(`File is larger than ${META.max_upload_mb} MB.`); fd.append("file", PFILE); }
+        if (PMODE === "file") { if (!PFILE) throw new Error("Choose a FASTA file first."); if (PFILE.size > META.max_upload_mb * 1048576) throw new Error(`File is larger than ${META.max_upload_mb} MB.`); fd.append("file", await maybeGzip(PFILE)); }
         else { if (!$("#seq").value.trim()) throw new Error("Paste a nucleotide sequence first."); fd.append("sequence", $("#seq").value); }
         res = await api("/api/v1/predict", { method: "POST", body: fd });
       }
@@ -300,12 +333,12 @@ async function bvNote() {
 INIT.browse = async () => {
   const f = META.facets;
   $("#f-sp").innerHTML = opts(Object.entries(SP), "All");
-  $("#f-st").innerHTML = opts(f.st.slice(0, 60).map(x => [x, x]), "All");
-  $("#f-country").innerHTML = opts(f.country.map(x => [x, x]), "All");
+  $("#dl-st").innerHTML = dl(f.st);
+  $("#f-country").innerHTML = opts(withN(f.country), "All");
   bvNote();
   let t; const reload = () => { BS.page = 1; loadBrowse(); };
-  $$("#p-browse select, #p-browse input[type=number], #f-wins").forEach(e => e.onchange = reload);
-  $$("#p-browse input[type=search]").forEach(e => e.oninput = () => { clearTimeout(t); t = setTimeout(reload, 350); });
+  $$("#p-browse select, #p-browse input[type=number], #f-wins, #f-st").forEach(e => e.onchange = reload);
+  $$("#p-browse input[type=search]:not(#f-st)").forEach(e => e.oninput = () => { clearTimeout(t); t = setTimeout(reload, 350); });
   $("#b-prev").onclick = () => { BS.page--; loadBrowse(); }; $("#b-next").onclick = () => { BS.page++; loadBrowse(); };
   $("#f-reset").onclick = () => { $$("#p-browse .filters select, #p-browse .filters input").forEach(e => e.value = ""); $("#f-wins").checked = false; reload(); };
   loadBrowse();
@@ -326,7 +359,9 @@ function loadPlotly() {
 async function loadMap() {
   const p = new URLSearchParams(); [["species", "#g-sp"], ["st", "#g-st"], ["tetratype", "#g-tt"], ["phenotype", "#g-ph"]].forEach(([k, s]) => { if ($(s).value) p.set(k, $(s).value); });
   const d = await api("/api/v1/stats/geography?" + p);
-  $("#g-table").innerHTML = `<tr><th>Country</th><th>Isolates</th><th>Resistant</th></tr>` + d.rows.slice(0, 15).map(r => `<tr><td>${esc(r.country)}</td><td class="stat">${fmt(r.n)}</td><td class="stat">${fmt(r.res)}</td></tr>`).join("");
+  const tot = d.rows.reduce((a, r) => a + r.n, 0), res = d.rows.reduce((a, r) => a + r.res, 0);
+  $("#g-sum").textContent = d.rows.length ? `${d.rows.length} countries, ${fmt(tot)} isolates (${fmt(res)} resistant)${d.no_country ? `. ${d.no_country} more with no country recorded.` : ""}` : "No isolates match these filters.";
+  $("#g-table").innerHTML = `<tr><th>Country</th><th>Isolates</th><th>Resistant</th><th>% resistant</th></tr>` + d.rows.map(r => `<tr><td>${esc(r.country)}</td><td class="stat">${fmt(r.n)}</td><td class="stat">${fmt(r.res)}</td><td class="stat">${Math.round(100 * r.res / r.n)}%</td></tr>`).join("");
   try {
     await loadPlotly();
     const dark = matchMedia("(prefers-color-scheme: dark)").matches;
@@ -339,9 +374,9 @@ async function loadMap() {
 INIT.analytics = () => {
   $("#a-sp").innerHTML = opts(Object.entries(SP)); $("#a-sp").onchange = loadBars; loadBars();
   $("#g-sp").innerHTML = opts(Object.entries(SP), "All");
-  $("#g-st").innerHTML = opts(META.facets.st.slice(0, 15).map(x => [x, x]), "All");
-  $("#g-tt").innerHTML = opts(META.facets.tetratype.slice(0, 12).map(x => [x, x]), "All");
-  $$("#p-analytics .filters select").forEach(e => e.onchange = loadMap); loadMap();
+  $("#dl-st2").innerHTML = dl(META.facets.st);
+  $("#g-tt").innerHTML = opts(withN(META.facets.tetratype), "All");
+  $$("#p-analytics .filters select, #g-st").forEach(e => e.onchange = loadMap); loadMap();
 };
 
 /* ------------------------------------------------------------------ submit */
@@ -361,7 +396,7 @@ INIT.submit = () => {
       const f = $("#s-file").files[0]; if (!f) throw new Error("Choose a genome FASTA file.");
       const fd = new FormData();
       [["species", "#s-sp"], ["habitat", "#s-hb"], ["genome_id", "#s-gid"], ["country", "#s-country"], ["year", "#s-year"], ["source_text", "#s-src"], ["mic", "#s-mic"], ["lab_phenotype", "#s-ph"], ["email", "#s-email"]].forEach(([k, s]) => fd.append(k, $(s).value.trim()));
-      fd.append("genome_name", $("#s-name").dataset.name || ""); fd.append("file", f);
+      fd.append("genome_name", $("#s-name").dataset.name || ""); fd.append("file", await maybeGzip(f));
       const r = await api("/api/v1/submissions", { method: "POST", body: fd });
       const msg = { needs_review: "Needs review: the septatype is new or the prediction disagrees with your laboratory result.", pending: "Pending: the prediction matches your result or no result was given. A curator will check it." }[r.status] || r.status;
       $("#s-result").innerHTML = renderResult(r.result, `<div class="info"><b>Submission ${esc(r.job_id)}</b><br>${esc(msg)}${r.matches === null ? " Without a laboratory phenotype the isolate cannot be approved." : ""}</div>`);
@@ -427,6 +462,54 @@ INIT.theory = async () => {
     $("#t-valid").innerHTML = h;
     $("#t-aa").innerHTML = `<tr><th>Residue</th><th>Name</th><th>Hydrophobicity</th><th>Class</th></tr>` + aa.rows.sort((a, b) => b.hydrophobicity - a.hydrophobicity).map(x => `<tr><td class="mono">${x.aa}</td><td>${esc(x.name)}</td><td class="stat">${x.hydrophobicity.toFixed(2)}</td><td>${esc(x.class)}</td></tr>`).join("");
   } catch (e) { $("#t-valid").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+};
+
+/* ------------------------------------------------------------------- calculation */
+INIT.calc = async () => {
+  const qs = new URLSearchParams(location.hash.split("?")[1] || "");
+  const start = (qs.get("r") || "LNIE").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  let aa, cs;
+  try { [aa, cs] = await Promise.all([api("/api/v1/aminoacids"), api("/api/v1/stats/cutoff")]); }
+  catch (e) { $("#calc-body").innerHTML = `<div class="band"><div class="err">${esc(e.message)}</div></div>`; return; }
+  const rows = aa.rows.slice().sort((a, b) => a.hydrophobicity - b.hydrophobicity);
+  const pos = rows.filter(x => x.hydrophobicity > 0), neg = rows.filter(x => x.hydrophobicity < 0);
+  const sp = pos.reduce((a, x) => a + x.hydrophobicity, 0), sn = neg.reduce((a, x) => a + x.hydrophobicity, 0), sum = rows.reduce((a, x) => a + x.hydrophobicity, 0);
+  const cut = t => t.map(x => `<tr><td class="num">${x.cutoff.toFixed(1)}</td><td class="num">${x.accuracy ?? "-"}%</td></tr>`).join("");
+  const ctab = (t, best) => `<div class="scroll"><table class="step"><tr><th class="num">Cutoff</th><th class="num">Isolates called correctly</th></tr>${t.filter(x => Math.abs(x.cutoff * 10 % 2) < 1e-6).map(x => `<tr${x.cutoff === best.cutoff ? ' class="hit-row"' : ""}><td class="num">${x.cutoff.toFixed(1)}</td><td class="num">${x.accuracy}%${x.cutoff === 0 ? " (used by the site)" : ""}${x.cutoff === best.cutoff ? " (best on this grid)" : ""}</td></tr>`).join("")}</table></div>`;
+  $("#calc-body").innerHTML = `
+  <div class="band"><h3>1. The hydrophobicity scale</h3>
+    <p>Each amino acid has a hydrophobicity value H from the scale in the paper (the Eisenberg normalised consensus scale). Negative means hydrophilic, positive means hydrophobic.</p>
+    <div class="scroll"><table class="step"><tr><th>Amino acid</th><th>Letter</th><th class="num">H</th><th>Class</th></tr>${rows.map(x => `<tr><td>${esc(x.name)}</td><td class="mono">${x.aa}</td><td class="num">${x.hydrophobicity.toFixed(2)}</td><td>${esc(x.class)}</td></tr>`).join("")}</table></div></div>
+  <div class="band"><h3>2. Calculate &lt;H&gt; for any four residues</h3>
+    <p>&lt;H&gt; is the mean of H over the four residues that form the tetratype: GyrA-83, GyrA-87, ParC-80 and ParC-84. Type them in that order.</p>
+    <label for="calc-in">Four residues, for example LNIE</label>
+    <input type="text" id="calc-in" maxlength="4" value="${esc(start)}" style="max-width:160px;text-transform:uppercase;font-family:var(--mono);margin-bottom:12px">
+    <div id="calc-steps"></div></div>
+  <div class="band" id="calc-cutoff"><h3>3. Where the cutoff comes from</h3>
+    <p><b>The scale is centred on zero.</b> The positive values add up to ${sp.toFixed(2)} and the negative values add up to ${sn.toFixed(2)}, so all 20 values sum to ${Math.abs(sum) < 1e-9 ? "0.00" : sum.toFixed(2)} and their mean is ${Math.abs(sum / 20) < 1e-9 ? "0.00" : (sum / 20).toFixed(2)}. Zero is therefore the midpoint between the hydrophilic and hydrophobic sides, and it is the cutoff the site uses. It was <b>not fitted</b> to the isolates.</p>
+    <p><b>Check against the data.</b> Across the ${fmt(cs.n_isolates)} reference isolates the mean &lt;H&gt; is <b>${cs.mean_resistant}</b> for resistant and <b>${cs.mean_susceptible}</b> for susceptible isolates, so &lt;H&gt; does separate the two groups on average.</p>
+    <p>Accuracy of &quot;&lt;H&gt; above the cutoff means Resistant&quot; over all isolates (best on this grid: <b>${cs.best_all.cutoff.toFixed(1)}</b>, ${cs.best_all.accuracy}%):</p>${ctab(cs.all, cs.best_all)}
+    <p style="margin-top:12px">The case where &lt;H&gt; actually decides is a single Resistant position. For these ${fmt(cs.n_single_vote)} isolates (${fmt(cs.single_vote_resistant)} resistant) &lt;H&gt; alone is a weak separator${cs.best_single_vote ? ` (best on this grid: <b>${cs.best_single_vote.cutoff.toFixed(1)}</b>, ${cs.best_single_vote.accuracy}%)` : ""}:</p>${ctab(cs.single_vote, cs.best_single_vote || { cutoff: 0 })}
+    <p class="muted" style="font-size:.9rem;margin-top:8px">This is one reason the grammar is only a fallback. When a septatype was seen in the reference isolates, the majority rule is used instead. These tables use the same isolates that define the rules, so they are a description, not a validation.</p></div>
+  <div class="band"><h3>4. Residue classes</h3>
+    <div class="scroll"><table><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>
+    <tr><td>GyrA-83</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
+    <tr><td>GyrA-87</td><td>Negatively charged residue</td><td>Polar or uncharged residue</td></tr>
+    <tr><td>ParC-80</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
+    <tr><td>ParC-84</td><td>Negatively charged residue</td><td>Uncharged or negatively charged residue</td></tr></table></div></div>`;
+  const draw = async r => {
+    const el = $("#calc-steps");
+    if (r.length !== 4 || /[^ACDEFGHIKLMNPQRSTVWY]/.test(r)) { el.innerHTML = `<p class="muted">Type four amino-acid letters.</p>`; return; }
+    try {
+      const c = await api("/api/v1/grammar?residues=" + r), hy = c.hydrophobicity;
+      el.innerHTML = `<div class="scroll"><table class="step"><tr><th>Position</th><th>Residue</th><th class="num">H</th></tr>${hy.values.map(v => `<tr><td>${esc(v.position)}</td><td class="mono">${esc(v.residue)}</td><td class="num">${v.h.toFixed(2)}</td></tr>`).join("")}<tr><td colspan="2"><b>Sum</b></td><td class="num"><b>${hy.sum.toFixed(2)}</b></td></tr><tr><td colspan="2"><b>&lt;H&gt; = sum / 4</b></td><td class="num"><b>${hy.mean.toFixed(3)}</b></td></tr></table></div>
+        <p>Cutoff ${hy.cutoff.toFixed(1)}. &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} it, which points to <b>${hy.side === "above" ? "Resistant" : "Susceptible"}</b>.</p>
+        <p>${c.n_resistant_positions} of 4 positions are in the Resistant column, so ${c.decided_by === "hydrophobicity" ? "<b>&lt;H&gt; decides the call</b> (exactly one position)." : "&lt;H&gt; is not needed: the residue classes already decide."}</p>${critTable(c.positions)}`;
+    } catch (e) { el.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  $("#calc-in").oninput = e => draw(e.target.value.toUpperCase());
+  await draw(start);
+  if (qs.get("s") === "cutoff") $("#calc-cutoff").scrollIntoView({ behavior: "smooth" }); else window.scrollTo(0, 0);
 };
 
 /* -------------------------------------------------------------- data, about */

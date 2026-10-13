@@ -74,23 +74,60 @@ def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = 
     vs = votes(g83, g87, p80, p84)
     n = sum(1 for x in vs if x["vote"])
     h = mean_h([g83, g87, p80, p84])
+    override, decided = None, "votes"
     if n >= 2:
         call, rule = "Resistant", f"{n} of 4 positions vote Resistant"
     elif n == 0:
         call, rule = "Susceptible", "no position votes Resistant"
     elif species == "ssonnei" and next(x for x in vs if x["vote"])["position"] in ("GyrA-83", "GyrA-87"):
-        call, rule = "Resistant", "S. sonnei single GyrA-83 or GyrA-87 change (L-D-S-E, S-Y-S-E pattern)"
+        call, rule, override, decided = "Resistant", "S. sonnei single GyrA-83 or GyrA-87 change (L-D-S-E, S-Y-S-E pattern)", "sonnei_gyr", "override"
     else:
         call = "Resistant" if h > H_CUTOFF else "Susceptible"
-        rule = f"1 vote; mean hydrophobicity {h} is {'above' if h > H_CUTOFF else 'at or below'} {H_CUTOFF}"
+        rule, decided = f"1 vote; mean hydrophobicity {h} is {'above' if h > H_CUTOFF else 'at or below'} {H_CUTOFF}", "hydrophobicity"
     if call == "Susceptible":
         if qnrB or qnrS:
-            call, rule = "Resistant", "qnr gene present on a susceptible baseline (PMQR override)"
+            call, rule, override, decided = "Resistant", "qnr gene present on a susceptible baseline (PMQR override)", "qnr", "override"
         elif species == "ssonnei" and r346 == "F":
-            call, rule = "Resistant", "S. sonnei with RecN-346 F on a susceptible baseline"
+            call, rule, override, decided = "Resistant", "S. sonnei with RecN-346 F on a susceptible baseline", "sonnei_recn", "override"
         elif species == "senterica" and [g83, g87, p80, p84] == list("FDSE") and (recn_codon or "").upper() == "CTG":
-            call, rule = "Resistant", "S. enterica F-D-S-E with RecN-346 codon ctg"
-    return {"call": call, "rule": rule, "votes": vs, "n_votes": n, "mean_h": h}
+            call, rule, override, decided = "Resistant", "S. enterica F-D-S-E with RecN-346 codon ctg", "senterica_ctg", "override"
+    return {"call": call, "rule": rule, "votes": vs, "n_votes": n, "mean_h": h, "override": override, "decided_by": decided}
+
+
+OVERRIDES = [("qnr", None, "A qnr gene is present on a susceptible baseline"),
+             ("sonnei_gyr", "ssonnei", "A single change at GyrA-83 or GyrA-87"),
+             ("sonnei_recn", "ssonnei", "RecN-346 is F on a susceptible baseline"),
+             ("senterica_ctg", "senterica", "F-D-S-E with the RecN-346 ctg codon")]
+ROWS = [("GyrA-83", "Polar residue with -OH group", "Hydrophobic residue"),
+        ("GyrA-87", "Negatively charged residue", "Polar or uncharged residue"),
+        ("ParC-80", "Polar residue with -OH group", "Hydrophobic residue"),
+        ("ParC-84", "Negatively charged residue", "Uncharged or negatively charged residue")]
+
+
+def explain(species: str, aas, g: dict) -> dict:
+    """Three criteria behind a call, laid out like the authors' residue-class table.
+    1 residue class per position, 2 mean hydrophobicity against the cutoff, 3 septatype overrides."""
+    g83, g87, p80, p84, _ = aas
+    pos = []
+    for v, (name, s_txt, r_txt), res in zip(g["votes"], ROWS, (g83, g87, p80, p84)):
+        note = ""
+        if name in ("GyrA-83", "ParC-80") and res not in POLAR_OH and res not in HYDROPHOBIC:
+            note = "no -OH group, so it sits in the Resistant column"
+        elif name == "GyrA-87" and res in BASIC:
+            note = "positively charged, so not negatively charged"
+        elif name == "ParC-84" and res in ACIDIC:
+            note = ("negatively charged, and ParC-80 is hydrophobic, so it counts as Resistant" if v["vote"]
+                    else "negatively charged, and ParC-80 is not hydrophobic, so it counts as Susceptible")
+        pos.append({"position": name, "residue": res, "class": aa_class(res), "column": "resistant" if v["vote"] else "susceptible",
+                    "susceptible": s_txt, "resistant": r_txt, "note": note})
+    vals = [{"position": p["position"], "residue": p["residue"], "h": EISENBERG[p["residue"]]} for p in pos]
+    total = round(sum(x["h"] for x in vals), 3)
+    mean = round(total / 4, 3)
+    ov = [{"key": k, "text": t, "fired": g["override"] == k} for k, sp, t in OVERRIDES if sp in (None, species)]
+    return {"decided_by": g["decided_by"], "n_resistant_positions": g["n_votes"], "positions": pos,
+            "hydrophobicity": {"values": vals, "sum": total, "mean": mean, "cutoff": H_CUTOFF,
+                               "side": "above" if mean > H_CUTOFF else "at_or_below"},
+            "overrides": ov, "grammar_call": g["call"], "rule": g["rule"]}
 
 
 def mechanism(aas) -> list[dict]:

@@ -178,3 +178,27 @@ tr.clk{cursor:pointer} tr.clk:hover td{background:var(--blue-soft)}
   main{padding:0}
   .badge{border:1px solid currentColor}
 }
+.scroll.tall{max-height:420px;overflow:auto}
+
+/* why: three criteria */
+.crit{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0}
+.crit h4{margin:0 0 8px;font:600 1rem var(--sans);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.crit .tag{font:600 .72rem var(--sans);padding:2px 8px;border-radius:999px;background:var(--paper);color:var(--muted)}
+.crit.hit{border-color:var(--gold);box-shadow:0 0 0 3px var(--amber-bg);animation:critPulse 1.2s ease-in-out 4}
+.crit.hit .tag{background:var(--gold);color:#fff}
+.crit.dim{opacity:.68}
+.crit table td,.crit table th{padding:6px 8px}
+td.hit-r{background:var(--res-bg);color:var(--res);font-weight:600}
+td.hit-s{background:var(--sus-bg);color:var(--sus);font-weight:600}
+.crit.hit td.hit-r{animation:pulseR 1.2s ease-in-out 4}
+.crit.hit td.hit-s{animation:pulseS 1.2s ease-in-out 4}
+li.ovr-hit{background:var(--amber-bg);color:var(--amber);font-weight:600;border-radius:4px;padding:2px 6px}
+.crit.hit li.ovr-hit{animation:critPulse 1.2s ease-in-out 4}
+@keyframes critPulse{0%,100%{box-shadow:0 0 0 3px var(--amber-bg)}50%{box-shadow:0 0 0 7px var(--gold)}}
+@keyframes pulseR{0%,100%{background:var(--res-bg);color:var(--res)}50%{background:var(--res);color:#fff}}
+@keyframes pulseS{0%,100%{background:var(--sus-bg);color:var(--sus)}50%{background:var(--sus);color:#fff}}
+@media(prefers-reduced-motion:reduce){.crit.hit,.crit.hit td.hit-r,.crit.hit td.hit-s,.crit.hit li.ovr-hit{animation:none}}
+.formula{font:.95rem var(--mono);background:var(--paper);border-radius:6px;padding:8px 10px;overflow-x:auto;white-space:nowrap}
+.calc-link{font-size:.88rem;white-space:nowrap}
+.step td.num,.step th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.hit-row td{background:var(--amber-bg);font-weight:600}

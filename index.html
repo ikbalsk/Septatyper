@@ -127,7 +127,7 @@
     <div class="filters">
       <div><label for="f-sp">Species</label><select id="f-sp"><option value="">All</option></select></div>
       <div><label for="f-hb">Site</label><select id="f-hb"><option value="">All</option><option value="FECAL">Fecal</option><option value="URINE">Urine</option><option value="RESPIRATORY">Respiratory</option></select></div>
-      <div><label for="f-st">Sequence type</label><select id="f-st"><option value="">All</option></select></div>
+      <div><label for="f-st">Sequence type</label><input type="search" id="f-st" list="dl-st" placeholder="All, or type ST131" autocomplete="off"><datalist id="dl-st"></datalist></div>
       <div><label for="f-country">Country</label><select id="f-country"><option value="">All</option></select></div>
       <div><label for="f-sep">Septatype</label><input type="search" id="f-sep" placeholder="S-D-S-E-L-1-0"></div>
       <div><label for="f-ph">Lab phenotype</label><select id="f-ph"><option value="">All</option><option>Resistant</option><option>Susceptible</option></select></div>
@@ -158,12 +158,13 @@
     <h3>Where is it found?</h3>
     <div class="filters">
       <div><label for="g-sp">Species</label><select id="g-sp"><option value="">All</option></select></div>
-      <div><label for="g-st">Sequence type</label><select id="g-st"><option value="">All</option></select></div>
+      <div><label for="g-st">Sequence type</label><input type="search" id="g-st" list="dl-st2" placeholder="All, or type ST131" autocomplete="off"><datalist id="dl-st2"></datalist></div>
       <div><label for="g-tt">Tetratype</label><select id="g-tt"><option value="">All</option></select></div>
-      <div><label for="g-ph">Phenotype</label><select id="g-ph"><option value="">All</option><option selected>Resistant</option><option>Susceptible</option></select></div>
+      <div><label for="g-ph">Phenotype</label><select id="g-ph"><option value="" selected>All</option><option>Resistant</option><option>Susceptible</option></select></div>
     </div>
     <div id="map"></div>
-    <div class="scroll"><table id="g-table"></table></div>
+    <p id="g-sum" class="muted" style="margin:10px 0 4px"></p>
+    <div class="scroll tall"><table id="g-table"></table></div>
   </div>
 </section>
 
@@ -221,17 +222,25 @@
   </div>
   <div class="band"><h3>Grammar rules</h3>
     <div class="scroll"><table>
-      <tr><th>Position</th><th>Keeps susceptibility</th><th>Votes Resistant</th></tr>
-      <tr><td>GyrA-83</td><td>Hydroxyl residue (S, T, Y)</td><td>Hydrophobic or no hydroxyl</td></tr>
-      <tr><td>GyrA-87</td><td>Acidic residue (D, E)</td><td>Polar, uncharged or other</td></tr>
-      <tr><td>ParC-80</td><td>Hydroxyl residue (S, T, Y)</td><td>Hydrophobic or no hydroxyl</td></tr>
-      <tr><td>ParC-84</td><td>Acidic residue (E, D)</td><td>Not acidic, or acidic next to a hydrophobic ParC-80</td></tr>
+      <tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>
+      <tr><td>GyrA-83</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
+      <tr><td>GyrA-87</td><td>Negatively charged residue</td><td>Polar or uncharged residue</td></tr>
+      <tr><td>ParC-80</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
+      <tr><td>ParC-84</td><td>Negatively charged residue</td><td>Uncharged or negatively charged residue</td></tr>
     </table></div>
+    <p class="muted" style="font-size:.9rem;margin-top:8px">A negatively charged ParC-84 counts in the Resistant column only when ParC-80 is hydrophobic.</p>
+    <p><a href="#/calc">See the worked calculation of the hydrophobicity value and the cutoff</a></p>
     <p style="margin-top:12px">Two or more votes mean Resistant and none means Susceptible. One vote is settled by the combined mean hydrophobicity &lt;H&gt; of the four residues against 0.0 (Eisenberg scale). Overrides on a susceptible baseline: a qnr gene present gives Resistant, <i>S. sonnei</i> with RecN-346 F gives Resistant, <i>S. enterica</i> F-D-S-E with the ctg codon gives Resistant, and a single GyrA-83 or GyrA-87 change in <i>S. sonnei</i> gives Resistant.</p>
     <p class="muted">The grammar is only used for septatypes not seen in the reference isolates. Residue classes marked as assumptions (for example G, P and C counted as hydrophobic) are set in <code>app/grammar.py</code>.</p>
   </div>
   <div class="band"><h3>Performance validation</h3><div id="t-valid"></div></div>
   <div class="band"><h3>Amino acid hydrophobicity (Eisenberg normalised consensus)</h3><div class="scroll"><table id="t-aa"></table></div></div>
+</section>
+
+<!-- CALC -->
+<section id="p-calc" class="page">
+  <div class="page-head"><h2>How the call is calculated</h2><p>Residue classes, the hydrophobicity value and the cutoff, with worked numbers.</p></div>
+  <div id="calc-body"><div class="band muted">Loading</div></div>
 </section>
 
 <!-- DATA -->
