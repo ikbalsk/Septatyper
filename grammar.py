@@ -5,7 +5,7 @@ Residue classes and voting rules follow the project's written rules; the places 
 the rules were silent are marked ASSUMPTION and are easy to change here.
 
   GyrA-83, ParC-80 : residue with an -OH group (S, T, Y) keeps the Mg2+-water bridge:
-                     no vote. Anything else (hydrophobic or no hydroxyl) votes Resistant.
+                     no vote. Anything else (hydrophobic/no hydroxyl group) votes Resistant.
   GyrA-87          : acidic residue (D, E) keeps the negative charge: no vote. Anything else votes Resistant.
   ParC-84          : a non-acidic residue votes Resistant. An acidic residue (E, D) votes Resistant
                      only when ParC-80 is hydrophobic (context dependence).
@@ -29,6 +29,7 @@ NAMES = {"A": "Alanine", "R": "Arginine", "N": "Asparagine", "D": "Aspartate", "
          "W": "Tryptophan", "Y": "Tyrosine", "V": "Valine"}
 POLAR_OH = set("STY")
 ACIDIC = set("DE")
+POLAR_UNCHARGED = set("STYNQ")     # polar side chain, no charge
 HYDROPHOBIC = set("AVILMFWPGC")  # ASSUMPTION: non-polar side chains incl. G, P, C
 BASIC = set("KRH")
 H_CUTOFF = 0.0
@@ -36,7 +37,7 @@ H_CUTOFF = 0.0
 
 def aa_class(a: str) -> str:
     if a in POLAR_OH:
-        return "polar, hydroxyl"
+        return "polar, hydroxyl group"
     if a in ACIDIC:
         return "acidic (negative)"
     if a in BASIC:
@@ -54,11 +55,11 @@ def votes(g83, g87, p80, p84) -> list[dict]:
     p80_hydrophobic = p80 in HYDROPHOBIC
     v = [
         {"position": "GyrA-83", "residue": g83, "vote": g83 not in POLAR_OH,
-         "why": "hydroxyl lost" if g83 not in POLAR_OH else "hydroxyl kept"},
+         "why": "hydroxyl group lost" if g83 not in POLAR_OH else "hydroxyl group kept"},
         {"position": "GyrA-87", "residue": g87, "vote": g87 not in ACIDIC,
          "why": "negative charge lost" if g87 not in ACIDIC else "negative charge kept"},
         {"position": "ParC-80", "residue": p80, "vote": p80 not in POLAR_OH,
-         "why": "hydroxyl lost" if p80 not in POLAR_OH else "hydroxyl kept"},
+         "why": "hydroxyl group lost" if p80 not in POLAR_OH else "hydroxyl group kept"},
     ]
     if p84 in ACIDIC:
         v.append({"position": "ParC-84", "residue": p84, "vote": p80_hydrophobic,
@@ -94,17 +95,43 @@ def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = 
     return {"call": call, "rule": rule, "votes": vs, "n_votes": n, "mean_h": h, "override": override, "decided_by": decided}
 
 
-OVERRIDES = [("qnr", None, "A qnr gene is present on a susceptible baseline"),
-             ("sonnei_gyr", "ssonnei", "A single change at GyrA-83 or GyrA-87"),
-             ("sonnei_recn", "ssonnei", "RecN-346 is F on a susceptible baseline"),
-             ("senterica_ctg", "senterica", "F-D-S-E with the RecN-346 ctg codon")]
+OVERRIDES = [("qnr", None, "A qnr gene is present"),
+             ("sonnei_gyr", "ssonnei", "One change at GyrA-83 or GyrA-87"),
+             ("sonnei_recn", "ssonnei", "RecN-346 is F"),
+             ("senterica_ctg", "senterica", "F-D-S-E with the ctg codon at RecN-346")]
 ROWS = [("GyrA-83", "Polar residue with -OH group", "Hydrophobic residue"),
         ("GyrA-87", "Negatively charged residue", "Polar or uncharged residue"),
         ("ParC-80", "Polar residue with -OH group", "Hydrophobic residue"),
         ("ParC-84", "Negatively charged residue", "Uncharged or negatively charged residue")]
 
 
-def explain(species: str, aas, g: dict) -> dict:
+def h_block(aas4) -> dict:
+    """Hydrophobicity worked out for four residues: each H value, the sum and the mean."""
+    names = ("GyrA-83", "GyrA-87", "ParC-80", "ParC-84")
+    vals = [{"position": n, "residue": a, "h": EISENBERG[a]} for n, a in zip(names, aas4)]
+    total = round(sum(v["h"] for v in vals), 3)
+    return {"residues": "".join(aas4), "values": vals, "sum": total, "mean": round(total / 4, 3)}
+
+
+def _terms(pos: str, res: str, vote: bool):
+    """The words of the authors' residue-class table, each flagged when it describes this residue.
+    Returns (susceptible terms, resistant terms, susceptible suffix, resistant suffix)."""
+    charged = ACIDIC | BASIC
+    if pos in ("GyrA-83", "ParC-80"):
+        S, R, sS, sR = [("Polar residue with -OH group", res in POLAR_OH)], [("Hydrophobic", res in HYDROPHOBIC)], "", " residue"
+    elif pos == "GyrA-87":
+        S = [("Negatively charged", res in ACIDIC)]
+        R, sS, sR = [("Polar", res in POLAR_UNCHARGED), ("uncharged", res not in charged)], " residue", " residue"
+    else:
+        S = [("Negatively charged", res in ACIDIC and not vote)]
+        R, sS, sR = [("Uncharged", res not in charged), ("negatively charged", res in ACIDIC and vote)], " residue", " residue"
+    active = R if vote else S
+    if not any(hit for _, hit in active):      # no single word fits, so the whole cell is the match
+        active[:] = [(t, True) for t, _ in active]
+    return S, R, sS, sR
+
+
+def explain(species: str, aas, g: dict, ref4=None) -> dict:
     """Three criteria behind a call, laid out like the authors' residue-class table.
     1 residue class per position, 2 mean hydrophobicity against the cutoff, 3 septatype overrides."""
     g83, g87, p80, p84, _ = aas
@@ -112,41 +139,46 @@ def explain(species: str, aas, g: dict) -> dict:
     for v, (name, s_txt, r_txt), res in zip(g["votes"], ROWS, (g83, g87, p80, p84)):
         note = ""
         if name in ("GyrA-83", "ParC-80") and res not in POLAR_OH and res not in HYDROPHOBIC:
-            note = "no -OH group, so it sits in the Resistant column"
+            note = "no -OH group, counted as resistant"
         elif name == "GyrA-87" and res in BASIC:
-            note = "positively charged, so not negatively charged"
+            note = "positively charged, counted as resistant"
+        elif name == "ParC-84" and res in BASIC:
+            note = "positively charged, counted as resistant"
         elif name == "ParC-84" and res in ACIDIC:
-            note = ("negatively charged, and ParC-80 is hydrophobic, so it counts as Resistant" if v["vote"]
-                    else "negatively charged, and ParC-80 is not hydrophobic, so it counts as Susceptible")
+            note = ("acidic, but ParC-80 is hydrophobic: counted as resistant" if v["vote"]
+                    else "acidic, and ParC-80 is not hydrophobic: stays susceptible")
+        S, R, sS, sR = _terms(name, res, v["vote"])
+        fmt = lambda terms, suf: [{"text": t, "hit": h} for t, h in terms]  # noqa: E731
         pos.append({"position": name, "residue": res, "class": aa_class(res), "column": "resistant" if v["vote"] else "susceptible",
-                    "susceptible": s_txt, "resistant": r_txt, "note": note})
-    vals = [{"position": p["position"], "residue": p["residue"], "h": EISENBERG[p["residue"]]} for p in pos]
-    total = round(sum(x["h"] for x in vals), 3)
-    mean = round(total / 4, 3)
+                    "susceptible": s_txt, "resistant": r_txt,
+                    "susceptible_parts": fmt(S, sS), "susceptible_suffix": sS,
+                    "resistant_parts": fmt(R, sR), "resistant_suffix": sR, "note": note})
+    sample = h_block([p["residue"] for p in pos])
+    ref = h_block(list(ref4) if ref4 else list("SDSE"))
     ov = [{"key": k, "text": t, "fired": g["override"] == k} for k, sp, t in OVERRIDES if sp in (None, species)]
     return {"decided_by": g["decided_by"], "n_resistant_positions": g["n_votes"], "positions": pos,
-            "hydrophobicity": {"values": vals, "sum": total, "mean": mean, "cutoff": H_CUTOFF,
-                               "side": "above" if mean > H_CUTOFF else "at_or_below"},
-            "overrides": ov, "grammar_call": g["call"], "rule": g["rule"]}
+            "hydrophobicity": {"values": sample["values"], "sum": sample["sum"], "mean": sample["mean"], "cutoff": H_CUTOFF,
+                               "side": "above" if sample["mean"] > H_CUTOFF else "at_or_below"},
+            "reference": ref, "overrides": ov, "grammar_call": g["call"], "rule": g["rule"]}
 
 
 def mechanism(aas) -> list[dict]:
-    """Plain-language reading of each position, for the Theory page and result panel.
+    """Plain-language reading of each position, for the result panel and the Theory page.
     A schematic reading of the grammar, not a structure calculation."""
     g83, g87, p80, p84, _ = aas
     out = []
     for pos, res in (("GyrA-83", g83), ("ParC-80", p80)):
         ok = res in POLAR_OH
         out.append({"position": pos, "residue": res, "effect": "intact" if ok else "lost", "kind": "H-bond",
-                    "text": f"{res} keeps a hydroxyl that can hydrogen-bond the water-Mg2+ bridge to ciprofloxacin." if ok
-                    else f"{res} has no hydroxyl, so the hydrogen bond to the water-Mg2+ bridge cannot form."})
+                    "text": f"{res} keeps its hydroxyl group, which can hydrogen-bond the water-Mg2+ bridge that holds ciprofloxacin." if ok
+                    else f"{res} has no hydroxyl group, so it cannot hydrogen-bond the water-Mg2+ bridge."})
     ok87 = g87 in ACIDIC
     out.append({"position": "GyrA-87", "residue": g87, "effect": "intact" if ok87 else "lost", "kind": "charge",
                 "text": f"{g87} keeps the negative charge that holds the Mg2+ bridge." if ok87
-                else f"{g87} removes the negative charge, so the Mg2+ bridge is held more weakly."})
+                else f"{g87} has no negative charge, so the Mg2+ bridge is held more weakly."})
     if p84 in ACIDIC and p80 in HYDROPHOBIC:
         out.append({"position": "ParC-84", "residue": p84, "effect": "context", "kind": "charge",
-                    "text": f"{p84} is still acidic, but ParC-80 is hydrophobic, so the pocket around it is less polar (context-dependent)."})
+                    "text": f"{p84} is still acidic, but ParC-80 is hydrophobic, so the pocket around it is less polar."})
     elif p84 in ACIDIC:
         out.append({"position": "ParC-84", "residue": p84, "effect": "intact", "kind": "charge",
                     "text": f"{p84} keeps the negative charge next to the Mg2+ bridge."})

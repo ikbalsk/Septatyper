@@ -58,7 +58,7 @@
   </div>
   <div class="band modules">
     <h2>Four modules</h2>
-    <a href="#/predict"><b>Predict</b><span>Upload or paste a sequence, or enter the residues, and get the septatype and phenotype.</span></a>
+    <a href="#/predict"><b>Predict</b><span>Upload or paste a sequence, or enter the residues, and get the septatype, the sequence type and the phenotype.</span></a>
     <a href="#/browse"><b>Browse</b><span>Filter the repository by species, site, ST, septatype, country and year. Compare lab, BV-BRC and SeptaTyper calls.</span></a>
     <a href="#/submit"><b>Submit</b><span>Contribute an isolate. Curators check the lab result against the prediction before it goes live.</span></a>
     <a href="#/theory"><b>Theory</b><span>The context-dependent grammar, an interactive view of the binding pocket and the validation figures.</span></a>
@@ -136,7 +136,7 @@
       <div><label for="f-q">Search ID or name</label><input type="search" id="f-q"></div>
       <div><label for="f-src">Source</label><select id="f-src"><option value="">All</option><option value="founding">Founding set</option><option value="community">Community</option></select></div>
     </div>
-    <div class="checks" style="margin-top:0"><label><input type="checkbox" id="f-wins" disabled>Only where SeptaTyper is right and BV-BRC is wrong</label></div>
+    <div class="checks" style="margin-top:0"><label><input type="checkbox" id="f-wins" disabled>Only where SeptaTyper matches the laboratory phenotype but the BV-BRC computational prediction does not</label></div>
     <div id="bv-note"></div>
     <div class="toolbar"><span id="b-count" class="muted"></span>
       <span><a class="btn line" id="dl-csv" href="#">Download CSV</a> <a class="btn line" id="dl-json" href="#">Download JSON</a> <button class="btn line" id="f-reset" type="button">Reset</button></span></div>
@@ -252,13 +252,13 @@
   <div class="band"><h3>Endpoints</h3>
     <div class="scroll"><table>
       <tr><th>Method and path</th><th>Purpose</th></tr>
-      <tr><td class="mono">GET /api/v1/isolates</td><td>Filter by species, habitat, st, country, septatype, tetratype, phenotype, year_from, year_to, wins, q. Paged with page and per_page.</td></tr>
+      <tr><td class="mono">GET /api/v1/isolates</td><td>Filter by species, habitat, st, country, septatype, tetratype, phenotype, year_from, year_to, wins, q. Each isolate carries its <span class="mono">st</span>. Paged with page and per_page.</td></tr>
       <tr><td class="mono">GET /api/v1/isolates/{genome_id}</td><td>One isolate, with its BV-BRC link.</td></tr>
       <tr><td class="mono">GET /api/v1/rules</td><td>Rules table for a species and habitat.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/accuracy</td><td>Accuracy, benchmark against BV-BRC and edge cases.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/geography</td><td>Counts per country.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/septatypes</td><td>Septatype frequency by site.</td></tr>
-      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence.</td></tr>
+      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence. The reply holds the septatype, the call, and <span class="mono">analysis.mlst</span> with the sample ST and its alleles.</td></tr>
       <tr><td class="mono">POST /api/v1/predict/manual</td><td>JSON with the five residues and qnr flags.</td></tr>
       <tr><td class="mono">POST /api/v1/submissions</td><td>Community submission (enters the curation queue).</td></tr>
     </table></div>

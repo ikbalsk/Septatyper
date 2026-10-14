@@ -199,6 +199,9 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
     """qnr_override: {'qnrB2': 'present'|'absent'|None, 'qnrS1': ...} for gene-level input."""
     qnr_override = qnr_override or {}
     chrom, qnrB_fa, qnrS_fa = _load_refs(species)
+    ref_info = {"species": REF_SPECIES[species], "genes": {g: r.description.split("|")[-1].strip() for g, r in chrom.items()},
+                "qnr": {"qnrB": next(SeqIO.parse(qnrB_fa, "fasta")).id.replace("|", " "),
+                        "qnrS": next(SeqIO.parse(qnrS_fa, "fasta")).id.replace("|", " ")}}
     seqs, names, total = read_fasta(fasta)
     warnings: list[str] = []
 
@@ -219,9 +222,10 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
             ref = str(rec.seq).upper()
             cand = [h for h in hits if h["qseqid"] == g]
             best = max(cand, key=lambda h: h["bitscore"]) if cand else None
-            info = {"found": False}
+            ref_acc = rec.description.split("|")[-1].strip()
+            info = {"found": False, "reference": ref_acc}
             if best and best["pident"] >= MIN_ID_CHROM:
-                info = {"found": True, "identity": round(best["pident"], 1), "coverage": round(100 * best["qcov"], 1),
+                info = {"found": True, "reference": ref_acc, "identity": round(best["pident"], 1), "coverage": round(100 * best["qcov"], 1),
                         "contig": names[best["sseqid"]], "strand": "+" if best["sstart"] <= best["send"] else "-"}
                 if best["qcov"] < MIN_COV:
                     warnings.append(f"{g}: only {info['coverage']}% of the reference gene was covered (partial gene or contig break).")
@@ -231,8 +235,8 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
                 region = _extract_region(seqs[best["sseqid"]], best)
                 gmap = _ref_to_region_map(region, ref)
             else:
-                warnings.append(f"{g}: not found (best identity {best['pident'] if best else 0}%). "
-                                "Wrong species, or the gene is missing from the input.")
+                warnings.append(f"{g} was not found (best match {best['pident'] if best else 0}% identity). "
+                                "Check the species, or the gene may be missing from the file.")
                 gmap = region = None
             genes[g] = info
             for gg, pos in POSITIONS:
@@ -242,6 +246,7 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
                 p = {"gene": g, "pos": pos, "codon": None, "aa": None}
                 ref_codon = ref[(pos - 1) * 3:(pos - 1) * 3 + 3]
                 p["ref_aa"] = _aa(ref_codon) if len(ref_codon) == 3 else None
+                p["ref_codon"] = ref_codon if len(ref_codon) == 3 else None
                 if gmap is not None:
                     p["codon"] = _codon(gmap, region, pos)
                     p["aa"] = _aa(p["codon"])
@@ -265,8 +270,10 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
             ov = qnr_override.get(label)
             if ov in ("present", "absent"):
                 present, src = ov == "present", "set by user"
-            qnr[label] = {"present": present, "source": src,
-                          "best_hit": (f"{best['qseqid']} ({best['pident']:.1f}% id, {100*best['qcov']:.0f}% cov)" if best else None)}
+            qnr[label] = {"present": present, "source": src, "reference": next(SeqIO.parse(fa, "fasta")).id.replace("|", " "),
+                          "identity": round(best["pident"], 1) if best else None,
+                          "coverage": round(100 * best["qcov"]) if best else None,
+                          }
         if total < 1_000_000 and not any(qnr_override.get(k) for k in ("qnrB2", "qnrS1")):
             warnings.append("The input is smaller than a bacterial genome. qnr 'absent' only means no qnr "
                             "sequence was in the file. Set qnrB/qnrS manually if you know them.")
@@ -286,5 +293,5 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
             "recN_codon": positions["recN346"]["codon"],
             "recN_syn": ({"CTA": "cta", "CTG": "ctg"}.get(positions["recN346"]["codon"] or "", "other")
                          if positions["recN346"]["aa"] == "L" else None),
-            "warnings": warnings, "mlst": ms,
+            "warnings": warnings, "mlst": ms, "reference": ref_info,
             "input": {"records": len(seqs), "total_bp": total}}

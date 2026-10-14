@@ -122,7 +122,7 @@ function drawBatch(done, total) {
   }).join("");
   const working = done < total;
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing file ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
-    <div class="scroll"><table><tr><th>File</th><th>Septatype</th><th>ST</th><th>Call</th><th>Basis</th><th>Support</th></tr>${rows}</table></div>
+    <div class="scroll"><table><tr><th>File</th><th>Septatype</th><th>ST</th><th>Call</th><th>Call from</th><th>Support</th></tr>${rows}</table></div>
     ${working ? "" : `<div class="actions no-print"><button class="btn solid" data-act="bcsv" type="button">Download CSV</button><button class="btn line" data-act="print" type="button">Print or save as PDF</button></div><p class="muted" style="font-size:.85rem">Tap a row for the full result.</p>`}
     <p class="print-only">SeptaTyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
 }
@@ -148,25 +148,43 @@ document.addEventListener("click", e => {
   else if (act === "detail") { const x = BATCH[+b.dataset.i]; if (x && x.res) { $("#bdetail").innerHTML = renderResult(x.res); $("#bdetail").scrollIntoView({ behavior: "smooth" }); } }
 });
 
+const PROT = { gyrA: "GyrA", parC: "ParC", recN: "RecN" };
+const f2 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(2);
 function critTable(positions) {
+  const cell = (parts, suffix, mine, cls, note) => parts.map(t => mine && t.hit ? `<span class="${cls}">${esc(t.text)}</span>` : esc(t.text)).join(" or ") + esc(suffix) + (mine && note ? `<span class="alias">${esc(note)}</span>` : "");
   return `<div class="scroll"><table><tr><th>Position</th><th>Residue</th><th>Susceptible</th><th>Resistant</th></tr>${positions.map(x => {
-    const s = x.column === "susceptible", note = x.note ? `<span class="alias">${esc(x.note)}</span>` : "";
-    return `<tr><td><b>${esc(x.position)}</b></td><td class="mono">${esc(x.residue)}</td><td class="${s ? "hit-s" : ""}">${esc(x.susceptible)}${s ? note : ""}</td><td class="${s ? "" : "hit-r"}">${esc(x.resistant)}${s ? "" : note}</td></tr>`;
+    const s = x.column === "susceptible";
+    return `<tr><td class="nw"><b>${esc(x.position)}</b></td><td class="mono">${esc(x.residue)}</td><td>${cell(x.susceptible_parts, x.susceptible_suffix, s, "hl-s", x.note)}</td><td>${cell(x.resistant_parts, x.resistant_suffix, !s, "hl-r", x.note)}</td></tr>`;
   }).join("")}</table></div>`;
+}
+/* number line: sample and reference <H> against the cutoff; extra = typical resistant and susceptible isolates */
+function hChart(sample, ref, cutoff, extra) {
+  const lo = -2, hi = 1.5, W = 560, pad = 28, H = extra ? 118 : 94;
+  const x = v => pad + (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * (W - 2 * pad), lab = v => Math.max(64, Math.min(W - 64, x(v)));
+  const col = sample > cutoff ? "var(--res)" : "var(--sus)";
+  const ticks = extra ? [[extra.res, "typical resistant isolate", "var(--res)"], [extra.sus, "typical susceptible isolate", "var(--sus)"]].map(([v, t, c]) =>
+    `<path d="M${x(v)} 60 l-6 11 h12 z" fill="${c}"/><text x="${lab(v)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--muted)">${t} ${f2(v)}</text>`).join("") : "";
+  return `<svg viewBox="0 0 ${W} ${H}" class="hchart" role="img" aria-label="Sample hydrophobicity ${f2(sample)}, reference ${f2(ref)}, cutoff ${f2(cutoff)}">
+    <line x1="${x(lo)}" x2="${x(cutoff)}" y1="48" y2="48" stroke="var(--sus-bg)" stroke-width="14"/><line x1="${x(cutoff)}" x2="${x(hi)}" y1="48" y2="48" stroke="var(--res-bg)" stroke-width="14"/>
+    <text x="${x(lo)}" y="12" font-size="11" fill="var(--muted)">hydrophilic</text><text x="${x(hi)}" y="12" font-size="11" text-anchor="end" fill="var(--muted)">hydrophobic</text>
+    <line x1="${x(cutoff)}" x2="${x(cutoff)}" y1="22" y2="74" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3"/><text x="${x(cutoff)}" y="14" font-size="12" text-anchor="middle" fill="var(--ink)">cutoff ${f2(cutoff)}</text>
+    <circle cx="${x(ref)}" cy="48" r="11" fill="var(--white)" stroke="var(--muted)" stroke-width="3"/><circle cx="${x(sample)}" cy="48" r="7" fill="${col}"/>
+    <text x="${lab(sample)}" y="34" text-anchor="middle" font-size="13" font-weight="600" fill="${col}" class="hs">Sample ${f2(sample)}</text>
+    <text x="${lab(ref)}" y="${extra ? 80 : 82}" text-anchor="middle" font-size="12" fill="var(--muted)">Reference ${f2(ref)}</text>${ticks}</svg>`;
 }
 function whyBlock(p) {
   const c = p.criteria; if (!c) return "";
-  const dec = c.decided_by, hy = c.hydrophobicity, res = c.positions.map(x => x.residue).join("");
-  const terms = hy.values.map(v => `${esc(v.residue)} ${v.h}`).join(" + ");
-  const basis = p.tier === "grammar" ? "The call comes from the grammar below." : `The call comes from the database majority rule. The grammar below explains the residue pattern${c.grammar_call !== p.call ? ` (on its own it would say ${esc(c.grammar_call)})` : ""}.`;
-  const nR = c.n_resistant_positions;
-  let h = `<h3>Why ${esc(p.call)}</h3><p class="muted" style="font-size:.9rem">${basis} The highlighted parts apply to this sample.</p>`;
-  h += `<div class="crit ${dec === "votes" ? "hit" : "dim"}"><h4>1. Residue class at each position <span class="tag">${dec === "votes" ? "decides this sample" : "context"}</span></h4>${critTable(c.positions)}<p style="margin:8px 0 0;font-size:.92rem">${nR} of 4 positions are in the Resistant column. Two or more gives Resistant, none gives Susceptible, exactly one goes to criterion 2.</p></div>`;
-  h += `<div class="crit ${dec === "hydrophobicity" ? "hit" : "dim"}"><h4>2. Mean hydrophobicity &lt;H&gt; against the cutoff <span class="tag">${dec === "hydrophobicity" ? "decides this sample" : nR === 1 ? "context" : "not needed here"}</span></h4>
-    <div class="formula">&lt;H&gt; = (${terms}) / 4 = ${hy.sum} / 4 = <b>${hy.mean}</b></div>
-    <p style="margin:8px 0 0;font-size:.92rem">Cutoff <b>${hy.cutoff}</b>. &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} the cutoff, which points to ${hy.side === "above" ? "Resistant" : "Susceptible"}. It only decides when exactly one position is in the Resistant column.
-    <a class="calc-link" href="#/calc?r=${esc(res)}">How is &lt;H&gt; calculated?</a> <a class="calc-link" href="#/calc?r=${esc(res)}&s=cutoff">Where does ${hy.cutoff} come from?</a></p></div>`;
-  h += `<div class="crit ${dec === "override" ? "hit" : "dim"}"><h4>3. Septatype overrides <span class="tag">${dec === "override" ? "decides this sample" : "not applied"}</span></h4><ul style="margin:0;padding-left:20px;font-size:.92rem">${c.overrides.map(o => `<li class="${o.fired ? "ovr-hit" : ""}">${esc(o.text)}${o.fired ? ": applied, call is Resistant" : ""}</li>`).join("")}</ul></div>`;
+  const dec = c.decided_by, hy = c.hydrophobicity, rf = c.reference, res = c.positions.map(x => x.residue).join("");
+  const terms = v => v.values.map(t => `${esc(t.residue)} ${f2(t.h)}`).join(" + ");
+  const intro = p.tier === "grammar" ? "Call from the grammar, because this septatype is new." : `Call from the database majority rule${c.grammar_call !== p.call ? `. The grammar alone would say ${esc(c.grammar_call)}` : ""}.`;
+  const tag = on => on ? `<span class="tag">decides</span>` : "";
+  let h = `<h3>Why ${esc(p.call)}</h3><p class="muted small">${intro} Highlighted is what applies to this sample.</p>`;
+  h += `<div class="crit ${dec === "votes" ? "hit" : "dim"}"><h4>1. Residues at the four positions ${tag(dec === "votes")}</h4>${critTable(c.positions)}</div>`;
+  h += `<div class="crit ${dec === "hydrophobicity" ? "hit" : "dim"}"><h4>2. Mean hydrophobicity &lt;H&gt; ${tag(dec === "hydrophobicity")}</h4>${hChart(hy.mean, rf.mean, hy.cutoff)}
+    <p class="formula">Sample &nbsp;&nbsp;&lt;H&gt; = (${terms(hy)}) / 4 = <b>${f2(hy.mean)}</b></p>
+    <p class="formula">Reference &lt;H&gt; = (${terms(rf)}) / 4 = <b>${f2(rf.mean)}</b></p>
+    <p class="small"><a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}">How is this calculated?</a> &nbsp; <a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}&s=cutoff">Why a cutoff of ${f2(hy.cutoff)}?</a></p></div>`;
+  h += `<div class="crit ${dec === "override" ? "hit" : "dim"}"><h4>3. Overrides ${tag(dec === "override")}</h4><ul class="ovr">${c.overrides.map(o => `<li class="${o.fired ? "ovr-hit" : ""}">${esc(o.text)}${o.fired ? ": applied" : ""}</li>`).join("")}</ul></div>`;
   return h;
 }
 function renderResult(r, extra) {
@@ -178,7 +196,7 @@ function renderResult(r, extra) {
   } else {
     const tier = p.tier === "database" ? `Majority rule from ${fmt(p.n_isolates)} reference isolates`
       : p.tier === "database_other_site" ? `Majority rule from ${fmt(p.n_isolates)} isolates at other sites`
-      : "Physicochemical grammar (new septatype)";
+      : "Grammar call, new septatype";
     h += `<div class="verdict-row">${badge(p.call)}<span class="muted">${esc(tier)}</span></div>`;
     const codon = (a && a.recN_codon) || r.recn_codon;
     h += `<div class="sep">${p.septatype.split("-").map((v, i) => {
@@ -189,35 +207,37 @@ function renderResult(r, extra) {
       h += `<div class="info">RecN-346 uses the ctg codon for leucine, a high-usage synonymous change flagged in <i>S. enterica</i>.</div>`;
     const ml = a && a.mlst;
     if (ml) {
-      h += `<h3>Sample sequence type</h3><p>${ml.st ? `<b class="mono">${esc(ml.st)}</b>` : `<span class="muted">${esc(ml.note || "Not typed")}</span>`} <span class="muted">${esc(ml.scheme_name || "")} MLST${ml.loci_total ? `, ${ml.loci_exact} of ${ml.loci_total} loci exact` : ""}</span></p>`;
-      if (ml.alleles) h += `<details><summary>MLST alleles</summary><div class="scroll"><table><tr>${Object.keys(ml.alleles).map(k => `<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(ml.alleles).map(v => `<td class="mono">${esc(v)}</td>`).join("")}</tr></table></div></details>`;
+      h += `<p class="stline"><span class="muted">Sequence type</span> ${ml.st ? `<b class="mono">${esc(ml.st)}</b>` : `<span class="muted">${esc(ml.note || "not typed")}</span>`}</p>`;
+      if (ml.alleles) h += `<details><summary>MLST alleles (${esc(ml.scheme_name || "")})</summary><div class="scroll"><table><tr>${Object.keys(ml.alleles).map(k => `<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(ml.alleles).map(v => `<td class="mono">${esc(v)}</td>`).join("")}</tr></table></div></details>`;
     }
     if (p.known) {
-      h += `<p class="stat">${fmt(p.n_resistant)} resistant and ${fmt(p.n_susceptible)} susceptible among reference isolates with this septatype.</p>${bar(p.n_resistant, p.n_susceptible)}`;
+      h += `<p class="stat">${fmt(p.n_resistant)} resistant, ${fmt(p.n_susceptible)} susceptible among reference isolates with this septatype.</p>${bar(p.n_resistant, p.n_susceptible)}`;
       if (p.reference_sts && p.reference_sts.length) {
         const mine = ml && ml.st;
-        h += `<h3>Reference isolates with this septatype, by ST</h3><div class="scroll"><table><tr><th>ST</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th></th></tr>${p.reference_sts.map(x => `<tr><td class="mono">${esc(x.st)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${mine && x.st === mine ? "<b>your genome</b>" : ""}</td></tr>`).join("")}</table></div>`;
-        if (mine && !p.reference_sts.some(x => x.st === mine)) h += `<p class="muted" style="font-size:.9rem">Your genome (${esc(mine)}) is not among the STs of the reference isolates with this septatype.</p>`;
+        h += `<h3>Those reference isolates, by ST</h3><div class="scroll"><table><tr><th>ST</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th></th></tr>${p.reference_sts.map(x => `<tr><td class="mono">${esc(x.st)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${mine && x.st === mine ? "<b>your genome</b>" : ""}</td></tr>`).join("")}</table></div>`;
+        if (mine && !p.reference_sts.some(x => x.st === mine)) h += `<p class="muted small">Your genome (${esc(mine)}) is not one of these STs.</p>`;
       }
     } else if (p.similar && p.similar.length) {
       h += `<p class="muted" style="margin-top:12px">Known septatypes with the same GyrA/ParC tetratype:</p><div class="scroll"><table><tr><th>Septatype</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th></tr>${p.similar.map(x => `<tr><td class="mono">${esc(x.septatype)}</td><td>${x.n_isolates}</td><td>${x.n_resistant}</td><td>${x.n_susceptible}</td></tr>`).join("")}</table></div>`;
     }
     h += whyBlock(p);
     h += `<details><summary>Structural reading (schematic)</summary><ul class="why">${p.mechanism.map(m => `<li><span class="dot ${esc(m.effect)}"></span><span><b>${esc(m.position)} ${esc(m.residue)}</b>. ${esc(m.text)}</span></li>`).join("")}</ul></details>`;
-    h += `<details><summary>Grammar votes: ${esc(p.grammar.call)} (${esc(p.grammar.rule)})</summary><div class="scroll"><table><tr><th>Position</th><th>Residue</th><th>Votes Resistant</th><th>Reason</th></tr>${p.grammar.votes.map(v => `<tr><td>${esc(v.position)}</td><td class="mono">${esc(v.residue)}</td><td>${v.vote ? "Yes" : "No"}</td><td>${esc(v.why)}</td></tr>`).join("")}</table></div></details>`;
   }
   if (r.warnings && r.warnings.length) h += `<div class="note"><ul>${r.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
   if (a && a.positions) {
-    h += `<details><summary>Sequence details</summary><div class="scroll"><table><tr><th>Position</th><th>Codon</th><th>Residue</th><th>Reference</th></tr>` +
-      Object.values(a.positions).map(x => `<tr><td>${esc(x.gene)}-${x.pos}</td><td class="mono">${esc((x.codon || "-").toLowerCase())}</td><td class="mono">${esc(x.aa || "-")}</td><td class="mono">${esc(x.ref_aa || "-")}</td></tr>`).join("") +
-      `</table></div><div class="scroll" style="margin-top:10px"><table><tr><th>Gene</th><th>Identity</th><th>Coverage</th><th>Contig</th><th>Strand</th></tr>` +
-      Object.entries(a.genes).map(([g, x]) => `<tr><td>${esc(g)}</td><td>${x.found ? x.identity + "%" : "not found"}</td><td>${x.found ? x.coverage + "%" : "-"}</td><td>${esc(x.contig || "-")}</td><td>${esc(x.strand || "-")}</td></tr>`).join("") +
-      `</table></div><div class="scroll" style="margin-top:10px"><table><tr><th>qnr family</th><th>Status</th><th>Basis</th><th>Best hit</th></tr>` +
-      Object.entries(a.qnr).map(([k, x]) => `<tr><td>${k === "qnrB2" ? "qnrB" : "qnrS"}</td><td>${x.present ? "Present" : "Absent"}</td><td>${esc(x.source)}</td><td>${esc(x.best_hit || "-")}</td></tr>`).join("") +
-      `</table></div><p class="muted" style="font-size:.85rem;margin-top:8px">${a.input.records} sequence record(s), ${fmt(a.input.total_bp)} bp.</p></details>`;
+    const ref = a.reference || { genes: {}, qnr: {} };
+    h += `<details><summary>Sequence details</summary>
+      <p class="muted small">Your sequence is compared with the ${esc(ref.species || "")} reference genes (${Object.entries(ref.genes || {}).map(([g, ac]) => `${esc(g)} ${esc(ac)}`).join(", ")}).</p>
+      <div class="scroll"><table><tr><th>Position</th><th>Sample codon</th><th>Sample residue</th><th>Reference codon</th><th>Reference residue</th></tr>` +
+      Object.values(a.positions).map(x => `<tr><td class="nw">${PROT[x.gene] || esc(x.gene)}-${x.pos}</td><td class="mono">${esc((x.codon || "-").toLowerCase())}</td><td class="mono">${esc(x.aa || "-")}</td><td class="mono">${esc((x.ref_codon || "-").toLowerCase())}</td><td class="mono">${esc(x.ref_aa || "-")}</td></tr>`).join("") +
+      `</table></div><div class="scroll" style="margin-top:10px"><table><tr><th>Gene</th><th>Identity to reference</th><th>Coverage of reference</th><th>Contig</th></tr>` +
+      Object.entries(a.genes).map(([g, x]) => `<tr><td>${esc(g)}</td><td>${x.found ? x.identity + "%" : "not found"}</td><td>${x.found ? x.coverage + "%" : "-"}</td><td>${esc(x.contig || "-")}</td></tr>`).join("") +
+      `</table></div><div class="scroll" style="margin-top:10px"><table><tr><th>qnr gene</th><th>Result</th><th>Match to reference</th></tr>` +
+      Object.entries(a.qnr).map(([k, x]) => `<tr><td>${k === "qnrB2" ? "qnrB" : "qnrS"}</td><td>${x.present ? "Present" : "Absent"}${x.source === "set by user" ? " (set by you)" : ""}</td><td>${x.identity != null ? `${x.identity}% identity, ${x.coverage}% coverage to ${esc(x.reference)}` : "-"}</td></tr>`).join("") +
+      `</table></div><p class="muted small" style="margin-top:8px">${a.input.records} sequence record(s), ${fmt(a.input.total_bp)} bp.</p></details>`;
   }
   if (p && p.novel) h += `<div class="info">This septatype is new for ${esc(SHORT[r.species])}. If you have the laboratory phenotype, <a href="#/submit">submit the isolate</a> so curators can add it.</div>`;
-  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div><p class="muted" style="font-size:.8rem">Research use only. Confirm with laboratory testing.</p></div>`;
+  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div><p class="muted small">Research use only. Confirm with laboratory testing.</p></div>`;
   return h;
 }
 INIT.predict = () => {
@@ -307,7 +327,7 @@ async function loadBrowse() {
     $("#b-prev").disabled = d.page <= 1; $("#b-next").disabled = d.page * PER >= d.total;
     const th = (k, t) => `<th class="sort" data-k="${k}">${t}${BS.sort === k ? (BS.desc ? " (desc)" : " (asc)") : ""}</th>`;
     const bv = META.bvLoaded;
-    $("#btable").innerHTML = `<tr>${th("genome_id", "Genome ID and name")}${th("species", "Species and site")}${th("st", "ST")}${th("country", "Country, year")}${th("septatype", "Septatype")}${th("lab", "Lab")}<th>BV-BRC</th><th>SeptaTyper</th></tr>` +
+    $("#btable").innerHTML = `<tr>${th("genome_id", "Genome ID and name")}${th("species", "Species and site")}${th("st", "ST")}${th("country", "Country, year")}${th("septatype", "Septatype")}${th("lab", "Lab phenotype")}<th>BV-BRC computational phenotype</th><th>SeptaTyper</th></tr>` +
       (d.rows.length ? d.rows.map(r => `<tr>
         <td class="nw">${r.bvbrc_url ? `<a href="${esc(r.bvbrc_url)}" target="_blank" rel="noopener">${esc(r.genome_id)}</a>` : esc(r.genome_id)}<span class="alias">${esc(r.genome_name || r.isolate_name)}</span></td>
         <td class="nw"><i>${esc(SHORT[r.species])}</i><span class="alias">${esc(SITE[r.habitat])}${r.source === "community" ? ", community" : ""}</span></td>
@@ -316,7 +336,7 @@ async function loadBrowse() {
         <td class="mono nw">${mutSep(r.septatype)}</td>
         <td>${badge(r.lab_phenotype, 1)}</td>
         <td>${r.bvbrc_call ? badge(r.bvbrc_call, 1) : `<span class="muted" title="Not loaded yet">-</span>`}</td>
-        <td class="nw">${r.septatyper_call ? badge(r.septatyper_call, 1) : "-"} ${r.star ? `<span class="star" title="SeptaTyper matches the lab result and BV-BRC does not">&#9733;</span>` : ""}</td></tr>`).join("")
+        <td class="nw">${r.septatyper_call ? badge(r.septatyper_call, 1) : "-"} ${r.star ? `<span class="star" title="SeptaTyper matches the laboratory phenotype. The BV-BRC computational prediction does not.">&#9733;</span>` : ""}</td></tr>`).join("")
         : `<tr><td colspan="8" class="muted">No isolates match these filters.</td></tr>`);
     $$("#btable th.sort").forEach(h => h.onclick = () => { BS.desc = BS.sort === h.dataset.k ? !BS.desc : false; BS.sort = h.dataset.k; BS.page = 1; loadBrowse(); });
   } catch (e) { $("#btable").innerHTML = `<tr><td class="err">${esc(e.message)}</td></tr>`; }
@@ -456,7 +476,7 @@ INIT.theory = async () => {
     const b = s.benchmark, rows = s.rows.filter(x => x.habitat !== "ALL");
     let h = `<h3 style="font-size:1rem">Majority rule and grammar against laboratory phenotype</h3><div class="scroll"><table><tr><th>Species</th><th>Site</th><th>Isolates</th><th>Majority rule</th><th>Grammar only</th></tr>${rows.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${esc(SITE[x.habitat])}</td><td class="stat">${fmt(x.n_isolates)}</td><td class="stat">${x.accuracy}%</td><td class="stat">${x.grammar_accuracy}%</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">Both are scored on the founding isolates the rules were built from. They describe the reference set, not independent performance. The grammar only calls septatypes missing from the database.</p>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Head to head with BV-BRC computational predictions</h3>`;
-    if (b.loaded) h += `<p class="stat">${fmt(b.compared)} isolates have a BV-BRC computational prediction. SeptaTyper matches the lab result in ${fmt(b.septatyper_ok)} (${(100 * b.septatyper_ok / b.compared).toFixed(1)}%) and BV-BRC in ${fmt(b.bvbrc_ok)} (${(100 * b.bvbrc_ok / b.compared).toFixed(1)}%). SeptaTyper is right and BV-BRC wrong in ${fmt(b.wins)}. The reverse happens in ${fmt(b.losses)}.</p><div class="scroll"><table><tr><th>Genome</th><th>Septatype</th><th>Lab</th><th>BV-BRC</th><th>SeptaTyper</th></tr>${b.examples.map(x => `<tr><td>${esc(x.genome_id)}<span class="alias">${esc(x.isolate_name)}</span></td><td class="mono">${esc(x.septatype)}</td><td>${badge(x.lab_phenotype, 1)}</td><td>${badge(x.bvbrc_call, 1)}</td><td>${badge(x.septatyper_call, 1)}</td></tr>`).join("")}</table></div>`;
+    if (b.loaded) h += `<p class="stat">${fmt(b.compared)} isolates have a BV-BRC computational prediction. SeptaTyper matches the lab result in ${fmt(b.septatyper_ok)} (${(100 * b.septatyper_ok / b.compared).toFixed(1)}%) and BV-BRC in ${fmt(b.bvbrc_ok)} (${(100 * b.bvbrc_ok / b.compared).toFixed(1)}%). SeptaTyper matches the laboratory phenotype where BV-BRC does not in ${fmt(b.wins)} isolates. The reverse happens in ${fmt(b.losses)}.</p><div class="scroll"><table><tr><th>Genome</th><th>Septatype</th><th>Lab</th><th>BV-BRC</th><th>SeptaTyper</th></tr>${b.examples.map(x => `<tr><td>${esc(x.genome_id)}<span class="alias">${esc(x.isolate_name)}</span></td><td class="mono">${esc(x.septatype)}</td><td>${badge(x.lab_phenotype, 1)}</td><td>${badge(x.bvbrc_call, 1)}</td><td>${badge(x.septatyper_call, 1)}</td></tr>`).join("")}</table></div>`;
     else h += `<div class="info">BV-BRC predictions have not been loaded yet, so the head-to-head comparison is empty. They load automatically when the server can reach BV-BRC.</div>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Susceptible tetratype S-D-S-E, split by qnr</h3><div class="scroll"><table><tr><th>Species</th><th>qnrB</th><th>qnrS</th><th>Isolates</th><th>Resistant</th></tr>${s.edgecases.wildtype_tetratype_by_qnr.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${x.qnrB2 ? "yes" : "no"}</td><td>${x.qnrS1 ? "yes" : "no"}</td><td class="stat">${x.n}</td><td class="stat">${x.res} (${Math.round(100 * x.res / x.n)}%)</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">A qnr gene on a susceptible baseline is usually resistant, but not always. A gene found in sequence may not be expressed.</p>`;
     $("#t-valid").innerHTML = h;
@@ -467,7 +487,8 @@ INIT.theory = async () => {
 /* ------------------------------------------------------------------- calculation */
 INIT.calc = async () => {
   const qs = new URLSearchParams(location.hash.split("?")[1] || "");
-  const start = (qs.get("r") || "LNIE").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  const clean = v => (v || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  const start = clean(qs.get("r")) || "LNIE", startRef = clean(qs.get("ref")) || "SDSE";
   let aa, cs;
   try { [aa, cs] = await Promise.all([api("/api/v1/aminoacids"), api("/api/v1/stats/cutoff")]); }
   catch (e) { $("#calc-body").innerHTML = `<div class="band"><div class="err">${esc(e.message)}</div></div>`; return; }
@@ -481,9 +502,9 @@ INIT.calc = async () => {
     <p>Each amino acid has a hydrophobicity value H from the scale in the paper (the Eisenberg normalised consensus scale). Negative means hydrophilic, positive means hydrophobic.</p>
     <div class="scroll"><table class="step"><tr><th>Amino acid</th><th>Letter</th><th class="num">H</th><th>Class</th></tr>${rows.map(x => `<tr><td>${esc(x.name)}</td><td class="mono">${x.aa}</td><td class="num">${x.hydrophobicity.toFixed(2)}</td><td>${esc(x.class)}</td></tr>`).join("")}</table></div></div>
   <div class="band"><h3>2. Calculate &lt;H&gt; for any four residues</h3>
-    <p>&lt;H&gt; is the mean of H over the four residues that form the tetratype: GyrA-83, GyrA-87, ParC-80 and ParC-84. Type them in that order.</p>
-    <label for="calc-in">Four residues, for example LNIE</label>
-    <input type="text" id="calc-in" maxlength="4" value="${esc(start)}" style="max-width:160px;text-transform:uppercase;font-family:var(--mono);margin-bottom:12px">
+    <p>&lt;H&gt; is the average of H over the four residues of the tetratype: GyrA-83, GyrA-87, ParC-80, ParC-84, in that order.</p>
+    <div class="row2"><div><label for="calc-in">Sample residues</label><input type="text" id="calc-in" maxlength="4" value="${esc(start)}" class="mono-in"></div>
+    <div><label for="calc-ref">Reference residues</label><input type="text" id="calc-ref" maxlength="4" value="${esc(startRef)}" class="mono-in"></div></div>
     <div id="calc-steps"></div></div>
   <div class="band" id="calc-cutoff"><h3>3. Where the cutoff comes from</h3>
     <p><b>The scale is centred on zero.</b> The positive values add up to ${sp.toFixed(2)} and the negative values add up to ${sn.toFixed(2)}, so all 20 values sum to ${Math.abs(sum) < 1e-9 ? "0.00" : sum.toFixed(2)} and their mean is ${Math.abs(sum / 20) < 1e-9 ? "0.00" : (sum / 20).toFixed(2)}. Zero is therefore the midpoint between the hydrophilic and hydrophobic sides, and it is the cutoff the site uses. It was <b>not fitted</b> to the isolates.</p>
@@ -497,18 +518,19 @@ INIT.calc = async () => {
     <tr><td>GyrA-87</td><td>Negatively charged residue</td><td>Polar or uncharged residue</td></tr>
     <tr><td>ParC-80</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
     <tr><td>ParC-84</td><td>Negatively charged residue</td><td>Uncharged or negatively charged residue</td></tr></table></div></div>`;
-  const draw = async r => {
-    const el = $("#calc-steps");
-    if (r.length !== 4 || /[^ACDEFGHIKLMNPQRSTVWY]/.test(r)) { el.innerHTML = `<p class="muted">Type four amino-acid letters.</p>`; return; }
+  const draw = async () => {
+    const r = $("#calc-in").value.toUpperCase(), rf = $("#calc-ref").value.toUpperCase(), el = $("#calc-steps");
+    const bad = v => v.length !== 4 || /[^ACDEFGHIKLMNPQRSTVWY]/.test(v);
+    if (bad(r) || bad(rf)) { el.innerHTML = `<p class="muted">Type four amino-acid letters in each box.</p>`; return; }
     try {
-      const c = await api("/api/v1/grammar?residues=" + r), hy = c.hydrophobicity;
-      el.innerHTML = `<div class="scroll"><table class="step"><tr><th>Position</th><th>Residue</th><th class="num">H</th></tr>${hy.values.map(v => `<tr><td>${esc(v.position)}</td><td class="mono">${esc(v.residue)}</td><td class="num">${v.h.toFixed(2)}</td></tr>`).join("")}<tr><td colspan="2"><b>Sum</b></td><td class="num"><b>${hy.sum.toFixed(2)}</b></td></tr><tr><td colspan="2"><b>&lt;H&gt; = sum / 4</b></td><td class="num"><b>${hy.mean.toFixed(3)}</b></td></tr></table></div>
-        <p>Cutoff ${hy.cutoff.toFixed(1)}. &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} it, which points to <b>${hy.side === "above" ? "Resistant" : "Susceptible"}</b>.</p>
-        <p>${c.n_resistant_positions} of 4 positions are in the Resistant column, so ${c.decided_by === "hydrophobicity" ? "<b>&lt;H&gt; decides the call</b> (exactly one position)." : "&lt;H&gt; is not needed: the residue classes already decide."}</p>${critTable(c.positions)}`;
+      const c = await api(`/api/v1/grammar?residues=${r}&reference=${rf}`), hy = c.hydrophobicity, rr = c.reference;
+      const tbl = (t, v) => `<div class="scroll"><table class="step"><tr><th>${t}</th><th>Residue</th><th class="num">H</th></tr>${v.values.map(x => `<tr><td>${esc(x.position)}</td><td class="mono">${esc(x.residue)}</td><td class="num">${f2(x.h)}</td></tr>`).join("")}<tr><td colspan="2">Sum</td><td class="num">${f2(v.sum)}</td></tr><tr><td colspan="2"><b>&lt;H&gt; = sum / 4</b></td><td class="num"><b>${f2(v.mean)}</b></td></tr></table></div>`;
+      el.innerHTML = `<div class="row2">${tbl("Sample", hy)}${tbl("Reference", rr)}</div>${hChart(hy.mean, rr.mean, hy.cutoff, { res: cs.mean_resistant, sus: cs.mean_susceptible })}
+        <p>Sample &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} the cutoff of ${f2(hy.cutoff)}, which points to <b>${hy.side === "above" ? "resistant" : "susceptible"}</b>. ${c.decided_by === "hydrophobicity" ? "Here that decides the call, because exactly one position is in the Resistant column." : "It does not decide this sample: the residue classes below do."}</p>${critTable(c.positions)}`;
     } catch (e) { el.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
-  $("#calc-in").oninput = e => draw(e.target.value.toUpperCase());
-  await draw(start);
+  $("#calc-in").oninput = draw; $("#calc-ref").oninput = draw;
+  await draw();
   if (qs.get("s") === "cutoff") $("#calc-cutoff").scrollIntoView({ behavior: "smooth" }); else window.scrollTo(0, 0);
 };
 
@@ -516,7 +538,7 @@ INIT.calc = async () => {
 INIT.data = () => {
   const o = location.origin;
   $("#ex-curl").textContent = `# Resistant E. coli urine isolates, first page\ncurl "${o}/api/v1/isolates?species=ecoli&habitat=URINE&phenotype=Resistant"\n\n# Predict from a genome file\ncurl -F file=@genome.fasta -F species=kpneumoniae -F habitat=URINE ${o}/api/v1/predict`;
-  $("#ex-py").textContent = `import requests\nbase = "${o}/api/v1"\nr = requests.post(f"{base}/predict", data={"species": "ecoli", "habitat": "URINE"},\n                  files={"file": open("genome.fasta", "rb")}).json()\nprint(r["septatype"], r["prediction"]["call"])`;
+  $("#ex-py").textContent = `import requests\nbase = "${o}/api/v1"\nr = requests.post(f"{base}/predict", data={"species": "ecoli", "habitat": "URINE"},\n                  files={"file": open("genome.fasta", "rb")}).json()\nprint(r["septatype"], r["analysis"]["mlst"]["st"], r["prediction"]["call"])`;
 };
 INIT.about = () => { $("#about-build").textContent = `Rules built ${META.build.built || ""} from ${META.build.source || ""} (${META.build.n_isolates || ""} isolates).`; };
 
@@ -533,15 +555,16 @@ INIT.curate = () => {
     $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
     try {
       const d = await api("/api/v1/admin/queue?status=" + $("#c-status").value, { headers: { "X-Admin-Token": tk } });
-      $("#c-table").innerHTML = `<tr><th>Submission</th><th>Isolate</th><th>Septatype</th><th>Prediction</th><th>Lab</th><th>Status</th><th>Decision</th></tr>` +
+      $("#c-table").innerHTML = `<tr><th>Submission</th><th>Isolate</th><th>Septatype</th><th>ST</th><th>Prediction</th><th>Lab</th><th>Status</th><th>Decision</th></tr>` +
         (d.rows.length ? d.rows.map(r => `<tr><td class="nw">${esc(r.job_id)}<span class="alias">${esc(r.created)}</span></td>
           <td>${esc(r.genome_id || "no ID")}<span class="alias">${esc(SHORT[r.species])}, ${esc(SITE[r.habitat])}, ${esc(r.country || "-")} ${esc(r.year || "")}</span></td>
           <td class="mono nw">${mutSep(r.septatype)}${r.novel ? `<span class="alias">new septatype</span>` : ""}</td>
+          <td class="nw">${esc(r.st || "-")}</td>
           <td>${r.call ? badge(r.call, 1) : "-"}<span class="alias">${esc(r.tier || "")}</span></td>
           <td>${r.lab_phenotype ? badge(r.lab_phenotype, 1) : "-"}${r.matches === 0 ? `<span class="alias">disagrees</span>` : ""}</td>
           <td>${esc(r.status)}<span class="alias">${esc(r.curator_note || "")}</span></td>
           <td>${["approved", "rejected"].includes(r.status) ? "" : `<input type="text" placeholder="note" data-n="${esc(r.job_id)}" style="margin-bottom:6px"><button class="btn solid" data-a="approve" data-j="${esc(r.job_id)}">Approve</button> <button class="btn line" data-a="reject" data-j="${esc(r.job_id)}">Reject</button>`}</td></tr>`).join("")
-          : `<tr><td colspan="7" class="muted">The queue is empty.</td></tr>`);
+          : `<tr><td colspan="8" class="muted">The queue is empty.</td></tr>`);
       $$("#c-table button[data-a]").forEach(b => b.onclick = async () => {
         try {
           await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value.trim() }, body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "" }) });

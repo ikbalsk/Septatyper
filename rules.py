@@ -89,20 +89,20 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
             out["reference_sts"] = reference_sts(db, species, "ALL" if pooled else habitat, sep)
             if pooled:
                 out["tier"] = "database_other_site"
-                flags.append("Not seen at this isolation site. The call uses isolates of this species from all sites.")
+                flags.append("Not seen at this site, so the call uses isolates of this species from all sites.")
             if n < LOW_SUPPORT:
-                flags.append(f"Low support: only {n} reference isolate(s) carry this septatype.")
+                flags.append(f"Only {n} reference isolate(s) carry this septatype, so treat the call with care.")
             if use["confidence"] < MIXED:
-                flags.append(f"Mixed phenotype: {r} resistant and {s} susceptible among reference isolates.")
+                flags.append(f"The reference isolates with this septatype are mixed: {r} resistant, {s} susceptible.")
             if r == s:
-                flags.append("Tie in the reference data (called Susceptible by the paper's rule).")
+                flags.append("The reference isolates are split evenly, so the paper's rule calls it susceptible.")
             if g["call"] != out["call"]:
-                flags.append(f"The physicochemical grammar would call this {g['call']}. The database majority is used.")
+                flags.append(f"The grammar alone would call this {g['call']}. The database majority is used.")
         else:
             out.update(call=g["call"], tier="grammar", known=False, novel=True, n_isolates=0, n_resistant=0,
                        n_susceptible=0, confidence=None, reference_sts=[])
-            flags.append("New septatype: never seen in the reference isolates for this species. "
-                         "The call comes from the physicochemical grammar and is less certain. It is flagged for curation.")
+            flags.append("New septatype: not seen in the reference isolates for this species, "
+                         "so the call comes from the grammar and is less certain. It is flagged for curation.")
             rows = db.execute("SELECT septatype,n_isolates,n_resistant,n_susceptible,predicted FROM septatypes "
                               "WHERE species=? AND habitat=? AND tetratype=? ORDER BY n_isolates DESC",
                               (species, "ALL", "-".join(parts[:4]))).fetchall()
@@ -116,8 +116,8 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                         calls[h] = _label(rr["predicted"])
             out["by_habitat"] = calls
             if len(set(calls.values())) > 1:
-                flags.append("The call differs between sites (" + ", ".join(f"{k}: {v}" for k, v in calls.items())
-                             + "). Choose the isolate's site for a reliable result.")
+                flags.append("The call differs by site (" + ", ".join(f"{k}: {v}" for k, v in calls.items())
+                             + "). Pick the isolate's site for a firmer answer.")
         out["flags"] = flags
         return out
     finally:
@@ -296,12 +296,20 @@ def list_queue(status: str = "") -> list[dict]:
     db = conn()
     try:
         sql = ("SELECT job_id,created,status,species,habitat,genome_id,genome_name,country,year,source_text,mic,"
-               "lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided FROM submissions")
+               "lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided,result_json FROM submissions")
         rows = db.execute(sql + (" WHERE status=?" if status else "") + " ORDER BY created DESC",
                           (status,) if status else ()).fetchall()
     finally:
         db.close()
-    return [dict(r) for r in rows]
+    out = []
+    for r in rows:
+        d = dict(r)
+        try:
+            d["st"] = ((json.loads(d.pop("result_json") or "{}").get("analysis") or {}).get("mlst") or {}).get("st")
+        except (TypeError, ValueError):
+            d["st"] = None
+        out.append(d)
+    return out
 
 
 def decide(job_id: str, action: str, note: str = "") -> dict:

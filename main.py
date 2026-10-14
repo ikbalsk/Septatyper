@@ -97,6 +97,11 @@ def _read_upload(file: UploadFile) -> str | bytes:
 
 def _result(species, habitat, analysis, sep):
     pred = rules.predict(species, habitat, sep, (analysis or {}).get("recN_codon")) if sep else None
+    if pred and pred.get("criteria"):
+        pos = (analysis or {}).get("positions") or {}
+        ref4 = [(pos.get(k) or {}).get("ref_aa") for k in ("gyrA83", "gyrA87", "parC80", "parC84")]
+        ref4 = ref4 if all(ref4) else list("SDSE")      # manual entry has no sample genome: compare with the wild type
+        pred["criteria"]["reference"] = grammar.h_block(ref4)
     warnings = (analysis or {}).get("warnings", []) + ((pred or {}).get("flags", []))
     return {"status": "ok" if sep else "incomplete", "species": species, "species_name": SPECIES[species],
             "habitat": habitat, "septatype": sep, "analysis": analysis, "prediction": pred, "warnings": warnings}
@@ -257,14 +262,14 @@ def stats_cutoff():
 
 
 @app.get("/api/v1/grammar")
-def grammar_explain(residues: str, species: str = "ecoli"):
-    """Worked grammar for four residues (GyrA-83, GyrA-87, ParC-80, ParC-84). Used by the calculation page."""
-    r = residues.strip().upper()
-    if species not in SPECIES or len(r) != 4 or any(a not in AA for a in r):
-        raise HTTPException(400, "Give four amino-acid letters, for example LNIE, and a valid species.")
+def grammar_explain(residues: str, species: str = "ecoli", reference: str = "SDSE"):
+    """Worked grammar for four residues (GyrA-83, GyrA-87, ParC-80, ParC-84) next to a reference. Used by the calculation page."""
+    r, ref = residues.strip().upper(), reference.strip().upper()
+    if species not in SPECIES or any(len(x) != 4 or any(a not in AA for a in x) for x in (r, ref)):
+        raise HTTPException(400, "Give four amino-acid letters for the sample and for the reference, for example LNIE and SDSE.")
     aas = list(r) + ["L"]
     g = grammar.predict(species, aas, False, False)
-    return grammar.explain(species, aas, g)
+    return grammar.explain(species, aas, g, list(ref))
 
 
 @app.get("/api/v1/aminoacids")
