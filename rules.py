@@ -58,6 +58,17 @@ def reference_sts(db, species: str, habitat: str, sep: str, top: int = 10) -> li
     return out
 
 
+def reference_sites(db, species: str, habitat: str, sep: str) -> list[dict]:
+    """Isolation sites (fecal, urine, ...) of the reference isolates that carry this septatype."""
+    where, args = "species=? AND septatype=?", [species, sep]
+    if habitat != "ALL":
+        where += " AND habitat=?"
+        args.append(habitat)
+    rows = db.execute(f"""SELECT habitat, COUNT(*) n, SUM(lab_phenotype='Resistant') r FROM isolates
+                          WHERE {where} GROUP BY habitat ORDER BY n DESC, habitat""", args).fetchall()
+    return [{"habitat": r["habitat"], "n": r["n"], "n_resistant": r["r"], "n_susceptible": r["n"] - r["r"]} for r in rows]
+
+
 # ---------------------------------------------------------------- prediction
 def _rule(db, species, habitat, sep):
     return db.execute("SELECT * FROM septatypes WHERE species=? AND habitat=? AND septatype=?",
@@ -79,7 +90,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                "mechanism": grammar.mechanism(aas), "novel": False}
         g = grammar.predict(species, aas, qb, qs, recn_codon)
         out["grammar"] = {"call": g["call"], "rule": g["rule"], "votes": g["votes"]}
-        out["criteria"] = grammar.explain(species, aas, g)
+        out["criteria"] = grammar.explain(species, aas, g, None, (qb, qs), recn_codon)
         pooled = None if rule or habitat == "ALL" else _rule(db, species, "ALL", sep)
         use = rule or pooled
         if use:
@@ -87,6 +98,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
             out.update(call=_label(use["predicted"]), tier="database", known=True, n_isolates=n, n_resistant=r,
                        n_susceptible=s, confidence=round(use["confidence"], 3))
             out["reference_sts"] = reference_sts(db, species, "ALL" if pooled else habitat, sep)
+            out["reference_sites"] = reference_sites(db, species, "ALL" if pooled else habitat, sep)
             if pooled:
                 out["tier"] = "database_other_site"
                 flags.append("Not seen at this site, so the call uses isolates of this species from all sites.")
@@ -100,7 +112,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                 flags.append(f"The grammar alone would call this {g['call']}. The database majority is used.")
         else:
             out.update(call=g["call"], tier="grammar", known=False, novel=True, n_isolates=0, n_resistant=0,
-                       n_susceptible=0, confidence=None, reference_sts=[])
+                       n_susceptible=0, confidence=None, reference_sts=[], reference_sites=[])
             flags.append("New septatype: not seen in the reference isolates for this species, "
                          "so the call comes from the grammar and is less certain. It is flagged for curation.")
             rows = db.execute("SELECT septatype,n_isolates,n_resistant,n_susceptible,predicted FROM septatypes "

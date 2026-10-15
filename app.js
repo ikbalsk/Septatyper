@@ -148,6 +148,7 @@ document.addEventListener("click", e => {
   else if (act === "detail") { const x = BATCH[+b.dataset.i]; if (x && x.res) { $("#bdetail").innerHTML = renderResult(x.res); $("#bdetail").scrollIntoView({ behavior: "smooth" }); } }
 });
 
+const SITE_LC = { FECAL: "fecal", URINE: "urine", RESPIRATORY: "respiratory" };
 const PROT = { gyrA: "GyrA", parC: "ParC", recN: "RecN" };
 const f2 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(2);
 function critTable(positions) {
@@ -159,18 +160,22 @@ function critTable(positions) {
 }
 /* number line: sample and reference <H> against the cutoff; extra = typical resistant and susceptible isolates */
 function hChart(sample, ref, cutoff, extra) {
-  const lo = -2, hi = 1.5, W = 560, pad = 28, H = extra ? 118 : 94;
+  const lo = -2, hi = 1.5, W = 560, pad = 28, H = extra ? 124 : 94;
   const x = v => pad + (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * (W - 2 * pad), lab = v => Math.max(64, Math.min(W - 64, x(v)));
   const col = sample > cutoff ? "var(--res)" : "var(--sus)";
-  const ticks = extra ? [[extra.res, "typical resistant isolate", "var(--res)"], [extra.sus, "typical susceptible isolate", "var(--sus)"]].map(([v, t, c]) =>
-    `<path d="M${x(v)} 60 l-6 11 h12 z" fill="${c}"/><text x="${lab(v)}" y="${H - 6}" text-anchor="middle" font-size="11" fill="var(--muted)">${t} ${f2(v)}</text>`).join("") : "";
+  let ticks = "";
+  if (extra) {
+    const left = x(extra.sus) <= x(extra.res), tk = (v, t, c, anchor, dx) =>
+      `<path d="M${x(v)} 62 l-6 11 h12 z" fill="${c}"/><text x="${x(v) + dx}" y="${H - 8}" text-anchor="${anchor}" font-size="11" fill="var(--muted)">${t} ${f2(v)}</text>`;
+    ticks = tk(extra.sus, "typical susceptible isolate", "var(--sus)", left ? "end" : "start", left ? 8 : -8) + tk(extra.res, "typical resistant isolate", "var(--res)", left ? "start" : "end", left ? -8 : 8);
+  }
   return `<svg viewBox="0 0 ${W} ${H}" class="hchart" role="img" aria-label="Sample hydrophobicity ${f2(sample)}, reference ${f2(ref)}, cutoff ${f2(cutoff)}">
     <line x1="${x(lo)}" x2="${x(cutoff)}" y1="48" y2="48" stroke="var(--sus-bg)" stroke-width="14"/><line x1="${x(cutoff)}" x2="${x(hi)}" y1="48" y2="48" stroke="var(--res-bg)" stroke-width="14"/>
     <text x="${x(lo)}" y="12" font-size="11" fill="var(--muted)">hydrophilic</text><text x="${x(hi)}" y="12" font-size="11" text-anchor="end" fill="var(--muted)">hydrophobic</text>
-    <line x1="${x(cutoff)}" x2="${x(cutoff)}" y1="22" y2="74" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3"/><text x="${x(cutoff)}" y="14" font-size="12" text-anchor="middle" fill="var(--ink)">cutoff ${f2(cutoff)}</text>
+    <line x1="${x(cutoff)}" x2="${x(cutoff)}" y1="38" y2="76" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3"/><text x="${x(cutoff)}" y="14" font-size="12" text-anchor="middle" fill="var(--ink)">cutoff ${f2(cutoff)}</text>
     <circle cx="${x(ref)}" cy="48" r="11" fill="var(--white)" stroke="var(--muted)" stroke-width="3"/><circle cx="${x(sample)}" cy="48" r="7" fill="${col}"/>
-    <text x="${lab(sample)}" y="34" text-anchor="middle" font-size="13" font-weight="600" fill="${col}" class="hs">Sample ${f2(sample)}</text>
-    <text x="${lab(ref)}" y="${extra ? 80 : 82}" text-anchor="middle" font-size="12" fill="var(--muted)">Reference ${f2(ref)}</text>${ticks}</svg>`;
+    <text x="${lab(sample)}" y="30" text-anchor="middle" font-size="13" font-weight="600" fill="${col}" class="hs">Sample ${f2(sample)}</text>
+    <text x="${lab(ref)}" y="${extra ? 90 : 82}" text-anchor="middle" font-size="12" fill="var(--muted)">Reference ${f2(ref)}</text>${ticks}</svg>`;
 }
 function whyBlock(p) {
   const c = p.criteria; if (!c) return "";
@@ -184,7 +189,7 @@ function whyBlock(p) {
     <p class="formula">Sample &nbsp;&nbsp;&lt;H&gt; = (${terms(hy)}) / 4 = <b>${f2(hy.mean)}</b></p>
     <p class="formula">Reference &lt;H&gt; = (${terms(rf)}) / 4 = <b>${f2(rf.mean)}</b></p>
     <p class="small"><a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}">How is this calculated?</a> &nbsp; <a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}&s=cutoff">Why a cutoff of ${f2(hy.cutoff)}?</a></p></div>`;
-  h += `<div class="crit ${dec === "override" ? "hit" : "dim"}"><h4>3. Overrides ${tag(dec === "override")}</h4><ul class="ovr">${c.overrides.map(o => `<li class="${o.fired ? "ovr-hit" : ""}">${esc(o.text)}${o.fired ? ": applied" : ""}</li>`).join("")}</ul></div>`;
+  h += `<div class="crit ${dec === "override" ? "hit" : "dim"}"><h4>3. Overrides ${tag(dec === "override")}</h4><ul class="ovr">${c.overrides.map(o => `<li class="${o.fired ? "ovr-hit" : ""}">${esc(o.text)}: ${o.fired ? "yes, applied" : o.met ? "yes, but not needed" : "no"}</li>`).join("")}</ul><p class="muted small" style="margin:6px 0 0">These only turn a susceptible baseline into resistant.</p></div>`;
   return h;
 }
 function renderResult(r, extra) {
@@ -194,10 +199,11 @@ function renderResult(r, extra) {
   if (!p) {
     h += `<h3>No call could be made</h3><p>A complete septatype could not be built from this input.</p>`;
   } else {
-    const tier = p.tier === "database" ? `Majority rule from ${fmt(p.n_isolates)} reference isolates`
-      : p.tier === "database_other_site" ? `Majority rule from ${fmt(p.n_isolates)} isolates at other sites`
-      : "Grammar call, new septatype";
-    h += `<div class="verdict-row">${badge(p.call)}<span class="muted">${esc(tier)}</span></div>`;
+    const sitesTxt = (p.reference_sites || []).map(x => `${SITE_LC[x.habitat] || String(x.habitat).toLowerCase()} ${x.n}`).join(", ");
+    const basis = p.tier === "database" ? `This septatype is in <b>${fmt(p.n_isolates)}</b> reference isolates (${esc(sitesTxt)}). Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
+      : p.tier === "database_other_site" ? `Not seen at this site. It is in <b>${fmt(p.n_isolates)}</b> reference isolates from other sites (${esc(sitesTxt)}). Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
+      : `New septatype, so the call comes from the grammar.`;
+    h += `<div class="verdict-row">${badge(p.call)}</div><p class="basis">${basis}</p>`;
     const codon = (a && a.recN_codon) || r.recn_codon;
     h += `<div class="sep">${p.septatype.split("-").map((v, i) => {
       const ch = v !== WILD[i] && !(i >= 5 && v === "0");
@@ -211,7 +217,7 @@ function renderResult(r, extra) {
       if (ml.alleles) h += `<details><summary>MLST alleles (${esc(ml.scheme_name || "")})</summary><div class="scroll"><table><tr>${Object.keys(ml.alleles).map(k => `<th>${esc(k)}</th>`).join("")}</tr><tr>${Object.values(ml.alleles).map(v => `<td class="mono">${esc(v)}</td>`).join("")}</tr></table></div></details>`;
     }
     if (p.known) {
-      h += `<p class="stat">${fmt(p.n_resistant)} resistant, ${fmt(p.n_susceptible)} susceptible among reference isolates with this septatype.</p>${bar(p.n_resistant, p.n_susceptible)}`;
+      h += `<p class="stat">${fmt(p.n_resistant)} resistant, ${fmt(p.n_susceptible)} susceptible.</p>${bar(p.n_resistant, p.n_susceptible)}`;
       if (p.reference_sts && p.reference_sts.length) {
         const mine = ml && ml.st;
         h += `<h3>Those reference isolates, by ST</h3><div class="scroll"><table><tr><th>ST</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th></th></tr>${p.reference_sts.map(x => `<tr><td class="mono">${esc(x.st)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${mine && x.st === mine ? "<b>your genome</b>" : ""}</td></tr>`).join("")}</table></div>`;
@@ -230,8 +236,6 @@ function renderResult(r, extra) {
       <p class="muted small">Your sequence is compared with the ${esc(ref.species || "")} reference genes (${Object.entries(ref.genes || {}).map(([g, ac]) => `${esc(g)} ${esc(ac)}`).join(", ")}).</p>
       <div class="scroll"><table><tr><th>Position</th><th>Sample codon</th><th>Sample residue</th><th>Reference codon</th><th>Reference residue</th></tr>` +
       Object.values(a.positions).map(x => `<tr><td class="nw">${PROT[x.gene] || esc(x.gene)}-${x.pos}</td><td class="mono">${esc((x.codon || "-").toLowerCase())}</td><td class="mono">${esc(x.aa || "-")}</td><td class="mono">${esc((x.ref_codon || "-").toLowerCase())}</td><td class="mono">${esc(x.ref_aa || "-")}</td></tr>`).join("") +
-      `</table></div><div class="scroll" style="margin-top:10px"><table><tr><th>Gene</th><th>Identity to reference</th><th>Coverage of reference</th><th>Contig</th></tr>` +
-      Object.entries(a.genes).map(([g, x]) => `<tr><td>${esc(g)}</td><td>${x.found ? x.identity + "%" : "not found"}</td><td>${x.found ? x.coverage + "%" : "-"}</td><td>${esc(x.contig || "-")}</td></tr>`).join("") +
       `</table></div><div class="scroll" style="margin-top:10px"><table><tr><th>qnr gene</th><th>Result</th><th>Match to reference</th></tr>` +
       Object.entries(a.qnr).map(([k, x]) => `<tr><td>${k === "qnrB2" ? "qnrB" : "qnrS"}</td><td>${x.present ? "Present" : "Absent"}${x.source === "set by user" ? " (set by you)" : ""}</td><td>${x.identity != null ? `${x.identity}% identity, ${x.coverage}% coverage to ${esc(x.reference)}` : "-"}</td></tr>`).join("") +
       `</table></div><p class="muted small" style="margin-top:8px">${a.input.records} sequence record(s), ${fmt(a.input.total_bp)} bp.</p></details>`;
@@ -384,7 +388,7 @@ async function loadMap() {
   $("#g-table").innerHTML = `<tr><th>Country</th><th>Isolates</th><th>Resistant</th><th>% resistant</th></tr>` + d.rows.map(r => `<tr><td>${esc(r.country)}</td><td class="stat">${fmt(r.n)}</td><td class="stat">${fmt(r.res)}</td><td class="stat">${Math.round(100 * r.res / r.n)}%</td></tr>`).join("");
   try {
     await loadPlotly();
-    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const dark = false;
     Plotly.react("map", [{ type: "choropleth", locations: d.rows.map(r => r.iso3), z: d.rows.map(r => r.n), text: d.rows.map(r => `${r.country}: ${r.n} isolates, ${r.res} resistant`), hoverinfo: "text",
       colorscale: [[0, "#e8f0fa"], [1, "#0a2540"]], marker: { line: { color: "#8aa0b8", width: .4 } }, colorbar: { title: "Isolates", thickness: 12 } }],
       { margin: { t: 0, b: 0, l: 0, r: 0 }, paper_bgcolor: "rgba(0,0,0,0)", geo: { showframe: false, showcoastlines: false, projection: { type: "natural earth" }, bgcolor: "rgba(0,0,0,0)", showcountries: true, countrycolor: dark ? "#26364a" : "#d5dee9" } },

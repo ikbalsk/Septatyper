@@ -95,7 +95,7 @@ def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = 
     return {"call": call, "rule": rule, "votes": vs, "n_votes": n, "mean_h": h, "override": override, "decided_by": decided}
 
 
-OVERRIDES = [("qnr", None, "A qnr gene is present"),
+OVERRIDES = [("qnr", None, "qnr gene present"),
              ("sonnei_gyr", "ssonnei", "One change at GyrA-83 or GyrA-87"),
              ("sonnei_recn", "ssonnei", "RecN-346 is F"),
              ("senterica_ctg", "senterica", "F-D-S-E with the ctg codon at RecN-346")]
@@ -131,7 +131,7 @@ def _terms(pos: str, res: str, vote: bool):
     return S, R, sS, sR
 
 
-def explain(species: str, aas, g: dict, ref4=None) -> dict:
+def explain(species: str, aas, g: dict, ref4=None, qnr=(False, False), codon=None) -> dict:
     """Three criteria behind a call, laid out like the authors' residue-class table.
     1 residue class per position, 2 mean hydrophobicity against the cutoff, 3 septatype overrides."""
     g83, g87, p80, p84, _ = aas
@@ -155,7 +155,12 @@ def explain(species: str, aas, g: dict, ref4=None) -> dict:
                     "resistant_parts": fmt(R, sR), "resistant_suffix": sR, "note": note})
     sample = h_block([p["residue"] for p in pos])
     ref = h_block(list(ref4) if ref4 else list("SDSE"))
-    ov = [{"key": k, "text": t, "fired": g["override"] == k} for k, sp, t in OVERRIDES if sp in (None, species)]
+    voters = [v["position"] for v in g["votes"] if v["vote"]]
+    met = {"qnr": bool(qnr[0] or qnr[1]),
+           "sonnei_gyr": species == "ssonnei" and len(voters) == 1 and voters[0] in ("GyrA-83", "GyrA-87"),
+           "sonnei_recn": species == "ssonnei" and aas[4] == "F",
+           "senterica_ctg": species == "senterica" and [g83, g87, p80, p84] == list("FDSE") and (codon or "").upper() == "CTG"}
+    ov = [{"key": k, "text": t, "fired": g["override"] == k, "met": met[k]} for k, sp, t in OVERRIDES if sp in (None, species)]
     return {"decided_by": g["decided_by"], "n_resistant_positions": g["n_votes"], "positions": pos,
             "hydrophobicity": {"values": sample["values"], "sum": sample["sum"], "mean": sample["mean"], "cutoff": H_CUTOFF,
                                "side": "above" if sample["mean"] > H_CUTOFF else "at_or_below"},
