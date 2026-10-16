@@ -69,6 +69,25 @@ def reference_sites(db, species: str, habitat: str, sep: str) -> list[dict]:
     return [{"habitat": r["habitat"], "n": r["n"], "n_resistant": r["r"], "n_susceptible": r["n"] - r["r"]} for r in rows]
 
 
+def reference_countries(db, species: str, habitat: str, sep: str) -> list[dict]:
+    """Countries of the reference isolates that carry this septatype, with the sites they came from."""
+    where, args = "species=? AND septatype=?", [species, sep]
+    if habitat != "ALL":
+        where += " AND habitat=?"
+        args.append(habitat)
+    rows = db.execute(f"""SELECT COALESCE(country,'not recorded') country, habitat, COUNT(*) n,
+                          SUM(lab_phenotype='Resistant') r FROM isolates WHERE {where}
+                          GROUP BY 1, habitat""", args).fetchall()
+    by = {}
+    for r in rows:
+        d = by.setdefault(r["country"], {"country": r["country"], "n": 0, "n_resistant": 0, "n_susceptible": 0, "sites": {}})
+        d["n"] += r["n"]
+        d["n_resistant"] += r["r"]
+        d["n_susceptible"] += r["n"] - r["r"]
+        d["sites"][r["habitat"]] = r["n"]
+    return sorted(by.values(), key=lambda d: (-d["n"], d["country"]))
+
+
 # ---------------------------------------------------------------- prediction
 def _rule(db, species, habitat, sep):
     return db.execute("SELECT * FROM septatypes WHERE species=? AND habitat=? AND septatype=?",
@@ -99,6 +118,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                        n_susceptible=s, confidence=round(use["confidence"], 3))
             out["reference_sts"] = reference_sts(db, species, "ALL" if pooled else habitat, sep)
             out["reference_sites"] = reference_sites(db, species, "ALL" if pooled else habitat, sep)
+            out["reference_countries"] = reference_countries(db, species, "ALL" if pooled else habitat, sep)
             if pooled:
                 out["tier"] = "database_other_site"
                 flags.append("Not seen at this site, so the call uses isolates of this species from all sites.")
@@ -112,7 +132,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                 flags.append(f"The grammar alone would call this {g['call']}. The database majority is used.")
         else:
             out.update(call=g["call"], tier="grammar", known=False, novel=True, n_isolates=0, n_resistant=0,
-                       n_susceptible=0, confidence=None, reference_sts=[], reference_sites=[])
+                       n_susceptible=0, confidence=None, reference_sts=[], reference_sites=[], reference_countries=[])
             flags.append("New septatype: not seen in the reference isolates for this species, "
                          "so the call comes from the grammar and is less certain. It is flagged for curation.")
             rows = db.execute("SELECT septatype,n_isolates,n_resistant,n_susceptible,predicted FROM septatypes "
@@ -324,21 +344,57 @@ def list_queue(status: str = "") -> list[dict]:
     return out
 
 
+def queue_counts() -> dict:
+    db = conn()
+    try:
+        c = {r[0]: r[1] for r in db.execute("SELECT status, COUNT(*) FROM submissions GROUP BY status")}
+    finally:
+        db.close()
+    return {k: c.get(k, 0) for k in ("needs_review", "pending", "approved", "rejected")} | {"all": sum(c.values())}
+
+
+def _revoke(db, s) -> None:
+    """Undo an approval: take the isolate out of the database and its vote out of the rules."""
+    gid = s["genome_id"] or f"SUB-{s['job_id']}"
+    db.execute("DELETE FROM isolates WHERE genome_id=? AND source='community'", (gid,))
+    for hab in {s["habitat"], "ALL"}:
+        r = db.execute("SELECT * FROM septatypes WHERE species=? AND habitat=? AND septatype=?",
+                       (s["species"], hab, s["septatype"])).fetchone()
+        if not r:
+            continue
+        res_ = r["n_resistant"] - (1 if s["lab_phenotype"] == "Resistant" else 0)
+        sus_ = r["n_susceptible"] - (1 if s["lab_phenotype"] == "Susceptible" else 0)
+        if res_ + sus_ <= 0:
+            db.execute("DELETE FROM septatypes WHERE species=? AND habitat=? AND septatype=?", (s["species"], hab, s["septatype"]))
+        else:
+            db.execute("UPDATE septatypes SET n_isolates=?, n_resistant=?, n_susceptible=?, predicted=?, confidence=? "
+                       "WHERE species=? AND habitat=? AND septatype=?",
+                       (res_ + sus_, res_, sus_, "R" if res_ > sus_ else "S", max(res_, sus_) / (res_ + sus_),
+                        s["species"], hab, s["septatype"]))
+
+
 def decide(job_id: str, action: str, note: str = "") -> dict:
+    """approve: pending, needs review or rejected -> approved. reject: pending, needs review or approved -> rejected.
+    Rejecting an approved submission removes its isolate again and takes its vote out of the rules."""
     db = conn()
     try:
         s = db.execute("SELECT * FROM submissions WHERE job_id=?", (job_id,)).fetchone()
         if not s:
             raise KeyError("Unknown submission")
-        if s["status"] in ("approved", "rejected"):
-            raise ValueError(f"Already {s['status']}")
+        status = s["status"]
         if action == "reject":
+            if status == "rejected":
+                raise ValueError("Already rejected")
+            if status == "approved":
+                _revoke(db, s)
             db.execute("UPDATE submissions SET status='rejected', curator_note=?, decided=? WHERE job_id=?",
-                       (note, _now(), job_id))
+                       (note or ("Rejected after approval" if status == "approved" else ""), _now(), job_id))
             db.commit()
-            return {"status": "rejected"}
+            return {"status": "rejected", "revoked": status == "approved"}
         if action != "approve":
             raise ValueError("action must be approve or reject")
+        if status == "approved":
+            raise ValueError("Already approved")
         if s["lab_phenotype"] not in ("Resistant", "Susceptible") or not s["septatype"]:
             raise ValueError("Cannot approve without a laboratory phenotype and a complete septatype.")
         aas = s["septatype"].split("-")
@@ -368,10 +424,9 @@ def decide(job_id: str, action: str, note: str = "") -> dict:
                 res_ += 1
             else:
                 sus_ += 1
-            pred = "R" if res_ > sus_ else "S"
             db.execute("INSERT OR REPLACE INTO septatypes VALUES (?,?,?,?,?,?,?,?,?,?)",
-                       (s["species"], hab, s["septatype"], "-".join(aas[:4]), res_ + sus_, res_, sus_, pred,
-                        max(res_, sus_) / (res_ + sus_), grammar.mean_h(aas[:4])))
+                       (s["species"], hab, s["septatype"], "-".join(aas[:4]), res_ + sus_, res_, sus_,
+                        "R" if res_ > sus_ else "S", max(res_, sus_) / (res_ + sus_), grammar.mean_h(aas[:4])))
         db.execute("UPDATE submissions SET status='approved', curator_note=?, decided=? WHERE job_id=?",
                    (note, _now(), job_id))
         db.commit()

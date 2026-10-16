@@ -355,7 +355,7 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
 
 @app.get("/api/v1/admin/queue", dependencies=[Depends(admin)])
 def queue(status: str = ""):
-    return {"rows": rules.list_queue(status)}
+    return {"rows": rules.list_queue(status), "counts": rules.queue_counts()}
 
 
 class Decision(BaseModel):

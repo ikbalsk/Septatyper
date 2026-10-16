@@ -116,7 +116,7 @@
       </div>
       <button class="btn solid block" id="go" type="submit" style="margin-top:14px">Predict phenotype</button>
       <div id="perr"></div>
-      <p class="muted" style="font-size:.8rem;margin-top:12px">Research use only. Confirm with laboratory susceptibility testing.</p>
+      <p class="muted" style="font-size:.8rem;margin-top:12px">Research use only. Confirm with laboratory susceptibility testing. Problem with a result? Write to <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>.</p>
     </form>
     <div id="presult"><div class="band muted">The result appears here.</div></div>
   </div>
@@ -198,6 +198,7 @@
       <input type="file" id="s-file" accept=".fa,.fasta,.fna,.fas,.txt,.gz" style="margin-bottom:12px">
       <button class="btn solid block" id="s-go" type="submit">Submit for curation</button>
       <div id="s-err"></div>
+      <p class="muted" style="font-size:.85rem;margin-top:10px">Trouble submitting or a question about a result? Write to <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>.</p>
     </form>
     <div id="s-result"><div class="band muted">After you submit, the prediction and the status of your submission appear here. An isolate without a laboratory phenotype cannot be approved.</div></div>
   </div>
@@ -260,7 +261,7 @@
       <tr><td class="mono">GET /api/v1/stats/accuracy</td><td>Accuracy, benchmark against BV-BRC and edge cases.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/geography</td><td>Counts per country.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/septatypes</td><td>Septatype frequency by site.</td></tr>
-      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence. The reply holds the septatype, the call, and <span class="mono">analysis.mlst</span> with the sample ST and its alleles.</td></tr>
+      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence. The reply holds the septatype, the call, <span class="mono">analysis.mlst</span> (sample ST and alleles) and, under <span class="mono">prediction</span>, the sites, countries and STs of the reference isolates behind the call.</td></tr>
       <tr><td class="mono">POST /api/v1/predict/manual</td><td>JSON with the five residues and qnr flags.</td></tr>
       <tr><td class="mono">POST /api/v1/submissions</td><td>Community submission (enters the curation queue).</td></tr>
     </table></div>
@@ -290,25 +291,27 @@
     </ul>
     <h3>Privacy</h3>
     <p>Uploaded sequence is analysed in a temporary folder and deleted. Submissions keep only the derived genotype, the metadata you enter and the result.</p>
+    <h3>Contact</h3>
+    <p>Suggestions, problems or questions: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a></p>
     <p id="about-build" class="muted"></p>
   </div>
 </section>
 
 <!-- CURATE -->
 <section id="p-curate" class="page">
-  <div class="page-head"><h2>Curation queue</h2><p>Approving adds the isolate to the repository and updates the rules for its septatype.</p></div>
+  <div class="page-head"><h2>Curation</h2><p>Approving adds the isolate to the repository and updates the rules for its septatype. An approved submission can be rejected later, which removes it again.</p></div>
   <div class="band">
-    <div class="row3"><div><label for="c-token">Curator token</label><input type="password" id="c-token" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
-      <div><label for="c-status">Status</label><select id="c-status"><option value="">All</option><option value="needs_review">Needs review</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></div>
-      <div style="align-self:end"><button class="btn solid block" id="c-load">Load queue</button></div></div>
-    <div class="toolbar" style="margin-top:14px"><button class="btn line" id="c-bv" type="button">Load BV-BRC data now</button><span id="c-bvs" class="muted"></span></div>
+    <div class="row2"><div><label for="c-token">Curator token</label><input type="password" id="c-token" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+      <div style="align-self:end"><button class="btn solid block" id="c-load">Sign in and load</button></div></div>
+    <div class="seg" id="c-tabs" style="display:none;flex-wrap:wrap"></div>
     <div id="c-err"></div>
     <div class="scroll"><table id="c-table"></table></div>
+    <div class="toolbar" style="margin-top:14px"><button class="btn line" id="c-bv" type="button">Load BV-BRC data now</button><span id="c-bvs" class="muted"></span></div>
   </div>
 </section>
 
 </main>
-<footer>SeptaTyper. Research use only. <a href="#/curate">Curator sign in</a></footer>
+<footer>SeptaTyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
 <script src="/static/app.js"></script>
 </body>
 </html>

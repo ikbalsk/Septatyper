@@ -96,6 +96,8 @@ function flat(res, name, error) {
   return { file: name, species: res ? res.species_name : "", site: res ? res.habitat : "", septatype: (res && res.septatype) || "",
     call: error ? "Error" : (p.call || "No call"), basis: p.tier || "", n_isolates: p.n_isolates ?? "", n_resistant: p.n_resistant ?? "", n_susceptible: p.n_susceptible ?? "",
     sample_st: ((a.mlst || {}).st) || "", mlst_status: ((a.mlst || {}).status) || "",
+    reference_sites: (p.reference_sites || []).map(x => `${x.habitat}:${x.n}`).join("; "),
+    reference_countries: (p.reference_countries || []).map(x => `${x.country}:${x.n}`).join("; "),
     reference_sts: (p.reference_sts || []).map(x => `${x.st}:${x.n} (R ${x.n_resistant}, S ${x.n_susceptible})`).join("; "),
     mean_H: p.mean_h ?? "", gyrA83_codon: cd("gyrA83"), gyrA87_codon: cd("gyrA87"), parC80_codon: cd("parC80"), parC84_codon: cd("parC84"), recN346_codon: cd("recN346"),
     notes: error || ((res && res.warnings) || []).join(" | ") };
@@ -200,8 +202,10 @@ function renderResult(r, extra) {
     h += `<h3>No call could be made</h3><p>A complete septatype could not be built from this input.</p>`;
   } else {
     const sitesTxt = (p.reference_sites || []).map(x => `${SITE_LC[x.habitat] || String(x.habitat).toLowerCase()} ${x.n}`).join(", ");
-    const basis = p.tier === "database" ? `This septatype is in <b>${fmt(p.n_isolates)}</b> reference isolates (${esc(sitesTxt)}). Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
-      : p.tier === "database_other_site" ? `Not seen at this site. It is in <b>${fmt(p.n_isolates)}</b> reference isolates from other sites (${esc(sitesTxt)}). Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
+    const cs = p.reference_countries || [], top = cs.slice(0, 3).map(x => `${esc(x.country)} ${x.n}`).join(", ");
+    const countryTxt = !cs.length ? "" : cs.length === 1 ? `, all from ${esc(cs[0].country)}` : `, from ${top}${cs.length > 3 ? ` and ${cs.length - 3} other ${cs.length - 3 === 1 ? "country" : "countries"}` : ""}`;
+    const basis = p.tier === "database" ? `This septatype is in <b>${fmt(p.n_isolates)}</b> reference isolates (${esc(sitesTxt)})${countryTxt}. Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
+      : p.tier === "database_other_site" ? `Not seen at this site. It is in <b>${fmt(p.n_isolates)}</b> reference isolates from other sites (${esc(sitesTxt)})${countryTxt}. Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
       : `New septatype, so the call comes from the grammar.`;
     h += `<div class="verdict-row">${badge(p.call)}</div><p class="basis">${basis}</p>`;
     const codon = (a && a.recN_codon) || r.recn_codon;
@@ -223,6 +227,7 @@ function renderResult(r, extra) {
         h += `<h3>Those reference isolates, by ST</h3><div class="scroll"><table><tr><th>ST</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th></th></tr>${p.reference_sts.map(x => `<tr><td class="mono">${esc(x.st)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${mine && x.st === mine ? "<b>your genome</b>" : ""}</td></tr>`).join("")}</table></div>`;
         if (mine && !p.reference_sts.some(x => x.st === mine)) h += `<p class="muted small">Your genome (${esc(mine)}) is not one of these STs.</p>`;
       }
+      if (cs.length) h += `<details><summary>Those reference isolates, by country and site</summary><div class="scroll"><table><tr><th>Country</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th>Sites</th></tr>${cs.map(x => `<tr><td>${esc(x.country)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${Object.entries(x.sites).map(([k, n]) => `${esc(SITE_LC[k] || String(k).toLowerCase())} ${n}`).join(", ")}</td></tr>`).join("")}</table></div></details>`;
     } else if (p.similar && p.similar.length) {
       h += `<p class="muted" style="margin-top:12px">Known septatypes with the same GyrA/ParC tetratype:</p><div class="scroll"><table><tr><th>Septatype</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th></tr>${p.similar.map(x => `<tr><td class="mono">${esc(x.septatype)}</td><td>${x.n_isolates}</td><td>${x.n_resistant}</td><td>${x.n_susceptible}</td></tr>`).join("")}</table></div>`;
     }
@@ -555,24 +560,41 @@ const tokenOk = () => {
 };
 INIT.curate = () => {
   if (!META.curation_enabled) $("#c-err").innerHTML = `<div class="note">Curation is not switched on for this server. In Render, open the service, then Environment, add ADMIN_TOKEN with a value, save, and wait for the redeploy.</div>`;
+  const TABS = [["needs_review", "Needs review"], ["pending", "Pending"], ["approved", "Approved"], ["rejected", "Rejected"], ["", "All"]];
+  const LABEL = { needs_review: "Needs review", pending: "Pending", approved: "Approved", rejected: "Rejected" };
+  let status = "needs_review";
   const load = async () => {
     $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
     try {
-      const d = await api("/api/v1/admin/queue?status=" + $("#c-status").value, { headers: { "X-Admin-Token": tk } });
+      const d = await api("/api/v1/admin/queue?status=" + status, { headers: { "X-Admin-Token": tk } });
+      const tabs = $("#c-tabs"); tabs.style.display = "";
+      tabs.innerHTML = TABS.map(([k, t]) => `<button type="button" data-s="${k}" class="${k === status ? "on" : ""}">${t} (${d.counts[k || "all"] ?? 0})</button>`).join("");
+      $$("#c-tabs button").forEach(b => b.onclick = () => { status = b.dataset.s; load(); });
+      const actions = r => {
+        const note = `<input type="text" placeholder="note (optional)" data-n="${esc(r.job_id)}" style="margin-bottom:6px">`;
+        const btn = (a, t, cls) => `<button class="btn ${cls}" data-a="${a}" data-j="${esc(r.job_id)}" data-st="${esc(r.status)}">${t}</button>`;
+        if (r.status === "approved") return `${note}${btn("reject", "Reject and remove", "line")}<span class="alias">In the database as ${esc(r.genome_id || "SUB-" + r.job_id)}</span>`;
+        if (r.status === "rejected") return `${note}${btn("approve", "Approve instead", "solid")}`;
+        return `${note}${btn("approve", "Approve", "solid")} ${btn("reject", "Reject", "line")}`;
+      };
       $("#c-table").innerHTML = `<tr><th>Submission</th><th>Isolate</th><th>Septatype</th><th>ST</th><th>Prediction</th><th>Lab</th><th>Status</th><th>Decision</th></tr>` +
-        (d.rows.length ? d.rows.map(r => `<tr><td class="nw">${esc(r.job_id)}<span class="alias">${esc(r.created)}</span></td>
+        (d.rows.length ? d.rows.map(r => `<tr><td class="nw">${esc(r.job_id)}<span class="alias">submitted ${esc(r.created)}</span></td>
           <td>${esc(r.genome_id || "no ID")}<span class="alias">${esc(SHORT[r.species])}, ${esc(SITE[r.habitat])}, ${esc(r.country || "-")} ${esc(r.year || "")}</span></td>
           <td class="mono nw">${mutSep(r.septatype)}${r.novel ? `<span class="alias">new septatype</span>` : ""}</td>
           <td class="nw">${esc(r.st || "-")}</td>
           <td>${r.call ? badge(r.call, 1) : "-"}<span class="alias">${esc(r.tier || "")}</span></td>
           <td>${r.lab_phenotype ? badge(r.lab_phenotype, 1) : "-"}${r.matches === 0 ? `<span class="alias">disagrees</span>` : ""}</td>
-          <td>${esc(r.status)}<span class="alias">${esc(r.curator_note || "")}</span></td>
-          <td>${["approved", "rejected"].includes(r.status) ? "" : `<input type="text" placeholder="note" data-n="${esc(r.job_id)}" style="margin-bottom:6px"><button class="btn solid" data-a="approve" data-j="${esc(r.job_id)}">Approve</button> <button class="btn line" data-a="reject" data-j="${esc(r.job_id)}">Reject</button>`}</td></tr>`).join("")
-          : `<tr><td colspan="8" class="muted">The queue is empty.</td></tr>`);
+          <td>${esc(LABEL[r.status] || r.status)}${r.decided ? `<span class="alias">decided ${esc(r.decided)}</span>` : ""}${r.curator_note ? `<span class="alias">${esc(r.curator_note)}</span>` : ""}</td>
+          <td>${actions(r)}</td></tr>`).join("")
+          : `<tr><td colspan="8" class="muted">Nothing in this list.</td></tr>`);
       $$("#c-table button[data-a]").forEach(b => b.onclick = async () => {
+        if (b.dataset.st === "approved" && !confirm("Reject this approved submission? Its isolate is removed from the repository and the rules.")) return;
         try {
-          await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value.trim() }, body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "" }) });
-          LOADED.browse = false; META.counts.genomes += b.dataset.a === "approve" ? 1 : 0; load();
+          const res = await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value.trim() },
+            body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "" }) });
+          LOADED.browse = false; LOADED.home = false;
+          if (b.dataset.a === "approve") META.counts.genomes += 1; else if (res.revoked) META.counts.genomes -= 1;
+          load();
         } catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
       });
     } catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
