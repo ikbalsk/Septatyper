@@ -5,7 +5,7 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN mkdir -p app/static scripts data refs && touch app/__init__.py
-COPY main.py rules.py septatype.py grammar.py config.py bvbrc.py mlst.py app/
+COPY main.py rules.py septatype.py grammar.py config.py bvbrc.py mlst.py persist.py app/
 COPY index.html style.css app.js app/static/
 COPY build_db.py fetch_bvbrc.py scripts/
 COPY Table_S1.xlsx data/

@@ -599,7 +599,31 @@ INIT.curate = () => {
       });
     } catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
-  $("#c-load").onclick = load;
+  const pstatus = async () => {
+    const tk = $("#c-token").value.trim(); if (!tk) return;
+    try {
+      const s = await api("/api/v1/admin/persist-status", { headers: { "X-Admin-Token": tk } });
+      $("#c-pst").textContent = s.github_backup ? `Automatic GitHub backup is on${s.last_saved ? `, last saved ${s.last_saved} UTC` : ", nothing saved yet"}${s.error ? `. Last problem: ${s.error}` : ""}.` : "Automatic GitHub backup is off (set BACKUP_GITHUB_REPO and BACKUP_GITHUB_TOKEN on the server).";
+    } catch (e) { /* the sign-in message is shown by the queue */ }
+  };
+  $("#c-load").onclick = () => { load(); pstatus(); };
+  $("#c-dl").onclick = async () => {
+    $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
+    try { const b = await api("/api/v1/admin/backup", { headers: { "X-Admin-Token": tk } });
+      download(`septatyper_backup_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(b, null, 1), "application/json");
+      $("#c-bks").textContent = `Downloaded ${b.submissions.length} submissions.`; }
+    catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  $("#c-rs").onclick = () => { if (tokenOk()) $("#c-rsf").click(); };
+  $("#c-rsf").onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
+    try {
+      const res = await api("/api/v1/admin/restore", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": tk }, body: await f.text() });
+      $("#c-bks").textContent = `Restored ${res.added} submissions (${res.approved_reapplied} approvals re-applied, ${res.already_present} already there)${res.problems.length ? `, ${res.problems.length} problems` : ""}.`;
+      LOADED.browse = false; LOADED.home = false; load();
+    } catch (ex) { $("#c-err").innerHTML = `<div class="err">${esc(ex.message)}</div>`; }
+  };
   $("#c-bv").onclick = async () => {
     $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
     try { const s = await api("/api/v1/admin/bvbrc/load", { method: "POST", headers: { "X-Admin-Token": tk } });

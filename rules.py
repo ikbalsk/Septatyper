@@ -34,6 +34,15 @@ def conn() -> sqlite3.Connection:
     return c
 
 
+def _persist():
+    """Ask the backup module to save soon. Does nothing unless automatic backup is configured."""
+    try:
+        from . import persist
+        persist.schedule_save()
+    except Exception:  # noqa: BLE001  a backup problem must never break a submission or a decision
+        pass
+
+
 def _now():
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -321,6 +330,7 @@ def create_submission(d: dict, result: dict) -> dict:
         db.commit()
     finally:
         db.close()
+    _persist()
     return {"job_id": job, "status": status, "novel": novel, "matches": matches}
 
 
@@ -373,6 +383,41 @@ def _revoke(db, s) -> None:
                         s["species"], hab, s["septatype"]))
 
 
+def apply_approval(db, s) -> str:
+    """Add an approved submission's isolate to the repository and its vote to the rules. Returns the genome ID."""
+    aas = s["septatype"].split("-")
+    gid = s["genome_id"] or f"SUB-{s['job_id']}"
+    if db.execute("SELECT 1 FROM isolates WHERE genome_id=?", (gid,)).fetchone():
+        raise ValueError(f"Genome ID {gid} is already in the database.")
+    country = s["country"]
+    iso3 = None
+    if country:
+        r = db.execute("SELECT iso3 FROM isolates WHERE country=? AND iso3 IS NOT NULL LIMIT 1", (country,)).fetchone()
+        iso3 = r[0] if r else None
+    ys = int(s["year"]) if s["year"] and str(s["year"]).isdigit() else None
+    try:
+        mst = ((json.loads(s["result_json"]).get("analysis") or {}).get("mlst") or {}).get("st")
+    except (TypeError, ValueError):
+        mst = None
+    db.execute(f"INSERT INTO isolates ({','.join(ISO_COLS)}) VALUES ({','.join('?'*len(ISO_COLS))})",
+               (gid, s["genome_name"], s["genome_name"] or gid, s["species"], s["habitat"], s["lab_phenotype"],
+                s["year"], ys, ys, country, iso3, mst, aas[0], aas[1], aas[2], aas[3], aas[4], int(aas[5]),
+                int(aas[6]), s["septatype"], "-".join(aas[:4]), s["call"], None, None, "community", _now()))
+    # the approved isolate joins the rules table, so a new septatype becomes a known one
+    for hab in {s["habitat"], "ALL"}:
+        r = db.execute("SELECT * FROM septatypes WHERE species=? AND habitat=? AND septatype=?",
+                       (s["species"], hab, s["septatype"])).fetchone()
+        res_, sus_ = (r["n_resistant"], r["n_susceptible"]) if r else (0, 0)
+        if s["lab_phenotype"] == "Resistant":
+            res_ += 1
+        else:
+            sus_ += 1
+        db.execute("INSERT OR REPLACE INTO septatypes VALUES (?,?,?,?,?,?,?,?,?,?)",
+                   (s["species"], hab, s["septatype"], "-".join(aas[:4]), res_ + sus_, res_, sus_,
+                    "R" if res_ > sus_ else "S", max(res_, sus_) / (res_ + sus_), grammar.mean_h(aas[:4])))
+    return gid
+
+
 def decide(job_id: str, action: str, note: str = "") -> dict:
     """approve: pending, needs review or rejected -> approved. reject: pending, needs review or approved -> rejected.
     Rejecting an approved submission removes its isolate again and takes its vote out of the rules."""
@@ -390,6 +435,7 @@ def decide(job_id: str, action: str, note: str = "") -> dict:
             db.execute("UPDATE submissions SET status='rejected', curator_note=?, decided=? WHERE job_id=?",
                        (note or ("Rejected after approval" if status == "approved" else ""), _now(), job_id))
             db.commit()
+            _persist()
             return {"status": "rejected", "revoked": status == "approved"}
         if action != "approve":
             raise ValueError("action must be approve or reject")
@@ -397,39 +443,11 @@ def decide(job_id: str, action: str, note: str = "") -> dict:
             raise ValueError("Already approved")
         if s["lab_phenotype"] not in ("Resistant", "Susceptible") or not s["septatype"]:
             raise ValueError("Cannot approve without a laboratory phenotype and a complete septatype.")
-        aas = s["septatype"].split("-")
-        gid = s["genome_id"] or f"SUB-{job_id}"
-        if db.execute("SELECT 1 FROM isolates WHERE genome_id=?", (gid,)).fetchone():
-            raise ValueError(f"Genome ID {gid} is already in the database.")
-        country = s["country"]
-        iso3 = None
-        if country:
-            r = db.execute("SELECT iso3 FROM isolates WHERE country=? AND iso3 IS NOT NULL LIMIT 1", (country,)).fetchone()
-            iso3 = r[0] if r else None
-        ys = int(s["year"]) if s["year"] and str(s["year"]).isdigit() else None
-        try:
-            mst = ((json.loads(s["result_json"]).get("analysis") or {}).get("mlst") or {}).get("st")
-        except (TypeError, ValueError):
-            mst = None
-        db.execute(f"INSERT INTO isolates ({','.join(ISO_COLS)}) VALUES ({','.join('?'*len(ISO_COLS))})",
-                   (gid, s["genome_name"], s["genome_name"] or gid, s["species"], s["habitat"], s["lab_phenotype"],
-                    s["year"], ys, ys, country, iso3, mst, aas[0], aas[1], aas[2], aas[3], aas[4], int(aas[5]),
-                    int(aas[6]), s["septatype"], "-".join(aas[:4]), s["call"], None, None, "community", _now()))
-        # the approved isolate joins the rules table, so a new septatype becomes a known one
-        for hab in {s["habitat"], "ALL"}:
-            r = db.execute("SELECT * FROM septatypes WHERE species=? AND habitat=? AND septatype=?",
-                           (s["species"], hab, s["septatype"])).fetchone()
-            res_, sus_ = (r["n_resistant"], r["n_susceptible"]) if r else (0, 0)
-            if s["lab_phenotype"] == "Resistant":
-                res_ += 1
-            else:
-                sus_ += 1
-            db.execute("INSERT OR REPLACE INTO septatypes VALUES (?,?,?,?,?,?,?,?,?,?)",
-                       (s["species"], hab, s["septatype"], "-".join(aas[:4]), res_ + sus_, res_, sus_,
-                        "R" if res_ > sus_ else "S", max(res_, sus_) / (res_ + sus_), grammar.mean_h(aas[:4])))
+        gid = apply_approval(db, s)
         db.execute("UPDATE submissions SET status='approved', curator_note=?, decided=? WHERE job_id=?",
                    (note, _now(), job_id))
         db.commit()
+        _persist()
         return {"status": "approved", "genome_id": gid}
     finally:
         db.close()

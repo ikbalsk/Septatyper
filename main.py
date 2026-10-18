@@ -17,12 +17,12 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import Body, Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import bvbrc, grammar, rules, septatype
+from . import bvbrc, grammar, persist, rules, septatype
 from .config import ADMIN_TOKEN, HABITATS, MAX_UPLOAD_MB, SPECIES
 
 app = FastAPI(title="SeptaTyper API", version="2.0",
@@ -119,6 +119,8 @@ def _startup():
     rules.ensure_db()
     if os.environ.get("BVBRC_AUTOLOAD", "1") != "0" and not bvbrc.is_loaded():
         bvbrc.start()
+    if persist.configured():
+        threading.Thread(target=persist.restore_if_configured, daemon=True).start()
 
 
 @app.get("/api/v1/bvbrc-status")
@@ -372,6 +374,26 @@ def decide(d: Decision):
         raise HTTPException(404, str(e))
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+@app.get("/api/v1/admin/backup", dependencies=[Depends(admin)])
+def backup_download():
+    return JSONResponse(persist.export_backup(), headers={"Content-Disposition": "attachment; filename=septatyper_backup.json"})
+
+
+@app.post("/api/v1/admin/restore", dependencies=[Depends(admin)])
+def backup_restore(data: dict = Body(...)):
+    try:
+        res = persist.import_backup(data)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    persist.schedule_save()
+    return res
+
+
+@app.get("/api/v1/admin/persist-status", dependencies=[Depends(admin)])
+def persist_status():
+    return persist.status()
 
 
 @app.get("/healthz")
