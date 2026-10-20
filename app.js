@@ -7,7 +7,7 @@ const fmt = n => Number(n).toLocaleString("en-US");
 let META = null;
 const SP = {};                       // key -> display name
 const SHORT = { ecoli: "E. coli", ssonnei: "S. sonnei", senterica: "S. enterica", kpneumoniae: "K. pneumoniae" };
-const SITE = { FECAL: "Fecal", URINE: "Urine", RESPIRATORY: "Respiratory", ALL: "All sites / unknown" };
+const SITE = { ALL: "Unknown / not specified" };           // the rest comes from the server (META.sources)
 const POS = [["gyrA", "GyrA-83"], ["gyrA", "GyrA-87"], ["parC", "ParC-80"], ["parC", "ParC-84"], ["recN", "RecN-346"], ["qnr", "qnrB"], ["qnr", "qnrS"]];
 const WILD = ["S", "D", "S", "E", "L", "0", "0"];
 const LOADED = {};
@@ -30,10 +30,15 @@ const withN = arr => arr.map(([v, n]) => [v, `${v} (${fmt(n)})`]);
 const dl = arr => arr.map(([v, n]) => `<option value="${esc(v)}" label="${fmt(n)} isolates"></option>`).join("");
 const opts = (arr, first) => (first ? `<option value="">${first}</option>` : "") + arr.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join("");
 function setSites(sel, sp, withAll) {
-  const list = (META.habitats[sp] || []).filter(h => withAll || h !== "ALL");
-  sel.innerHTML = opts(list.map(h => [h, SITE[h]]));
-  if (list.includes("ALL") && !withAll) sel.value = list[0];
+  const keys = (META.habitats[sp] || []).filter(h => h !== "ALL");
+  sel.innerHTML = opts((withAll ? ["ALL", ...keys] : keys).map(h => [h, SITE[h] || h]));
 }
+function useSources() { META.sources.forEach(s => { SITE[s.key] = s.label; SITE_LC[s.key] = s.short; }); }
+async function refreshMeta() {          // approved submissions change the counts and lists
+  try { const m = await api("/api/v1/meta"); META.facets = m.facets; META.counts = m.counts; META.stats = m.stats; META.sources = m.sources; useSources(); } catch (e) { /* keep what we have */ }
+}
+const PAL = ["#1d4e89", "#4d9de0", "#9cc4f5", "#00897b", "#8e6bbf", "#c98a00", "#6d7f95", "#d98aa0", "#4f9d69", "#a0522d", "#2a9d8f", "#7a7a7a"];
+const hcol = h => PAL[Math.max(0, META.sources.findIndex(s => s.key === h)) % PAL.length];
 
 /* ------------------------------------------------------------------ router */
 const PAGES = ["home", "predict", "browse", "analytics", "submit", "theory", "data", "about", "curate", "calc"];
@@ -80,7 +85,7 @@ INIT.home = async () => {
   if (!reduce) setTimeout(() => { demoState = 1; drawDemo(true); }, 900);
   $("#demo-toggle").onclick = () => { demoState = 1 - demoState; drawDemo(!reduce); };
   const rows = META.stats.filter(s => s.habitat !== "ALL");
-  $("#home-stats").innerHTML = `<tr><th>Species</th><th>Site</th><th>Isolates</th><th>Resistant</th><th>Septatypes</th><th>Accuracy</th></tr>` +
+  $("#home-stats").innerHTML = `<tr><th>Species</th><th>Source</th><th>Isolates</th><th>Resistant</th><th>Septatypes</th><th>Accuracy</th></tr>` +
     rows.map(s => `<tr><td><i>${esc(SP[s.species])}</i></td><td>${esc(SITE[s.habitat])}</td><td class="stat">${fmt(s.n_isolates)}</td><td class="stat">${fmt(s.n_resistant)}</td><td class="stat">${s.n_septatypes}</td><td class="stat">${s.accuracy}%</td></tr>`).join("");
 };
 
@@ -93,7 +98,7 @@ const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
 const toCsv = rows => { const cols = Object.keys(rows[0]); return [cols.join(","), ...rows.map(r => cols.map(c => csvCell(r[c])).join(","))].join("\n"); };
 function flat(res, name, error) {
   const p = (res && res.prediction) || {}, a = (res && res.analysis) || {}, pos = a.positions || {}, cd = k => (pos[k] || {}).codon || "";
-  return { file: name, species: res ? res.species_name : "", site: res ? res.habitat : "", septatype: (res && res.septatype) || "",
+  return { file: name, species: res ? res.species_name : "", isolation_source: res ? res.habitat : "", septatype: (res && res.septatype) || "",
     call: error ? "Error" : (p.call || "No call"), basis: p.tier || "", n_isolates: p.n_isolates ?? "", n_resistant: p.n_resistant ?? "", n_susceptible: p.n_susceptible ?? "",
     sample_st: ((a.mlst || {}).st) || "", mlst_status: ((a.mlst || {}).status) || "",
     reference_sites: (p.reference_sites || []).map(x => `${x.habitat}:${x.n}`).join("; "),
@@ -115,7 +120,7 @@ async function maybeGzip(f) {      // smaller upload on a phone connection; the 
   try { const b = await new Response(f.stream().pipeThrough(new CompressionStream("gzip"))).blob(); return new File([b], f.name + ".gz", { type: "application/gzip" }); }
   catch (e) { return f; }
 }
-const TIER = { database: "Database", database_other_site: "Database (other site)", grammar: "Grammar (new)" };
+const TIER = { database: "Database", database_other_site: "Database (other source)", grammar: "Grammar (new)" };
 function drawBatch(done, total) {
   const rows = BATCH.map((x, i) => {
     if (x.error) return `<tr><td>${esc(x.name)}</td><td colspan="5" class="muted">${esc(x.error)}</td></tr>`;
@@ -150,7 +155,7 @@ document.addEventListener("click", e => {
   else if (act === "detail") { const x = BATCH[+b.dataset.i]; if (x && x.res) { $("#bdetail").innerHTML = renderResult(x.res); $("#bdetail").scrollIntoView({ behavior: "smooth" }); } }
 });
 
-const SITE_LC = { FECAL: "fecal", URINE: "urine", RESPIRATORY: "respiratory" };
+const SITE_LC = {};
 const PROT = { gyrA: "GyrA", parC: "ParC", recN: "RecN" };
 const f2 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(2);
 function critTable(positions) {
@@ -205,7 +210,7 @@ function renderResult(r, extra) {
     const cs = p.reference_countries || [], top = cs.slice(0, 3).map(x => `${esc(x.country)} ${x.n}`).join(", ");
     const countryTxt = !cs.length ? "" : cs.length === 1 ? `, all from ${esc(cs[0].country)}` : `, from ${top}${cs.length > 3 ? ` and ${cs.length - 3} other ${cs.length - 3 === 1 ? "country" : "countries"}` : ""}`;
     const basis = p.tier === "database" ? `This septatype is in <b>${fmt(p.n_isolates)}</b> reference isolates (${esc(sitesTxt)})${countryTxt}. Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
-      : p.tier === "database_other_site" ? `Not seen at this site. It is in <b>${fmt(p.n_isolates)}</b> reference isolates from other sites (${esc(sitesTxt)})${countryTxt}. Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
+      : p.tier === "database_other_site" ? `Not seen for this isolation source. It is in <b>${fmt(p.n_isolates)}</b> reference isolates from other sources (${esc(sitesTxt)})${countryTxt}. Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
       : `New septatype, so the call comes from the grammar.`;
     h += `<div class="verdict-row">${badge(p.call)}</div><p class="basis">${basis}</p>`;
     const codon = (a && a.recN_codon) || r.recn_codon;
@@ -227,7 +232,7 @@ function renderResult(r, extra) {
         h += `<h3>Those reference isolates, by ST</h3><div class="scroll"><table><tr><th>ST</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th></th></tr>${p.reference_sts.map(x => `<tr><td class="mono">${esc(x.st)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${mine && x.st === mine ? "<b>your genome</b>" : ""}</td></tr>`).join("")}</table></div>`;
         if (mine && !p.reference_sts.some(x => x.st === mine)) h += `<p class="muted small">Your genome (${esc(mine)}) is not one of these STs.</p>`;
       }
-      if (cs.length) h += `<details><summary>Those reference isolates, by country and site</summary><div class="scroll"><table><tr><th>Country</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th>Sites</th></tr>${cs.map(x => `<tr><td>${esc(x.country)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${Object.entries(x.sites).map(([k, n]) => `${esc(SITE_LC[k] || String(k).toLowerCase())} ${n}`).join(", ")}</td></tr>`).join("")}</table></div></details>`;
+      if (cs.length) h += `<details><summary>Those reference isolates, by country and source</summary><div class="scroll"><table><tr><th>Country</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th>Sources</th></tr>${cs.map(x => `<tr><td>${esc(x.country)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${Object.entries(x.sites).map(([k, n]) => `${esc(SITE_LC[k] || String(k).toLowerCase())} ${n}`).join(", ")}</td></tr>`).join("")}</table></div></details>`;
     } else if (p.similar && p.similar.length) {
       h += `<p class="muted" style="margin-top:12px">Known septatypes with the same GyrA/ParC tetratype:</p><div class="scroll"><table><tr><th>Septatype</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th></tr>${p.similar.map(x => `<tr><td class="mono">${esc(x.septatype)}</td><td>${x.n_isolates}</td><td>${x.n_resistant}</td><td>${x.n_susceptible}</td></tr>`).join("")}</table></div>`;
     }
@@ -336,7 +341,7 @@ async function loadBrowse() {
     $("#b-prev").disabled = d.page <= 1; $("#b-next").disabled = d.page * PER >= d.total;
     const th = (k, t) => `<th class="sort" data-k="${k}">${t}${BS.sort === k ? (BS.desc ? " (desc)" : " (asc)") : ""}</th>`;
     const bv = META.bvLoaded;
-    $("#btable").innerHTML = `<tr>${th("genome_id", "Genome ID and name")}${th("species", "Species and site")}${th("st", "ST")}${th("country", "Country, year")}${th("septatype", "Septatype")}${th("lab", "Lab phenotype")}<th>BV-BRC computational phenotype</th><th>SeptaTyper</th></tr>` +
+    $("#btable").innerHTML = `<tr>${th("genome_id", "Genome ID and name")}${th("species", "Species and source")}${th("st", "ST")}${th("country", "Country, year")}${th("septatype", "Septatype")}${th("lab", "Lab phenotype")}<th>BV-BRC computational phenotype</th><th>SeptaTyper</th></tr>` +
       (d.rows.length ? d.rows.map(r => `<tr>
         <td class="nw">${r.bvbrc_url ? `<a href="${esc(r.bvbrc_url)}" target="_blank" rel="noopener">${esc(r.genome_id)}</a>` : esc(r.genome_id)}<span class="alias">${esc(r.genome_name || r.isolate_name)}</span></td>
         <td class="nw"><i>${esc(SHORT[r.species])}</i><span class="alias">${esc(SITE[r.habitat])}${r.source === "community" ? ", community" : ""}</span></td>
@@ -360,7 +365,9 @@ async function bvNote() {
   else n.innerHTML = `<div class="info">The BV-BRC comparison is being prepared and will appear here soon.</div>`;
 }
 INIT.browse = async () => {
+  await refreshMeta();
   const f = META.facets;
+  $("#f-hb").innerHTML = opts(f.habitat.map(([k, n]) => [k, `${SITE[k] || k} (${fmt(n)})`]), "All");
   $("#f-sp").innerHTML = opts(Object.entries(SP), "All");
   $("#dl-st").innerHTML = dl(f.st);
   $("#f-country").innerHTML = opts(withN(f.country), "All");
@@ -377,8 +384,10 @@ INIT.browse = async () => {
 async function loadBars() {
   const d = await api("/api/v1/stats/septatypes?species=" + $("#a-sp").value + "&top=12");
   const max = Math.max(...d.rows.map(r => Math.max(...Object.values(r.by_habitat))), 1);
-  $("#a-bars").innerHTML = d.rows.map(r => `<div class="hb"><span class="mono">${mutSep(r.septatype)}</span><div class="bars">${Object.entries(r.by_habitat).map(([h, n]) => `<div class="b ${h}" style="width:${Math.max(1, 100 * n / max)}%" title="${SITE[h]}: ${n}"></div>`).join("")}</div></div>`).join("") +
-    `<p class="muted" style="font-size:.85rem;margin-top:8px">Top 12 septatypes of ${fmt(d.total)} isolates. Bar length is the number of isolates at each site.</p>`;
+  const present = META.sources.map(s => s.key).filter(k => d.rows.some(r => k in r.by_habitat));
+  $("#a-legend").innerHTML = present.map(k => `<span><i style="background:${hcol(k)}"></i>${esc(SITE[k] || k)}</span>`).join("");
+  $("#a-bars").innerHTML = d.rows.map(r => `<div class="hb"><span class="mono">${mutSep(r.septatype)}</span><div class="bars">${Object.entries(r.by_habitat).map(([h, n]) => `<div class="b" style="width:${Math.max(1, 100 * n / max)}%;background:${hcol(h)}" title="${esc(SITE[h] || h)}: ${n}"></div>`).join("")}</div></div>`).join("") +
+    `<p class="muted" style="font-size:.85rem;margin-top:8px">Top 12 septatypes of ${fmt(d.total)} isolates. Bar length is the number of isolates from each isolation source.</p>`;
 }
 let plotlyP = null;
 function loadPlotly() {
@@ -386,11 +395,11 @@ function loadPlotly() {
   return plotlyP || (plotlyP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"; s.onload = ok; s.onerror = () => no(new Error("map library")); document.head.appendChild(s); }));
 }
 async function loadMap() {
-  const p = new URLSearchParams(); [["species", "#g-sp"], ["st", "#g-st"], ["tetratype", "#g-tt"], ["phenotype", "#g-ph"]].forEach(([k, s]) => { if ($(s).value) p.set(k, $(s).value); });
+  const p = new URLSearchParams(); [["species", "#g-sp"], ["st", "#g-st"], ["septatype", "#g-sep"], ["phenotype", "#g-ph"]].forEach(([k, s]) => { if ($(s).value) p.set(k, $(s).value); });
   const d = await api("/api/v1/stats/geography?" + p);
   const tot = d.rows.reduce((a, r) => a + r.n, 0), res = d.rows.reduce((a, r) => a + r.res, 0);
-  $("#g-sum").textContent = d.rows.length ? `${d.rows.length} countries, ${fmt(tot)} isolates (${fmt(res)} resistant)${d.no_country ? `. ${d.no_country} more with no country recorded.` : ""}` : "No isolates match these filters.";
-  $("#g-table").innerHTML = `<tr><th>Country</th><th>Isolates</th><th>Resistant</th><th>% resistant</th></tr>` + d.rows.map(r => `<tr><td>${esc(r.country)}</td><td class="stat">${fmt(r.n)}</td><td class="stat">${fmt(r.res)}</td><td class="stat">${Math.round(100 * r.res / r.n)}%</td></tr>`).join("");
+  $("#g-sum").textContent = d.rows.length || d.no_country ? `${d.rows.length} countries, ${fmt(tot)} isolates with a country (${fmt(res)} resistant)${d.no_country ? `, plus ${d.no_country} with no country recorded: ${fmt(tot + d.no_country)} in all.` : "."}` : "No isolates match these filters.";
+  $("#g-table").innerHTML = `<tr><th>Country</th><th>Isolates</th><th>Resistant</th><th>% resistant</th></tr>` + d.rows.map(r => `<tr><td>${esc(r.country)}</td><td class="stat">${fmt(r.n)}</td><td class="stat">${fmt(r.res)}</td><td class="stat">${Math.round(100 * r.res / r.n)}%</td></tr>`).join("") + (d.no_country ? `<tr><td class="muted">No country recorded</td><td class="stat">${fmt(d.no_country)}</td><td class="muted">-</td><td class="muted">-</td></tr>` : "");
   try {
     await loadPlotly();
     const dark = false;
@@ -400,17 +409,19 @@ async function loadMap() {
       { displayModeBar: false, responsive: true });
   } catch (e) { $("#map").innerHTML = `<p class="muted">The map library could not be loaded. The table below has the same counts.</p>`; }
 }
-INIT.analytics = () => {
+INIT.analytics = async () => {
+  await refreshMeta();
   $("#a-sp").innerHTML = opts(Object.entries(SP)); $("#a-sp").onchange = loadBars; loadBars();
   $("#g-sp").innerHTML = opts(Object.entries(SP), "All");
   $("#dl-st2").innerHTML = dl(META.facets.st);
-  $("#g-tt").innerHTML = opts(withN(META.facets.tetratype), "All");
-  $$("#p-analytics .filters select, #g-st").forEach(e => e.onchange = loadMap); loadMap();
+  $("#dl-sep").innerHTML = dl(META.facets.septatype);
+  $$("#p-analytics .filters select, #g-st, #g-sep").forEach(e => e.onchange = loadMap); loadMap();
 };
 
 /* ------------------------------------------------------------------ submit */
 INIT.submit = () => {
   $("#s-sp").innerHTML = opts(Object.entries(SP));
+  $("#dl-country").innerHTML = META.countries.map(c => `<option value="${esc(c)}"></option>`).join("");
   const upd = () => { setSites($("#s-hb"), $("#s-sp").value, false); }; $("#s-sp").onchange = upd; upd();
   $("#s-look").onclick = async () => {
     const id = $("#s-gid").value.trim(); if (!id) return;
@@ -424,7 +435,7 @@ INIT.submit = () => {
     try {
       const f = $("#s-file").files[0]; if (!f) throw new Error("Choose a genome FASTA file.");
       const fd = new FormData();
-      [["species", "#s-sp"], ["habitat", "#s-hb"], ["genome_id", "#s-gid"], ["country", "#s-country"], ["year", "#s-year"], ["source_text", "#s-src"], ["mic", "#s-mic"], ["lab_phenotype", "#s-ph"], ["email", "#s-email"]].forEach(([k, s]) => fd.append(k, $(s).value.trim()));
+      [["species", "#s-sp"], ["habitat", "#s-hb"], ["genome_id", "#s-gid"], ["country", "#s-country"], ["year", "#s-year"], ["mic", "#s-mic"], ["lab_phenotype", "#s-ph"], ["email", "#s-email"]].forEach(([k, s]) => fd.append(k, $(s).value.trim()));
       fd.append("genome_name", $("#s-name").dataset.name || ""); fd.append("file", await maybeGzip(f));
       const r = await api("/api/v1/submissions", { method: "POST", body: fd });
       const msg = { needs_review: "Needs review: the septatype is new or the prediction disagrees with your laboratory result.", pending: "Pending: the prediction matches your result or no result was given. A curator will check it." }[r.status] || r.status;
@@ -483,7 +494,7 @@ INIT.theory = async () => {
   try {
     const [s, aa] = await Promise.all([api("/api/v1/stats/accuracy"), api("/api/v1/aminoacids")]);
     const b = s.benchmark, rows = s.rows.filter(x => x.habitat !== "ALL");
-    let h = `<h3 style="font-size:1rem">Majority rule and grammar against laboratory phenotype</h3><div class="scroll"><table><tr><th>Species</th><th>Site</th><th>Isolates</th><th>Majority rule</th><th>Grammar only</th></tr>${rows.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${esc(SITE[x.habitat])}</td><td class="stat">${fmt(x.n_isolates)}</td><td class="stat">${x.accuracy}%</td><td class="stat">${x.grammar_accuracy}%</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">Both are scored on the founding isolates the rules were built from. They describe the reference set, not independent performance. The grammar only calls septatypes missing from the database.</p>`;
+    let h = `<h3 style="font-size:1rem">Majority rule and grammar against laboratory phenotype</h3><div class="scroll"><table><tr><th>Species</th><th>Source</th><th>Isolates</th><th>Majority rule</th><th>Grammar only</th></tr>${rows.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${esc(SITE[x.habitat])}</td><td class="stat">${fmt(x.n_isolates)}</td><td class="stat">${x.accuracy}%</td><td class="stat">${x.grammar_accuracy}%</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">Both are scored on the founding isolates the rules were built from. They describe the reference set, not independent performance. The grammar only calls septatypes missing from the database.</p>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Head to head with BV-BRC computational predictions</h3>`;
     if (b.loaded) h += `<p class="stat">${fmt(b.compared)} isolates have a BV-BRC computational prediction. SeptaTyper matches the lab result in ${fmt(b.septatyper_ok)} (${(100 * b.septatyper_ok / b.compared).toFixed(1)}%) and BV-BRC in ${fmt(b.bvbrc_ok)} (${(100 * b.bvbrc_ok / b.compared).toFixed(1)}%). SeptaTyper matches the laboratory phenotype where BV-BRC does not in ${fmt(b.wins)} isolates. The reverse happens in ${fmt(b.losses)}.</p><div class="scroll"><table><tr><th>Genome</th><th>Septatype</th><th>Lab</th><th>BV-BRC</th><th>SeptaTyper</th></tr>${b.examples.map(x => `<tr><td>${esc(x.genome_id)}<span class="alias">${esc(x.isolate_name)}</span></td><td class="mono">${esc(x.septatype)}</td><td>${badge(x.lab_phenotype, 1)}</td><td>${badge(x.bvbrc_call, 1)}</td><td>${badge(x.septatyper_call, 1)}</td></tr>`).join("")}</table></div>`;
     else h += `<div class="info">BV-BRC predictions have not been loaded yet, so the head-to-head comparison is empty. They load automatically when the server can reach BV-BRC.</div>`;
@@ -592,7 +603,7 @@ INIT.curate = () => {
         try {
           const res = await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value.trim() },
             body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "" }) });
-          LOADED.browse = false; LOADED.home = false;
+          LOADED.browse = false; LOADED.home = false; LOADED.analytics = false;
           if (b.dataset.a === "approve") META.counts.genomes += 1; else if (res.revoked) META.counts.genomes -= 1;
           load();
         } catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
@@ -607,23 +618,6 @@ INIT.curate = () => {
     } catch (e) { /* the sign-in message is shown by the queue */ }
   };
   $("#c-load").onclick = () => { load(); pstatus(); };
-  $("#c-dl").onclick = async () => {
-    $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
-    try { const b = await api("/api/v1/admin/backup", { headers: { "X-Admin-Token": tk } });
-      download(`septatyper_backup_${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(b, null, 1), "application/json");
-      $("#c-bks").textContent = `Downloaded ${b.submissions.length} submissions.`; }
-    catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
-  };
-  $("#c-rs").onclick = () => { if (tokenOk()) $("#c-rsf").click(); };
-  $("#c-rsf").onchange = async e => {
-    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-    $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
-    try {
-      const res = await api("/api/v1/admin/restore", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": tk }, body: await f.text() });
-      $("#c-bks").textContent = `Restored ${res.added} submissions (${res.approved_reapplied} approvals re-applied, ${res.already_present} already there)${res.problems.length ? `, ${res.problems.length} problems` : ""}.`;
-      LOADED.browse = false; LOADED.home = false; load();
-    } catch (ex) { $("#c-err").innerHTML = `<div class="err">${esc(ex.message)}</div>`; }
-  };
   $("#c-bv").onclick = async () => {
     $("#c-err").innerHTML = ""; const tk = tokenOk(); if (!tk) return;
     try { const s = await api("/api/v1/admin/bvbrc/load", { method: "POST", headers: { "X-Admin-Token": tk } });
@@ -636,7 +630,7 @@ INIT.curate = () => {
 (async () => {
   try {
     META = await api("/api/v1/meta");
-    Object.assign(SP, META.species);
+    Object.assign(SP, META.species); useSources();
     LOADED.home = false;
     route();
   } catch (e) {

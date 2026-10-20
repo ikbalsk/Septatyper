@@ -8,6 +8,7 @@ import sqlite3
 import uuid
 
 from . import grammar
+from . import countries
 from .config import DB_PATH, HABITATS, SEED_DB, SPECIES
 
 LOW_SUPPORT = 5       # fewer reference isolates than this -> flag
@@ -130,7 +131,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
             out["reference_countries"] = reference_countries(db, species, "ALL" if pooled else habitat, sep)
             if pooled:
                 out["tier"] = "database_other_site"
-                flags.append("Not seen at this site, so the call uses isolates of this species from all sites.")
+                flags.append("Not seen for this isolation source, so the call uses isolates of this species from all sources.")
             if n < LOW_SUPPORT:
                 flags.append(f"Only {n} reference isolate(s) carry this septatype, so treat the call with care.")
             if use["confidence"] < MIXED:
@@ -157,8 +158,8 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                         calls[h] = _label(rr["predicted"])
             out["by_habitat"] = calls
             if len(set(calls.values())) > 1:
-                flags.append("The call differs by site (" + ", ".join(f"{k}: {v}" for k, v in calls.items())
-                             + "). Pick the isolate's site for a firmer answer.")
+                flags.append("The call differs by source (" + ", ".join(f"{k}: {v}" for k, v in calls.items())
+                             + "). Pick the isolate's source for a firmer answer.")
         out["flags"] = flags
         return out
     finally:
@@ -215,10 +216,10 @@ def benchmark() -> dict:
     return res
 
 
-def geography(species="", st="", tetratype="", phenotype="", missing=False):
+def geography(species="", st="", tetratype="", phenotype="", missing=False, septatype=""):
     """Counts per country. With missing=True, returns how many matching isolates have no country."""
     where, args = ["iso3 IS NULL" if missing else "iso3 IS NOT NULL"], []
-    for col, val in (("species", species), ("st", st), ("tetratype", tetratype), ("lab_phenotype", phenotype)):
+    for col, val in (("species", species), ("st", st), ("tetratype", tetratype), ("septatype", septatype), ("lab_phenotype", phenotype)):
         if val:
             where.append(f"{col}=?")
             args.append(val)
@@ -257,6 +258,8 @@ def facets() -> dict:
         f = {"st": q("SELECT st, COUNT(*) FROM isolates WHERE st IS NOT NULL GROUP BY st ORDER BY COUNT(*) DESC, st"),
              "country": q("SELECT country, COUNT(*) FROM isolates WHERE country IS NOT NULL GROUP BY country ORDER BY COUNT(*) DESC, country"),
              "tetratype": q("SELECT tetratype, COUNT(*) FROM isolates GROUP BY tetratype ORDER BY COUNT(*) DESC, tetratype"),
+             "septatype": q("SELECT septatype, COUNT(*) FROM isolates GROUP BY septatype ORDER BY COUNT(*) DESC, septatype"),
+             "habitat": q("SELECT habitat, COUNT(*) FROM isolates GROUP BY habitat ORDER BY COUNT(*) DESC, habitat"),
              "year": [r[0] for r in db.execute("SELECT MIN(year_start), MAX(COALESCE(year_end,year_start)) FROM isolates")]}
     finally:
         db.close()
@@ -389,9 +392,9 @@ def apply_approval(db, s) -> str:
     gid = s["genome_id"] or f"SUB-{s['job_id']}"
     if db.execute("SELECT 1 FROM isolates WHERE genome_id=?", (gid,)).fetchone():
         raise ValueError(f"Genome ID {gid} is already in the database.")
-    country = s["country"]
-    iso3 = None
-    if country:
+    country = countries.canonical(s["country"]) or s["country"]
+    iso3 = countries.iso3(country)
+    if country and not iso3:
         r = db.execute("SELECT iso3 FROM isolates WHERE country=? AND iso3 IS NOT NULL LIMIT 1", (country,)).fetchone()
         iso3 = r[0] if r else None
     ys = int(s["year"]) if s["year"] and str(s["year"]).isdigit() else None

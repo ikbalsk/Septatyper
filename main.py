@@ -22,8 +22,8 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import bvbrc, grammar, persist, rules, septatype
-from .config import ADMIN_TOKEN, HABITATS, MAX_UPLOAD_MB, SPECIES
+from . import bvbrc, countries, grammar, persist, rules, septatype
+from .config import ADMIN_TOKEN, HABITATS, MAX_UPLOAD_MB, SOURCES, SPECIES
 
 app = FastAPI(title="SeptaTyper API", version="2.0",
               description="Ciprofloxacin resistance prediction and isolate repository for Enterobacterales.")
@@ -38,7 +38,7 @@ def _check(species: str, habitat: str):
     if species not in SPECIES:
         raise HTTPException(400, "Unknown species.")
     if habitat not in HABITATS[species]:
-        raise HTTPException(400, f"Site '{habitat}' is not available for {SPECIES[species]}.")
+        raise HTTPException(400, f"Isolation source '{habitat}' is not available.")
 
 
 _CACHE: dict = {}          # (sha256, species, qnr overrides) -> analysis; the same file is never analysed twice
@@ -148,6 +148,7 @@ def meta():
     finally:
         db.close()
     return {"species": SPECIES, "habitats": HABITATS, "stats": s["rows"], "build": s["meta"],
+            "sources": [{"key": k, "label": l, "short": sh} for k, l, sh in SOURCES], "countries": sorted(countries.COUNTRIES),
             "counts": {"genomes": n, "species": nsp, "septatypes": nsep, "countries": ncountry, "community": ncomm},
             "references": septatype.refs_status(), "max_upload_mb": MAX_UPLOAD_MB,
             "curation_enabled": bool(ADMIN_TOKEN), "facets": rules.facets()}
@@ -246,9 +247,9 @@ def stats_accuracy():
 
 
 @app.get("/api/v1/stats/geography")
-def stats_geo(species: str = "", st: str = "", tetratype: str = "", phenotype: str = ""):
-    return {"rows": rules.geography(species, st, tetratype, phenotype),
-            "no_country": rules.geography(species, st, tetratype, phenotype, missing=True)}
+def stats_geo(species: str = "", st: str = "", tetratype: str = "", phenotype: str = "", septatype: str = ""):
+    return {"rows": rules.geography(species, st, tetratype, phenotype, septatype=septatype),
+            "no_country": rules.geography(species, st, tetratype, phenotype, missing=True, septatype=septatype)}
 
 
 @app.get("/api/v1/stats/septatypes")
@@ -330,7 +331,12 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
            sequence: str = Form(""), qnrB2: str = Form("auto"), qnrS1: str = Form("auto")):
     _check(species, habitat)
     if habitat == "ALL":
-        raise HTTPException(400, "Choose the isolation site.")
+        raise HTTPException(400, "Choose the isolation source.")
+    country_name = None
+    if country.strip():
+        country_name = countries.canonical(country)
+        if not country_name:
+            raise HTTPException(400, "Pick the country from the list.")
     if genome_id and not GENOME_ID.match(genome_id.strip()):
         raise HTTPException(400, "A BV-BRC genome ID looks like 562.7710. Leave it empty if the genome is not at BV-BRC.")
     if lab_phenotype and lab_phenotype not in ("Resistant", "Susceptible"):
@@ -349,7 +355,7 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
     result = _result(species, habitat, analysis, analysis["septatype"])
     # keep only derived genotype data. The genome itself is never stored.
     d = dict(species=species, habitat=habitat, genome_id=genome_id.strip() or None, genome_name=genome_name.strip()[:200] or None,
-             country=country.strip()[:80] or None, year=year.strip() or None, source_text=source_text.strip()[:200] or None,
+             country=country_name, year=year.strip() or None, source_text=None,
              mic=mic.strip()[:40] or None, lab_phenotype=lab_phenotype or None, email=email.strip() or None)
     sub = rules.create_submission(d, result)
     return sub | {"result": result}

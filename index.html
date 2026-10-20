@@ -61,7 +61,7 @@
   <div class="band modules">
     <h2>Four modules</h2>
     <a href="#/predict"><b>Predict</b><span>Upload or paste a sequence, or enter the residues, and get the septatype, the sequence type and the phenotype.</span></a>
-    <a href="#/browse"><b>Browse</b><span>Filter the repository by species, site, ST, septatype, country and year. Compare lab, BV-BRC and SeptaTyper calls.</span></a>
+    <a href="#/browse"><b>Browse</b><span>Filter the repository by species, isolation source, ST, septatype, country and year. Compare lab, BV-BRC and SeptaTyper calls.</span></a>
     <a href="#/submit"><b>Submit</b><span>Contribute an isolate. Curators check the lab result against the prediction before it goes live.</span></a>
     <a href="#/theory"><b>Theory</b><span>The context-dependent grammar, an interactive view of the binding pocket and the validation figures.</span></a>
   </div>
@@ -74,7 +74,7 @@
     <form class="band" id="pf" autocomplete="off">
       <div class="row2">
         <div><label for="sp">Species</label><select id="sp"></select></div>
-        <div><label for="hb">Isolation site</label><select id="hb"></select></div>
+        <div><label for="hb">Isolation source</label><select id="hb"></select></div>
       </div>
       <div id="refwarn"></div>
       <div class="seg" id="pmode" role="tablist">
@@ -128,7 +128,7 @@
   <div class="band">
     <div class="filters">
       <div><label for="f-sp">Species</label><select id="f-sp"><option value="">All</option></select></div>
-      <div><label for="f-hb">Site</label><select id="f-hb"><option value="">All</option><option value="FECAL">Fecal</option><option value="URINE">Urine</option><option value="RESPIRATORY">Respiratory</option></select></div>
+      <div><label for="f-hb">Isolation source</label><select id="f-hb"><option value="">All</option></select></div>
       <div><label for="f-st">Sequence type</label><input type="search" id="f-st" list="dl-st" placeholder="All, or type ST131" autocomplete="off"><datalist id="dl-st"></datalist></div>
       <div><label for="f-country">Country</label><select id="f-country"><option value="">All</option></select></div>
       <div><label for="f-sep">Septatype</label><input type="search" id="f-sep" placeholder="S-D-S-E-L-1-0"></div>
@@ -149,11 +149,11 @@
 
 <!-- ANALYTICS -->
 <section id="p-analytics" class="page">
-  <div class="page-head"><h2>Analytics</h2><p>Septatype frequency by site and the geography of a clone or tetratype.</p></div>
+  <div class="page-head"><h2>Analytics</h2><p>Septatype frequency by isolation source and the geography of a clone or septatype. Approved submissions are included.</p></div>
   <div class="band">
-    <h3>Septatype frequency by site</h3>
+    <h3>Septatype frequency by isolation source</h3>
     <div class="row2"><div><label for="a-sp">Species</label><select id="a-sp"></select></div></div>
-    <div class="legend"><span><i style="background:#1d4e89"></i>Fecal</span><span><i style="background:#4d9de0"></i>Urine</span><span><i style="background:#9cc4f5"></i>Respiratory</span></div>
+    <div class="legend" id="a-legend"></div>
     <div id="a-bars"></div>
   </div>
   <div class="band">
@@ -161,7 +161,7 @@
     <div class="filters">
       <div><label for="g-sp">Species</label><select id="g-sp"><option value="">All</option></select></div>
       <div><label for="g-st">Sequence type</label><input type="search" id="g-st" list="dl-st2" placeholder="All, or type ST131" autocomplete="off"><datalist id="dl-st2"></datalist></div>
-      <div><label for="g-tt">Tetratype</label><select id="g-tt"><option value="">All</option></select></div>
+      <div><label for="g-sep">Septatype</label><input type="search" id="g-sep" list="dl-sep" placeholder="All, or type S-D-S-E-L-0-0" autocomplete="off"><datalist id="dl-sep"></datalist></div>
       <div><label for="g-ph">Phenotype</label><select id="g-ph"><option value="" selected>All</option><option>Resistant</option><option>Susceptible</option></select></div>
     </div>
     <div id="map"></div>
@@ -177,23 +177,20 @@
     <form class="band" id="sf" autocomplete="off">
       <div class="row2">
         <div><label for="s-sp">Species</label><select id="s-sp" required></select></div>
-        <div><label for="s-hb">Isolation site</label><select id="s-hb" required></select></div>
+        <div><label for="s-hb">Isolation source</label><select id="s-hb" required></select></div>
       </div>
       <label for="s-gid">BV-BRC genome ID (optional)</label>
       <div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" id="s-gid" placeholder="562.7710" inputmode="decimal"><button class="btn line" type="button" id="s-look">Look up</button></div>
       <div id="s-name" class="muted" style="margin:-6px 0 10px;font-size:.9rem"></div>
       <div class="row2">
-        <div><label for="s-country">Country</label><input type="text" id="s-country"></div>
+        <div><label for="s-country">Country (type to search)</label><input type="text" id="s-country" list="dl-country" placeholder="Start typing a country" autocomplete="off"><datalist id="dl-country"></datalist></div>
         <div><label for="s-year">Collection year</label><input type="text" id="s-year" inputmode="numeric" maxlength="4" placeholder="2024"></div>
       </div>
       <div class="row2">
-        <div><label for="s-src">Source or sample type</label><input type="text" id="s-src" placeholder="clean-catch urine"></div>
         <div><label for="s-mic">Ciprofloxacin MIC (mg/L)</label><input type="text" id="s-mic"></div>
-      </div>
-      <div class="row2">
         <div><label for="s-ph">Laboratory phenotype</label><select id="s-ph"><option value="">Not tested</option><option>Resistant</option><option>Susceptible</option></select></div>
-        <div><label for="s-email">Contact email (optional)</label><input type="email" id="s-email"></div>
       </div>
+      <div style="margin-bottom:12px"><label for="s-email">Contact email (optional)</label><input type="email" id="s-email"></div>
       <label for="s-file">Genome FASTA</label>
       <input type="file" id="s-file" accept=".fa,.fasta,.fna,.fas,.txt,.gz" style="margin-bottom:12px">
       <button class="btn solid block" id="s-go" type="submit">Submit for curation</button>
@@ -260,8 +257,8 @@
       <tr><td class="mono">GET /api/v1/rules</td><td>Rules table for a species and habitat.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/accuracy</td><td>Accuracy, benchmark against BV-BRC and edge cases.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/geography</td><td>Counts per country.</td></tr>
-      <tr><td class="mono">GET /api/v1/stats/septatypes</td><td>Septatype frequency by site.</td></tr>
-      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence. The reply holds the septatype, the call, <span class="mono">analysis.mlst</span> (sample ST and alleles) and, under <span class="mono">prediction</span>, the sites, countries and STs of the reference isolates behind the call.</td></tr>
+      <tr><td class="mono">GET /api/v1/stats/septatypes</td><td>Septatype frequency by isolation source.</td></tr>
+      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence. The reply holds the septatype, the call, <span class="mono">analysis.mlst</span> (sample ST and alleles) and, under <span class="mono">prediction</span>, the isolation sources, countries and STs of the reference isolates behind the call.</td></tr>
       <tr><td class="mono">POST /api/v1/predict/manual</td><td>JSON with the five residues and qnr flags.</td></tr>
       <tr><td class="mono">POST /api/v1/submissions</td><td>Community submission (enters the curation queue).</td></tr>
     </table></div>
@@ -308,8 +305,7 @@
     <div class="scroll"><table id="c-table"></table></div>
     <div class="toolbar" style="margin-top:14px"><button class="btn line" id="c-bv" type="button">Load BV-BRC data now</button><span id="c-bvs" class="muted"></span></div>
     <h3 style="margin-top:18px">Backup</h3>
-    <p class="muted small" style="margin:0 0 8px">Free hosting forgets submissions and decisions when the server restarts. Download a backup now and then, or switch on the automatic GitHub backup. <span id="c-pst"></span></p>
-    <div class="toolbar"><span><button class="btn line" id="c-dl" type="button">Download backup</button> <button class="btn line" id="c-rs" type="button">Restore from backup file</button><input type="file" id="c-rsf" accept=".json,application/json" hidden></span><span id="c-bks" class="muted"></span></div>
+    <p class="muted small" style="margin:0"><span id="c-pst">Sign in to see the automatic backup status.</span></p>
   </div>
 </section>
 

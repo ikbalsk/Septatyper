@@ -18,13 +18,25 @@ SPECIES = {
     "senterica": "Salmonella enterica subsp. I",
     "kpneumoniae": "Klebsiella pneumoniae",
 }
-# habitats with data per species (ALL = pooled across habitats)
-HABITATS = {
-    "ecoli": ["FECAL", "URINE", "ALL"],
-    "ssonnei": ["FECAL"],
-    "senterica": ["FECAL"],
-    "kpneumoniae": ["FECAL", "URINE", "RESPIRATORY", "ALL"],
-}
+# Isolation sources. The first three have reference isolates; the others can be submitted and, once a curator
+# approves them, build their own reference. A prediction for a source with no reference isolates yet falls back to
+# the isolates of that species from all sources, and says so. ALL means the source is unknown.
+SOURCES = [
+    ("FECAL", "Stool (fecal)", "fecal"),
+    ("URINE", "Urine", "urine"),
+    ("RESPIRATORY", "Respiratory (sputum, lung)", "respiratory"),
+    ("BLOOD", "Blood", "blood"),
+    ("WOUND", "Wound, skin or soft tissue", "wound or skin"),
+    ("CSF", "Cerebrospinal fluid", "cerebrospinal fluid"),
+    ("ABDOMINAL", "Abdominal, bile or peritoneal", "abdominal"),
+    ("GENITAL", "Genital tract", "genital tract"),
+    ("ENVIRONMENT", "Environment (water, soil)", "environmental"),
+    ("FOOD", "Food", "food"),
+    ("ANIMAL", "Animal", "animal"),
+    ("OTHER", "Other source", "other source"),
+]
+HABITATS = {sp: [k for k, _, _ in SOURCES] + ["ALL"] for sp in SPECIES}
+
 # Table S1 section name -> species key
 SECTION_TO_SPECIES = {
     "Escherichia coli": "ecoli",
