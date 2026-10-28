@@ -124,7 +124,7 @@
 
 <!-- BROWSE -->
 <section id="p-browse" class="page">
-  <div class="page-head"><h2>Browse the repository</h2><p>Genome IDs link to BV-BRC. The isolate name sits under each ID.</p></div>
+  <div class="page-head"><h2>Browse the repository</h2><p>Genome IDs link to BV-BRC. The isolate name sits under each ID. The &lt;H&gt; column is the mean hydrophobicity of the whole GyrA and ParC QRDR helices, with the isolate&#39;s residues at the four positions.</p></div>
   <div class="band">
     <div class="filters">
       <div><label for="f-sp">Species</label><select id="f-sp"><option value="">All</option></select></div>
@@ -230,7 +230,7 @@
     </table></div>
     <p class="muted" style="font-size:.9rem;margin-top:8px">A negatively charged ParC-84 counts in the Resistant column only when ParC-80 is hydrophobic.</p>
     <p><a href="#/calc">See the worked calculation of the hydrophobicity value and the cutoff</a></p>
-    <p style="margin-top:12px">Two or more votes mean Resistant and none means Susceptible. One vote is settled by the combined mean hydrophobicity &lt;H&gt; of the four residues against 0.0 (Eisenberg scale). Overrides on a susceptible baseline: a qnr gene present gives Resistant, <i>S. sonnei</i> with RecN-346 F gives Resistant, <i>S. enterica</i> F-D-S-E with the ctg codon gives Resistant, and a single GyrA-83 or GyrA-87 change in <i>S. sonnei</i> gives Resistant.</p>
+    <p style="margin-top:12px">Two or more votes mean Resistant and none means Susceptible. One vote is settled by the QRDR helix mean hydrophobicity &lt;H&gt; (Eisenberg scale) against a cutoff of 0.334, the midpoint between the wild-type helices (S-D-S-E, 0.270) and the resistant reference helices (L-N-I-E, 0.397). &lt;H&gt; covers the whole GyrA helix (82-93, 12 residues) and ParC helix (80-90, 11 residues) with the sample&#39;s residues at positions 83, 87, 80 and 84: the GyrA mean is the sum over 12, the ParC mean is the sum over 11, and &lt;H&gt; is the average of the two. Overrides on a susceptible baseline: a qnr gene present gives Resistant, <i>S. sonnei</i> with RecN-346 F gives Resistant, <i>S. enterica</i> F-D-S-E with the ctg codon gives Resistant, and a single GyrA-83 or GyrA-87 change in <i>S. sonnei</i> gives Resistant.</p>
     <p class="muted">The grammar is only used for septatypes not seen in the reference isolates. Residue classes marked as assumptions (for example G, P and C counted as hydrophobic) are set in <code>app/grammar.py</code>.</p>
   </div>
   <div class="band"><h3>Performance validation</h3><div id="t-valid"></div></div>
@@ -239,7 +239,7 @@
 
 <!-- CALC -->
 <section id="p-calc" class="page">
-  <div class="page-head"><h2>How the call is calculated</h2><p>Residue classes, the hydrophobicity value and the cutoff, with worked numbers.</p></div>
+  <div class="page-head"><h2>How the call is calculated</h2><p>Residue classes, the QRDR helix hydrophobicity value and the cutoff, with worked numbers.</p></div>
   <div id="calc-body"><div class="band muted">Loading</div></div>
 </section>
 
@@ -252,7 +252,7 @@
   <div class="band"><h3>Endpoints</h3>
     <div class="scroll"><table>
       <tr><th>Method and path</th><th>Purpose</th></tr>
-      <tr><td class="mono">GET /api/v1/isolates</td><td>Filter by species, habitat, st, country, septatype, tetratype, phenotype, year_from, year_to, wins, q. Each isolate carries its <span class="mono">st</span>. Paged with page and per_page.</td></tr>
+      <tr><td class="mono">GET /api/v1/isolates</td><td>Filter by species, habitat, st, country, septatype, tetratype, phenotype, year_from, year_to, wins, q. Each isolate carries its <span class="mono">st</span> and its QRDR helix hydrophobicity (<span class="mono">h_gyr</span>, <span class="mono">h_parc</span>, <span class="mono">h_qrdr</span>). Paged with page and per_page.</td></tr>
       <tr><td class="mono">GET /api/v1/isolates/{genome_id}</td><td>One isolate, with its BV-BRC link.</td></tr>
       <tr><td class="mono">GET /api/v1/rules</td><td>Rules table for a species and habitat.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/accuracy</td><td>Accuracy, benchmark against BV-BRC and edge cases.</td></tr>
@@ -277,6 +277,8 @@
     <p>The septatype combines the residues at GyrA-83, GyrA-87, ParC-80, ParC-84 and RecN-346 with the presence or absence of qnrB and qnrS family genes. Residues are read from codons so that synonymous changes, such as the RecN-346 cta and ctg codons in <i>Salmonella</i>, are kept. Genes are located with BLAST+ against reference genes for the chosen species, then aligned to that reference to read each codon. The qnr genes are detected with qnrB2 and qnrS1 reference alleles.</p>
     <h3>Sequence types</h3>
     <p>The sequence type (ST) of an uploaded genome is read with PubMLST schemes: Achtman for <i>E. coli</i>, <i>S. sonnei</i> and <i>S. enterica</i>, Diancourt for <i>K. pneumoniae</i>. An ST is given only when all seven alleles match exactly and the profile exists. Otherwise the nearest alleles are shown. The STs of the reference isolates come from Table S1. Scheme data were taken from the tseemann/mlst database (downloaded 2026-03-11) and the PubMLST website; cite PubMLST (Jolley et al. 2018).</p>
+    <h3>Hydrophobicity (QRDR helix)</h3>
+    <p>The mean hydrophobicity &lt;H&gt; is read over the whole quinolone resistance-determining region helix of each enzyme: GyrA 82-93 (D<b>S</b>AVY<b>D</b>TIVRMA, 12 residues) and ParC 80-90 (<b>S</b>ACY<b>E</b>AMVLMA, 11 residues). The four tetratype positions (in bold) take the sample&#39;s residues and the others stay fixed. The GyrA helix mean is the sum of H over 12, the ParC helix mean is the sum over 11, and &lt;H&gt; = (GyrA mean + ParC mean) / 2. The Browse table and the CSV and JSON downloads give all three values for every isolate.</p>
     <h3>What the numbers mean</h3>
     <p>Reference accuracy is calculated on the 2,734 founding isolates that also define the rules. It is not independent validation. The grammar accuracy is also scored on these isolates, with rules written while looking at them.</p>
     <h3>Limits</h3>

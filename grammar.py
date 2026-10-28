@@ -9,8 +9,17 @@ the rules were silent are marked ASSUMPTION and are easy to change here.
   GyrA-87          : acidic residue (D, E) keeps the negative charge: no vote. Anything else votes Resistant.
   ParC-84          : a non-acidic residue votes Resistant. An acidic residue (E, D) votes Resistant
                      only when ParC-80 is hydrophobic (context dependence).
-  Two or more votes = Resistant, zero = Susceptible. A single vote is settled by the combined
-  mean hydrophobicity <H> of the four residues against 0.0 (the mean of the Eisenberg scale).
+  Two or more votes = Resistant, zero = Susceptible. A single vote is settled by the QRDR helix mean
+  hydrophobicity <H> against the cutoff (see below).
+  <H> is read over the whole QRDR helix of both enzymes, with the sample's residues put in at the four
+  tetratype positions:
+      GyrA helix 82-93  D(S)AVY(D)TIVRMA   12 residues, mean = sum / 12   (S = GyrA-83, D = GyrA-87)
+      ParC helix 80-90  (S)ACY(E)AMVLMA    11 residues, mean = sum / 11   (S = ParC-80, E = ParC-84)
+      <H> = (GyrA mean + ParC mean) / 2
+  Cutoff: the midpoint between the <H> of the susceptible wild-type helices (S-D-S-E, 0.270) and the <H> of the
+  resistant reference helices (L-N-I-E, 0.397), which is 0.334. It is set from these two reference helices,
+  not by searching the isolates for the best score. A cutoff at the wild-type value alone (0.270) would turn
+  single-vote septatypes such as S. enterica F-D-S-E (0.327) resistant whatever the codon.
   S. sonnei with a single vote at GyrA-83 or GyrA-87 -> Resistant (data show L-D-S-E and S-Y-S-E are resistant).
   Septatype overrides (applied to a Susceptible baseline):
     qnrB or qnrS present            -> Resistant
@@ -32,7 +41,6 @@ ACIDIC = set("DE")
 POLAR_UNCHARGED = set("STYNQ")     # polar side chain, no charge
 HYDROPHOBIC = set("AVILMFWPGC")  # ASSUMPTION: non-polar side chains incl. G, P, C
 BASIC = set("KRH")
-H_CUTOFF = 0.0
 
 
 def aa_class(a: str) -> str:
@@ -47,8 +55,39 @@ def aa_class(a: str) -> str:
     return "polar, uncharged"
 
 
+# QRDR helices (E. coli numbering). The four tetratype positions are replaced by the sample's residues.
+GYR_HELIX, GYR_START = "DSAVYDTIVRMA", 82      # GyrA 82-93; GyrA-83 and GyrA-87 sit at helix places 2 and 6
+PARC_HELIX, PARC_START = "SACYEAMVLMA", 80     # ParC 80-90; ParC-80 and ParC-84 sit at helix places 1 and 5
+WILD4 = "SDSE"                                 # wild-type, susceptible residues at the four positions
+RES4 = "LNIE"                                  # resistant reference: the commonest fully changed tetratype in the reference isolates
+
+
+def _helices(aas4):
+    g83, g87, p80, p84 = aas4
+    g, p = list(GYR_HELIX), list(PARC_HELIX)
+    g[83 - GYR_START], g[87 - GYR_START] = g83, g87
+    p[80 - PARC_START], p[84 - PARC_START] = p80, p84
+    return g, p
+
+
+def _helix_means(aas4):
+    g, p = _helices(aas4)
+    return sum(EISENBERG[a] for a in g) / len(g), sum(EISENBERG[a] for a in p) / len(p)
+
+
 def mean_h(aas4) -> float:
-    return round(sum(EISENBERG[a] for a in aas4) / 4, 3)
+    """QRDR helix mean hydrophobicity: (GyrA helix mean over 12 residues + ParC helix mean over 11 residues) / 2."""
+    hg, hp = _helix_means(aas4)
+    return round((hg + hp) / 2, 3)
+
+
+def _unrounded(aas4) -> float:
+    hg, hp = _helix_means(aas4)
+    return (hg + hp) / 2
+
+
+H_WILD, H_RES = mean_h(list(WILD4)), mean_h(list(RES4))                        # 0.270 and 0.397
+H_CUTOFF = round((_unrounded(list(WILD4)) + _unrounded(list(RES4))) / 2, 3)   # 0.334, the midpoint of the two reference helices
 
 
 def votes(g83, g87, p80, p84) -> list[dict]:
@@ -69,12 +108,13 @@ def votes(g83, g87, p80, p84) -> list[dict]:
     return v
 
 
-def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = None) -> dict:
+def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = None, cutoff: float | None = None) -> dict:
     """aas = [g83, g87, p80, p84, r346]. Returns call, rule fired, votes, <H>."""
     g83, g87, p80, p84, r346 = aas
     vs = votes(g83, g87, p80, p84)
     n = sum(1 for x in vs if x["vote"])
     h = mean_h([g83, g87, p80, p84])
+    cut = H_CUTOFF if cutoff is None else cutoff       # only the calculation page tries other cutoffs
     override, decided = None, "votes"
     if n >= 2:
         call, rule = "Resistant", f"{n} of 4 positions vote Resistant"
@@ -83,8 +123,8 @@ def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = 
     elif species == "ssonnei" and next(x for x in vs if x["vote"])["position"] in ("GyrA-83", "GyrA-87"):
         call, rule, override, decided = "Resistant", "S. sonnei single GyrA-83 or GyrA-87 change (L-D-S-E, S-Y-S-E pattern)", "sonnei_gyr", "override"
     else:
-        call = "Resistant" if h > H_CUTOFF else "Susceptible"
-        rule, decided = f"1 vote; mean hydrophobicity {h} is {'above' if h > H_CUTOFF else 'at or below'} {H_CUTOFF}", "hydrophobicity"
+        call = "Resistant" if h > cut else "Susceptible"
+        rule, decided = f"1 vote; QRDR helix mean hydrophobicity {h} is {'above' if h > cut else 'at or below'} {cut}", "hydrophobicity"
     if call == "Susceptible":
         if qnrB or qnrS:
             call, rule, override, decided = "Resistant", "qnr gene present on a susceptible baseline (PMQR override)", "qnr", "override"
@@ -106,11 +146,18 @@ ROWS = [("GyrA-83", "Polar residue with -OH group", "Hydrophobic residue"),
 
 
 def h_block(aas4) -> dict:
-    """Hydrophobicity worked out for four residues: each H value, the sum and the mean."""
-    names = ("GyrA-83", "GyrA-87", "ParC-80", "ParC-84")
-    vals = [{"position": n, "residue": a, "h": EISENBERG[a]} for n, a in zip(names, aas4)]
-    total = round(sum(v["h"] for v in vals), 3)
-    return {"residues": "".join(aas4), "values": vals, "sum": total, "mean": round(total / 4, 3)}
+    """QRDR helix hydrophobicity worked out for four tetratype residues: every residue's H for the GyrA helix
+    (12 residues) and the ParC helix (11 residues), each helix mean, and the combined mean."""
+    g, p = _helices(aas4)
+
+    def blk(res, start, label, subs):
+        vals = [{"position": f"{label}-{start + i}", "residue": a, "h": EISENBERG[a], "sub": (start + i) in subs}
+                for i, a in enumerate(res)]
+        tot = sum(v["h"] for v in vals)
+        return {"gene": label, "start": start, "end": start + len(res) - 1, "n": len(res), "values": vals,
+                "sum": round(tot, 3), "mean": round(tot / len(res), 3)}
+    return {"residues": "".join(aas4), "gyr": blk(g, GYR_START, "GyrA", (83, 87)),
+            "parc": blk(p, PARC_START, "ParC", (80, 84)), "mean": mean_h(aas4)}
 
 
 def _terms(pos: str, res: str, vote: bool):
@@ -133,7 +180,7 @@ def _terms(pos: str, res: str, vote: bool):
 
 def explain(species: str, aas, g: dict, ref4=None, qnr=(False, False), codon=None) -> dict:
     """Three criteria behind a call, laid out like the authors' residue-class table.
-    1 residue class per position, 2 mean hydrophobicity against the cutoff, 3 septatype overrides."""
+    1 residue class per position, 2 QRDR helix mean hydrophobicity against the cutoff, 3 septatype overrides."""
     g83, g87, p80, p84, _ = aas
     pos = []
     for v, (name, s_txt, r_txt), res in zip(g["votes"], ROWS, (g83, g87, p80, p84)):
@@ -154,7 +201,7 @@ def explain(species: str, aas, g: dict, ref4=None, qnr=(False, False), codon=Non
                     "susceptible_parts": fmt(S, sS), "susceptible_suffix": sS,
                     "resistant_parts": fmt(R, sR), "resistant_suffix": sR, "note": note})
     sample = h_block([p["residue"] for p in pos])
-    ref = h_block(list(ref4) if ref4 else list("SDSE"))
+    ref = h_block(list(ref4) if ref4 else list(WILD4))
     voters = [v["position"] for v in g["votes"] if v["vote"]]
     met = {"qnr": bool(qnr[0] or qnr[1]),
            "sonnei_gyr": species == "ssonnei" and len(voters) == 1 and voters[0] in ("GyrA-83", "GyrA-87"),
@@ -162,7 +209,7 @@ def explain(species: str, aas, g: dict, ref4=None, qnr=(False, False), codon=Non
            "senterica_ctg": species == "senterica" and [g83, g87, p80, p84] == list("FDSE") and (codon or "").upper() == "CTG"}
     ov = [{"key": k, "text": t, "fired": g["override"] == k, "met": met[k]} for k, sp, t in OVERRIDES if sp in (None, species)]
     return {"decided_by": g["decided_by"], "n_resistant_positions": g["n_votes"], "positions": pos,
-            "hydrophobicity": {"values": sample["values"], "sum": sample["sum"], "mean": sample["mean"], "cutoff": H_CUTOFF,
+            "hydrophobicity": {"gyr": sample["gyr"], "parc": sample["parc"], "mean": sample["mean"], "cutoff": H_CUTOFF,
                                "side": "above" if sample["mean"] > H_CUTOFF else "at_or_below"},
             "reference": ref, "overrides": ov, "grammar_call": g["call"], "rule": g["rule"]}
 

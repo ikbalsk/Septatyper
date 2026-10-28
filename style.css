@@ -210,3 +210,10 @@ tr.hit-row td{background:var(--amber-bg);font-weight:600}
 .basis{margin:10px 0 4px;font-size:1rem}
 .page-head h2{color:var(--th-ink)}
 a{text-decoration-thickness:1px;text-underline-offset:2px}
+
+/* QRDR helix strips */
+.helix{font:600 .92rem var(--mono);letter-spacing:.1em;margin:0 4px}
+.helix .sub{color:var(--res);background:var(--res-bg);border-radius:3px;padding:0 2px}
+.formula.wrap{white-space:normal;overflow-wrap:anywhere}
+.grid2>*,.mech>*,.row2>*{min-width:0}
+.res5 input{width:100%;min-width:0}

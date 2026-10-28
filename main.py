@@ -238,7 +238,10 @@ def rules_table(species: str, habitat: str = "ALL"):
         st = db.execute("SELECT * FROM species_stats WHERE species=? AND habitat=?", (species, habitat)).fetchone()
     finally:
         db.close()
-    return {"stats": dict(st) if st else None, "rows": [dict(r) for r in rows]}
+    out = [dict(r) for r in rows]
+    for r in out:                      # recomputed, so a live database built before the helix change still shows current values
+        r["mean_h"] = grammar.mean_h(r["tetratype"].split("-"))
+    return {"stats": dict(st) if st else None, "rows": out}
 
 
 @app.get("/api/v1/stats/accuracy")

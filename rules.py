@@ -266,6 +266,16 @@ def facets() -> dict:
     return f
 
 
+def _row_h(d: dict):
+    """QRDR helix hydrophobicity of an isolate, from its four tetratype residues: GyrA helix mean, ParC helix mean, combined."""
+    try:
+        a4 = [d["gyrA_83"], d["gyrA_87"], d["parC_80"], d["parC_84"]]
+        hg, hp = grammar._helix_means(a4)
+    except (KeyError, TypeError):
+        return None, None, None
+    return round(hg, 3), round(hp, 3), grammar.mean_h(a4)
+
+
 SORTS = {"genome_id": "genome_id", "species": "species, habitat", "st": "st", "year": "year_start",
          "country": "country", "septatype": "septatype", "lab": "lab_phenotype"}
 
@@ -308,6 +318,7 @@ def isolates_query(f: dict, sort="genome_id", desc=False, page=1, per_page=25, l
     out = []
     for r in rows:
         d = dict(r)
+        d["h_gyr"], d["h_parc"], d["h_qrdr"] = _row_h(d)
         d["star"] = bool(d["bvbrc_call"] and d["septatyper_call"] == d["lab_phenotype"] and d["bvbrc_call"] != d["lab_phenotype"])
         d["bvbrc_url"] = f"https://www.bv-brc.org/view/Genome/{d['genome_id']}" if not d["genome_id"].startswith("SUB-") else None
         out.append(d)
@@ -457,7 +468,7 @@ def decide(job_id: str, action: str, note: str = "") -> dict:
 
 
 def cutoff_stats() -> dict:
-    """How well mean hydrophobicity separates resistant from susceptible isolates, from the founding data."""
+    """How well the QRDR helix mean hydrophobicity separates resistant from susceptible isolates, from the founding data."""
     db = conn()
     try:
         rows = db.execute("""SELECT tetratype, SUM(lab_phenotype='Resistant') r, SUM(lab_phenotype='Susceptible') s
@@ -469,12 +480,13 @@ def cutoff_stats() -> dict:
         a = t["tetratype"].split("-")
         groups.append((grammar.mean_h(a), sum(1 for v in grammar.votes(*a) if v["vote"]), t["r"], t["s"]))
     n_r, n_s = sum(g[2] for g in groups), sum(g[3] for g in groups)
+    cut = grammar.H_CUTOFF
+    grid = sorted({round(0.20 + 0.02 * i, 2) for i in range(16)} | {cut, grammar.H_WILD})
 
     def table(sub):
         tot = sum(g[2] + g[3] for g in sub)
         out = []
-        for c10 in range(-10, 11):
-            c = c10 / 10
+        for c in grid:
             ok = sum((g[2] if g[0] > c else g[3]) for g in sub)
             out.append({"cutoff": c, "accuracy": round(100 * ok / tot, 1) if tot else None})
         return out, tot
@@ -482,10 +494,31 @@ def cutoff_stats() -> dict:
     allt, tot_all = table(groups)
     one = [g for g in groups if g[1] == 1]
     onet, tot_one = table(one)
-    best = lambda t: max(t, key=lambda x: (x["accuracy"], -abs(x["cutoff"])))  # noqa: E731
-    return {"n_isolates": n_r + n_s,
+    best = lambda t: max(t, key=lambda x: (x["accuracy"], -abs(x["cutoff"] - cut)))  # noqa: E731
+    hs = [g[0] for g in groups]
+    # the whole grammar (votes, hydrophobicity, overrides) scored over all founding isolates at each cutoff, as in the
+    # stored grammar accuracy: this is the figure that matters for choosing a cutoff
+    db = conn()
+    try:
+        sep_rows = db.execute("""SELECT species, septatype, SUM(lab_phenotype='Resistant') r, SUM(lab_phenotype='Susceptible') s
+                                 FROM isolates WHERE source='founding' GROUP BY species, septatype""").fetchall()
+    finally:
+        db.close()
+    gram = []
+    for c in grid:
+        ok = 0
+        for t in sep_rows:
+            a = t["septatype"].split("-")
+            call = grammar.predict(t["species"], a[:5], a[5] == "1", a[6] == "1", None, c)["call"]
+            ok += t["r"] if call == "Resistant" else t["s"]
+        gram.append({"cutoff": c, "accuracy": round(100 * ok / (n_r + n_s), 1)})
+    return {"n_isolates": n_r + n_s, "cutoff": cut, "wild_type": grammar.h_block(list(grammar.WILD4)), "resistant_reference": grammar.h_block(list(grammar.RES4)),
+            "helix": {"gyrA": {"start": grammar.GYR_START, "sequence": grammar.GYR_HELIX},
+                      "parC": {"start": grammar.PARC_START, "sequence": grammar.PARC_HELIX}},
+            "range": [min(hs), max(hs)] if hs else None,
             "mean_resistant": round(sum(g[0] * g[2] for g in groups) / n_r, 3),
             "mean_susceptible": round(sum(g[0] * g[3] for g in groups) / n_s, 3),
             "all": allt, "best_all": best(allt), "n_single_vote": tot_one,
             "single_vote": onet, "best_single_vote": best(onet) if one else None,
+            "grammar_all": gram, "best_grammar_all": best(gram),
             "single_vote_resistant": sum(g[2] for g in one)}
