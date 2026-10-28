@@ -171,6 +171,68 @@ def predict_upload(file: UploadFile | None = File(None), sequence: str = Form(""
     return _result(species, habitat, analysis, analysis["septatype"])
 
 
+class BvbrcReq(BaseModel):
+    genome_id: str
+    species: str = "auto"            # "auto" reads the species from the BV-BRC record
+    fallback_species: str = ""       # used only when auto cannot decide
+    habitat: str = "ALL"
+
+
+@app.post("/api/v1/predict/bvbrc")
+def predict_bvbrc(m: BvbrcReq):
+    """Predict from a BV-BRC genome ID: the assembly is fetched from BV-BRC, analysed and discarded. One genome per call."""
+    gid = m.genome_id.strip()
+    if not bvbrc.valid_id(gid):
+        raise HTTPException(400, f"'{gid[:30]}' is not a BV-BRC genome ID. An ID looks like 562.7710.")
+    try:
+        meta = bvbrc.genome_meta(gid)
+    except Exception as e:
+        raise HTTPException(502, f"Could not reach BV-BRC ({type(e).__name__}). Try again in a minute.")
+    if not meta:
+        raise HTTPException(404, f"BV-BRC has no genome with ID {gid}.")
+    name, detected, notes = meta.get("genome_name") or gid, bvbrc.detect_species(meta), []
+    species = m.species
+    if species == "auto":
+        named = bool((meta.get("species") or "").strip() or (meta.get("genome_name") or "").strip())
+        if detected:
+            species = detected
+        elif named:      # the record names another organism: never guess
+            raise HTTPException(400, f"BV-BRC calls this genome '{name}', which is not one of the four species SeptaTyper covers.")
+        else:
+            species = m.fallback_species
+            if species not in SPECIES:
+                raise HTTPException(400, "BV-BRC does not name the species of this genome. Choose the species and try again.")
+            notes.append(f"BV-BRC did not name the species, so {SPECIES[species]} (your selection) was used.")
+    elif species in SPECIES and detected and detected != species:
+        notes.append(f"BV-BRC calls this genome '{name}', but {SPECIES[species]} was chosen.")
+    if species not in SPECIES:
+        raise HTTPException(400, "Unknown species.")
+    habitat = m.habitat
+    if habitat not in HABITATS[species]:
+        notes.append(f"Isolation source '{habitat}' is not available for {SPECIES[species]}, so all sources were used.")
+        habitat = "ALL"
+    try:
+        text = bvbrc.genome_fasta(gid, MAX_UPLOAD_MB * 1024 * 1024)
+    except bvbrc.TooLarge as e:
+        raise HTTPException(413, str(e))
+    except Exception as e:
+        raise HTTPException(502, f"Could not download the assembly from BV-BRC ({type(e).__name__}: {str(e)[:120]}).")
+    analysis = _analyse_text(text, species, {"qnrB2": "auto", "qnrS1": "auto"})
+    res = _result(species, habitat, analysis, analysis["septatype"])
+    db = rules.conn()
+    try:
+        ref = db.execute("SELECT lab_phenotype FROM isolates WHERE genome_id=? AND source='founding'", (gid,)).fetchone()
+    finally:
+        db.close()
+    if ref:
+        notes.append(f"This genome is one of the reference isolates (laboratory phenotype {ref[0]}), so its call is not an independent test.")
+    res["bvbrc"] = {"genome_id": gid, "genome_name": name, "species_detected": detected, "isolation_source": meta.get("isolation_source"),
+                    "year": meta.get("collection_year"), "country": meta.get("isolation_country"),
+                    "url": f"https://www.bv-brc.org/view/Genome/{gid}", "in_reference": bool(ref), "lab_phenotype": ref[0] if ref else None}
+    res["warnings"] = list(res.get("warnings") or []) + notes
+    return res
+
+
 class Manual(BaseModel):
     species: str
     habitat: str = "ALL"
@@ -268,14 +330,16 @@ def stats_cutoff():
 
 
 @app.get("/api/v1/grammar")
-def grammar_explain(residues: str, species: str = "ecoli", reference: str = "SDSE"):
-    """Worked grammar for four residues (GyrA-83, GyrA-87, ParC-80, ParC-84) next to a reference. Used by the calculation page."""
-    r, ref = residues.strip().upper(), reference.strip().upper()
-    if species not in SPECIES or any(len(x) != 4 or any(a not in AA for a in x) for x in (r, ref)):
+def grammar_explain(residues: str, species: str = "ecoli", reference: str = "SDSE", recn: str = "L", codon: str = "",
+                    qnrB: bool = False, qnrS: bool = False):
+    """The three checkpoints worked for four residues (GyrA-83, GyrA-87, ParC-80, ParC-84) next to a reference.
+    Optional RecN-346 residue and codon and qnr presence. Used by the calculation page."""
+    r, ref, rn, cd = residues.strip().upper(), reference.strip().upper(), recn.strip().upper(), codon.strip().upper()
+    if species not in SPECIES or any(len(x) != 4 or any(a not in AA for a in x) for x in (r, ref)) or rn not in AA:
         raise HTTPException(400, "Give four amino-acid letters for the sample and for the reference, for example LNIE and SDSE.")
-    aas = list(r) + ["L"]
-    g = grammar.predict(species, aas, False, False)
-    return grammar.explain(species, aas, g, list(ref))
+    aas = list(r) + [rn]
+    g = grammar.predict(species, aas, qnrB, qnrS, cd or None)
+    return grammar.explain(species, aas, g, list(ref), (qnrB, qnrS), cd or None)
 
 
 @app.get("/api/v1/aminoacids")

@@ -50,7 +50,7 @@
       <li><b>Read the codons</b>BLAST finds gyrA, parC and recN in your sequence and reads GyrA-83, GyrA-87, ParC-80, ParC-84 and RecN-346 as codons, so synonymous changes are kept.</li>
       <li><b>Find the qnr genes</b>qnrB and qnrS family genes count as present at 80% identity and 90% coverage.</li>
       <li><b>Build the septatype</b>The seven values join into one string, for example L-N-I-E-L-0-0.</li>
-      <li><b>Call the phenotype</b>The majority phenotype among reference isolates with that septatype wins. A new septatype is called by the physicochemical grammar and sent for curation.</li>
+      <li><b>Call the phenotype</b>The majority phenotype among reference isolates with that septatype wins. A new septatype is called by the three checkpoints (residue classes, RecN-346, qnr genes) and sent for curation.</li>
     </ol>
   </div>
   <div class="band">
@@ -69,7 +69,7 @@
 
 <!-- PREDICT -->
 <section id="p-predict" class="page">
-  <div class="page-head"><h2>Predict ciprofloxacin phenotype</h2><p>Genome assemblies and gene-level FASTA both work. The sequence is analysed and deleted. Nothing is stored.</p></div>
+  <div class="page-head"><h2>Predict ciprofloxacin phenotype</h2><p>Genome assemblies and gene-level FASTA both work, or just type BV-BRC genome IDs. The sequence is analysed and deleted. Nothing is stored.</p></div>
   <div class="grid2">
     <form class="band" id="pf" autocomplete="off">
       <div class="row2">
@@ -81,6 +81,7 @@
         <button type="button" data-m="file" class="on">Upload file</button>
         <button type="button" data-m="paste">Paste sequence</button>
         <button type="button" data-m="batch">Batch</button>
+        <button type="button" data-m="bvbrc">BV-BRC ID</button>
         <button type="button" data-m="manual">Enter residues</button>
       </div>
       <div id="m-file">
@@ -90,6 +91,11 @@
       <div id="m-batch" style="display:none">
         <div class="drop" id="bdrop" tabindex="0" role="button">Choose up to 10 FASTA files<br><span id="bnames" class="muted">One genome per file. Results appear in one table you can download.</span></div>
         <input type="file" id="bfile" hidden multiple accept=".fa,.fasta,.fna,.fas,.txt,.gz">
+      </div>
+      <div id="m-bvbrc" style="display:none">
+        <label for="bv-ids">BV-BRC genome ID or IDs</label>
+        <textarea id="bv-ids" placeholder="562.7710&#10;624.1885&#10;573.24308" style="min-height:96px"></textarea>
+        <p class="muted" style="font-size:.9rem;margin-top:6px">Type one ID, or several separated by spaces, commas or new lines (up to 10). The assembly is fetched from BV-BRC and the species is read from its record. The species chosen above is used only if the record does not say. Needs a BV-BRC genome ID such as 562.7710, not a name.</p>
       </div>
       <div id="m-paste" style="display:none"><label for="seq">Nucleotide FASTA</label><textarea id="seq" placeholder=">gyrA&#10;ATGAGCGAC..."></textarea></div>
       <div id="m-gene">
@@ -220,18 +226,23 @@
       </div>
     </div>
   </div>
-  <div class="band"><h3>Grammar rules</h3>
+  <div class="band"><h3>Grammar rules: three checkpoints</h3>
+    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. The isolate is <b>susceptible</b> if all four residues fall in the Susceptible classes and <b>resistant</b> if all four fall in the Resistant classes.</p>
     <div class="scroll"><table>
       <tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>
       <tr><td>GyrA-83</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
-      <tr><td>GyrA-87</td><td>Negatively charged residue</td><td>Polar or uncharged residue</td></tr>
+      <tr><td>GyrA-87</td><td>Negatively charged or polar residue</td><td>Uncharged or negatively charged residue</td></tr>
       <tr><td>ParC-80</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
-      <tr><td>ParC-84</td><td>Negatively charged residue</td><td>Uncharged or negatively charged residue</td></tr>
+      <tr><td>ParC-84</td><td>Negatively charged residue</td><td>Hydrophobic or negatively charged residue</td></tr>
     </table></div>
-    <p class="muted" style="font-size:.9rem;margin-top:8px">A negatively charged ParC-84 counts in the Resistant column only when ParC-80 is hydrophobic.</p>
+    <p class="muted" style="font-size:.9rem;margin-top:8px">A residue can fit both columns (a negatively charged residue at GyrA-87 or ParC-84), so the other positions decide. That is the context sensitivity.</p>
+    <p><b>Checkpoint 2.</b> RecN-346. Susceptible if leucine (L) encoded by cta. Resistant if leucine encoded by ctg, or phenylalanine (F).</p>
+    <p><b>Checkpoint 3.</b> PMQR genes. Susceptible if both qnrB2 and qnrS1 are absent. Resistant if either or both are present.</p>
+    <p><b>Combined.</b> The isolate is predicted susceptible if all checkpoints consider it susceptible, and resistant if any checkpoint considers it resistant.</p>
     <p><a href="#/calc">See the worked calculation of the hydrophobicity value and the cutoff</a></p>
-    <p style="margin-top:12px">Two or more votes mean Resistant and none means Susceptible. One vote is settled by the QRDR helix mean hydrophobicity &lt;H&gt; (Eisenberg scale) against a cutoff of 0.334, the midpoint between the wild-type helices (S-D-S-E, 0.270) and the resistant reference helices (L-N-I-E, 0.397). &lt;H&gt; covers the whole GyrA helix (82-93, 12 residues) and ParC helix (80-90, 11 residues) with the sample&#39;s residues at positions 83, 87, 80 and 84: the GyrA mean is the sum over 12, the ParC mean is the sum over 11, and &lt;H&gt; is the average of the two. Overrides on a susceptible baseline: a qnr gene present gives Resistant, <i>S. sonnei</i> with RecN-346 F gives Resistant, <i>S. enterica</i> F-D-S-E with the ctg codon gives Resistant, and a single GyrA-83 or GyrA-87 change in <i>S. sonnei</i> gives Resistant.</p>
-    <p class="muted">The grammar is only used for septatypes not seen in the reference isolates. Residue classes marked as assumptions (for example G, P and C counted as hydrophobic) are set in <code>app/grammar.py</code>.</p>
+    <h3 style="margin-top:16px">Where the written rules are silent</h3>
+    <p>When the four residues fit neither complete pattern in checkpoint 1 (for example L-D-S-E), the rules above give no answer. The site then counts the positions outside the Susceptible classes: two or more mean Resistant and none means Susceptible. One position is settled by the QRDR helix mean hydrophobicity &lt;H&gt; (Eisenberg scale) against a cutoff of 0.334, the midpoint between the wild-type helices (S-D-S-E, 0.270) and the resistant reference helices (L-N-I-E, 0.397). &lt;H&gt; covers the whole GyrA helix (82-93, 12 residues) and ParC helix (80-90, 11 residues) with the sample&#39;s residues at positions 83, 87, 80 and 84: the GyrA mean is the sum over 12, the ParC mean is the sum over 11, and &lt;H&gt; is the average of the two. These steps are assumptions of the site, not part of the three written checkpoints. <i>S. sonnei</i> also keeps one extra rule taken from the reference isolates: a single change at GyrA-83 or GyrA-87 gives Resistant.</p>
+    <p class="muted">The checkpoints are only used for septatypes not seen in the reference isolates, and are shown next to every majority-rule call. Residue classes marked as assumptions (for example G, P and C counted as hydrophobic) are set in <code>app/grammar.py</code>. The RecN-346 codon is read from an uploaded genome or typed in by hand, and the reference isolates carry no codon, so checkpoint 2 for ctg could not be scored on them.</p>
   </div>
   <div class="band"><h3>Performance validation</h3><div id="t-valid"></div></div>
   <div class="band"><h3>Amino acid hydrophobicity (Eisenberg normalised consensus)</h3><div class="scroll"><table id="t-aa"></table></div></div>
@@ -259,6 +270,7 @@
       <tr><td class="mono">GET /api/v1/stats/geography</td><td>Counts per country.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/septatypes</td><td>Septatype frequency by isolation source.</td></tr>
       <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence. The reply holds the septatype, the call, <span class="mono">analysis.mlst</span> (sample ST and alleles) and, under <span class="mono">prediction</span>, the isolation sources, countries and STs of the reference isolates behind the call.</td></tr>
+      <tr><td class="mono">POST /api/v1/predict/bvbrc</td><td>JSON with <span class="mono">genome_id</span> (for example 562.7710). The assembly is fetched from BV-BRC. One genome per call.</td></tr>
       <tr><td class="mono">POST /api/v1/predict/manual</td><td>JSON with the five residues and qnr flags.</td></tr>
       <tr><td class="mono">POST /api/v1/submissions</td><td>Community submission (enters the curation queue).</td></tr>
     </table></div>

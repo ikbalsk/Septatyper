@@ -16,9 +16,13 @@ REST API under `/api/v1` (interactive docs at `/docs`).
 
 1. **Database majority rule** (the paper's rule). If the septatype was seen for that species and site,
    the majority phenotype of those isolates is the call. Ties go to Susceptible. Reproduces the paper's accuracies.
-2. **Physicochemical grammar** (fallback only). For a septatype never seen for that species, four positions vote
-   (hydroxyl group lost, negative charge lost), the QRDR helix `<H>` settles single votes, then the qnr, *S. sonnei* and *S. enterica* ctg overrides apply.
-   The result is flagged as new and sent to curation. Rules and residue classes are in `app/grammar.py`.
+2. **Three checkpoints** (fallback only, also shown next to every majority call). Checkpoint 1: GyrA-83, GyrA-87, ParC-80 and ParC-84
+   are Susceptible if all four fit the Susceptible classes and Resistant if all four fit the Resistant classes (the paper's
+   residue-class table, in `ROWS` of `app/grammar.py`). Checkpoint 2: RecN-346 is Susceptible if L encoded by cta, Resistant if L encoded
+   by ctg or F. Checkpoint 3: Resistant if qnrB2 or qnrS1 is present. The isolate is Susceptible if all checkpoints are Susceptible and
+   Resistant if any is. Where checkpoint 1 fits neither complete pattern the written rules are silent, so the site counts positions
+   outside the Susceptible classes (two or more: Resistant, none: Susceptible) and settles one position with the QRDR helix `<H>`. *S. sonnei*
+   keeps one extra rule from the data (a single GyrA-83 or GyrA-87 change is Resistant). The result is flagged as new and sent to curation.
 
 ## Run locally
 
@@ -78,8 +82,15 @@ repository when PubMLST adds new alleles.
   spread-out alleles and looks the exact window up in a dictionary, and only falls back to BLASTing a locus's
   full allele set when it is not an exact hit. Browsers compress large uploads before sending, and the server
   keeps the last 32 results so the same file is never analysed twice.
+- **Predict from a BV-BRC genome ID.** The Predict page has a "BV-BRC ID" tab. Type one ID (for example 562.7710) or up to 10 separated by
+  spaces, commas or new lines. For each ID the server asks BV-BRC for the genome record (`/api/v1/predict/bvbrc`, one genome per call, the page
+  loops through the list), reads the species from the record, downloads the assembly (FASTA output of the `genome_sequence` collection, with a JSON
+  fallback that rebuilds the FASTA), analyses it and discards it. One ID opens the full result, several give the batch table with CSV download.
+  A genome BV-BRC names as another organism is refused, never guessed. A genome that is one of the 2,734 reference isolates is flagged, because
+  its call is not an independent test. Only IDs of the form `digits.digits` are ever put in a URL, and only on the fixed BV-BRC host. The tests
+  fake the two BV-BRC calls: the real download could not be tried from the build environment, so test it once from the live site with a known ID.
 - The result explains each call in three criteria, laid out like the manuscript's residue-class table:
-  1 residue class at each position, 2 mean hydrophobicity <H> against the cutoff, 3 septatype overrides.
+  checkpoint 1 residue classes (with the QRDR helix <H> worked out when the classes leave it open), checkpoint 2 RecN-346 and checkpoint 3 qnr, then the combined call.
   The criterion that decides the sample is highlighted and pulses.
 - `#/calc` shows the worked calculation of the QRDR helix `<H>` for any four residues (every helix residue, the GyrA mean over 12, the ParC mean over 11, the average of the two), where the 0.334 cutoff comes from, and a data check of it against the reference isolates (`/api/v1/stats/cutoff`, which also scores the whole grammar at each cutoff). `<H>` alone is weak when exactly one position is in the Resistant column, so it is only a last tie-breaker. Browse and the CSV/JSON downloads give `h_gyr`, `h_parc` and `h_qrdr` for every isolate.
 

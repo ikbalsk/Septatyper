@@ -7,6 +7,7 @@ The free Render plan forgets the database on restart, so the fetch simply repeat
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import urllib.parse
@@ -84,3 +85,69 @@ def run() -> bool:
 
 def start() -> None:
     threading.Thread(target=run, daemon=True).start()
+
+
+# ----------------------------------------------------------------------------------------------
+# One genome on demand: the Predict page's "BV-BRC ID" mode. Only a validated ID is ever put into a
+# URL, and only on the fixed BV-BRC host, so nothing the visitor types can point the server elsewhere.
+GENOME_ID = re.compile(r"^\d{1,9}\.\d{1,6}$")
+SPECIES_NAMES = (("escherichia coli", "ecoli"), ("shigella sonnei", "ssonnei"),
+                 ("salmonella enterica", "senterica"), ("klebsiella pneumoniae", "kpneumoniae"))
+
+
+class TooLarge(Exception):
+    pass
+
+
+def valid_id(s: str) -> bool:
+    return bool(GENOME_ID.match(s or ""))
+
+
+def genome_meta(gid: str):
+    """The BV-BRC record of one genome (name, species, source, year, country), or None when the ID does not exist."""
+    rows = _get("genome", f"eq(genome_id,{gid})&select(genome_id,genome_name,species,isolation_source,collection_year,"
+                          f"isolation_country,host_name,mlst)&limit(1)")
+    return rows[0] if rows else None
+
+
+def detect_species(meta: dict):
+    """Our species key from the BV-BRC species field or genome name, or None when it is not one of the four."""
+    text = f"{meta.get('species') or ''} {meta.get('genome_name') or ''}".lower()
+    for needle, key in SPECIES_NAMES:
+        if needle in text:
+            return key
+    return None
+
+
+def _download(url: str, accept: str, max_bytes: int) -> bytes:
+    req = urllib.request.Request(url, headers={**UA, "Accept": accept})
+    buf = bytearray()
+    with urllib.request.urlopen(req, timeout=120) as r:
+        while chunk := r.read(1 << 20):
+            buf += chunk
+            if len(buf) > max_bytes:
+                raise TooLarge(f"The genome is larger than {max_bytes // 1048576} MB.")
+    return bytes(buf)
+
+
+def genome_fasta(gid: str, max_bytes: int) -> str:
+    """The assembly of one genome as FASTA text. First the API's FASTA output for the genome_sequence collection;
+    if that does not come back as FASTA, the contigs are fetched as JSON and written out here."""
+    base = f"{API}/genome_sequence/?eq(genome_id,{gid})"
+    try:
+        text = _download(base + "&limit(25000)&http_accept=application/dna%2Bfasta", "application/dna+fasta", max_bytes).decode("utf-8", "replace")
+        if text.lstrip().startswith(">"):
+            return text
+    except TooLarge:
+        raise
+    except Exception:
+        pass                                   # fall through to the JSON route
+    rows = json.loads(_download(base + "&select(sequence_id,accession,description,sequence)&limit(25000)&http_accept=application/json",
+                                "application/json", max_bytes * 2).decode())
+    out = []
+    for r in rows:
+        if r.get("sequence"):
+            out.append(f">{r.get('accession') or r.get('sequence_id') or gid} {r.get('description') or ''}".rstrip() + "\n" + r["sequence"])
+    if not out:
+        raise RuntimeError("BV-BRC returned no sequence for this genome ID")
+    return "\n".join(out) + "\n"

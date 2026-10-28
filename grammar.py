@@ -108,41 +108,106 @@ def votes(g83, g87, p80, p84) -> list[dict]:
     return v
 
 
-def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = None, cutoff: float | None = None) -> dict:
-    """aas = [g83, g87, p80, p84, r346]. Returns call, rule fired, votes, <H>."""
-    g83, g87, p80, p84, r346 = aas
-    vs = votes(g83, g87, p80, p84)
-    n = sum(1 for x in vs if x["vote"])
-    h = mean_h([g83, g87, p80, p84])
-    cut = H_CUTOFF if cutoff is None else cutoff       # only the calculation page tries other cutoffs
-    override, decided = None, "votes"
-    if n >= 2:
-        call, rule = "Resistant", f"{n} of 4 positions vote Resistant"
-    elif n == 0:
-        call, rule = "Susceptible", "no position votes Resistant"
-    elif species == "ssonnei" and next(x for x in vs if x["vote"])["position"] in ("GyrA-83", "GyrA-87"):
-        call, rule, override, decided = "Resistant", "S. sonnei single GyrA-83 or GyrA-87 change (L-D-S-E, S-Y-S-E pattern)", "sonnei_gyr", "override"
-    else:
-        call = "Resistant" if h > cut else "Susceptible"
-        rule, decided = f"1 vote; QRDR helix mean hydrophobicity {h} is {'above' if h > cut else 'at or below'} {cut}", "hydrophobicity"
-    if call == "Susceptible":
-        if qnrB or qnrS:
-            call, rule, override, decided = "Resistant", "qnr gene present on a susceptible baseline (PMQR override)", "qnr", "override"
-        elif species == "ssonnei" and r346 == "F":
-            call, rule, override, decided = "Resistant", "S. sonnei with RecN-346 F on a susceptible baseline", "sonnei_recn", "override"
-        elif species == "senterica" and [g83, g87, p80, p84] == list("FDSE") and (recn_codon or "").upper() == "CTG":
-            call, rule, override, decided = "Resistant", "S. enterica F-D-S-E with RecN-346 codon ctg", "senterica_ctg", "override"
-    return {"call": call, "rule": rule, "votes": vs, "n_votes": n, "mean_h": h, "override": override, "decided_by": decided}
-
-
-OVERRIDES = [("qnr", None, "qnr gene present"),
-             ("sonnei_gyr", "ssonnei", "One change at GyrA-83 or GyrA-87"),
-             ("sonnei_recn", "ssonnei", "RecN-346 is F"),
-             ("senterica_ctg", "senterica", "F-D-S-E with the ctg codon at RecN-346")]
+POS = ("GyrA-83", "GyrA-87", "ParC-80", "ParC-84")
+# The residue classes of checkpoint 1, in the paper's words
 ROWS = [("GyrA-83", "Polar residue with -OH group", "Hydrophobic residue"),
-        ("GyrA-87", "Negatively charged residue", "Polar or uncharged residue"),
+        ("GyrA-87", "Negatively charged or polar residue", "Uncharged or negatively charged residue"),
         ("ParC-80", "Polar residue with -OH group", "Hydrophobic residue"),
-        ("ParC-84", "Negatively charged residue", "Uncharged or negatively charged residue")]
+        ("ParC-84", "Negatively charged residue", "Hydrophobic or negatively charged residue")]
+
+
+def _parts(pos: str, res: str):
+    """The words of each class cell, each flagged when it describes this residue.
+    Returns (susceptible words, resistant words, susceptible suffix, resistant suffix)."""
+    if pos in ("GyrA-83", "ParC-80"):
+        return [("Polar residue with -OH group", res in POLAR_OH)], [("Hydrophobic", res in HYDROPHOBIC)], "", " residue"
+    if pos == "GyrA-87":
+        return ([("Negatively charged", res in ACIDIC), ("polar", res in POLAR_UNCHARGED)],
+                [("Uncharged", res not in ACIDIC | BASIC), ("negatively charged", res in ACIDIC)], " residue", " residue")
+    return [("Negatively charged", res in ACIDIC)], [("Hydrophobic", res in HYDROPHOBIC), ("negatively charged", res in ACIDIC)], " residue", " residue"
+
+
+def checkpoint1(species: str, aas4) -> dict:
+    """Checkpoint 1, the context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84.
+    Susceptible when all four residues fit the susceptible classes, Resistant when all four fit the resistant classes.
+    Where the four fit neither complete pattern the written rules are silent: the residue votes and <H> settle it (ASSUMPTION),
+    and S. sonnei keeps its extra single-change rule."""
+    cells = []
+    for pos, res in zip(POS, aas4):
+        S, R, sS, sR = _parts(pos, res)
+        fs, fr = any(h for _, h in S), any(h for _, h in R)
+        cells.append({"position": pos, "residue": res, "fits_s": fs, "fits_r": fr, "S": S, "R": R, "sS": sS, "sR": sR})
+    pattern = "susceptible" if all(c["fits_s"] for c in cells) else "resistant" if all(c["fits_r"] for c in cells) else None
+    vs = votes(*aas4)
+    n = sum(1 for x in vs if x["vote"])
+    h = mean_h(list(aas4))
+    voter = next((x["position"] for x in vs if x["vote"]), None)
+    override = None
+    if species == "ssonnei" and n == 1 and voter in ("GyrA-83", "GyrA-87"):
+        call, by, override = "Resistant", "override", "sonnei_gyr"
+        rule = "S. sonnei single GyrA-83 or GyrA-87 change (L-D-S-E, S-Y-S-E pattern)"
+    elif pattern:
+        call, by = ("Susceptible", "pattern") if pattern == "susceptible" else ("Resistant", "pattern")
+        rule = f"all four residues fit the {pattern} pattern"
+    elif n >= 2:
+        call, by, rule = "Resistant", "votes", f"neither complete pattern; {n} of 4 positions vote Resistant"
+    elif n == 0:
+        call, by, rule = "Susceptible", "votes", "neither complete pattern; no position votes Resistant"
+    else:
+        cut = H_CUTOFF if _CUT[0] is None else _CUT[0]
+        call = "Resistant" if h > cut else "Susceptible"
+        by = "hydrophobicity"
+        rule = f"neither complete pattern; 1 vote, so the QRDR helix mean hydrophobicity {h} is {'above' if h > cut else 'at or below'} {cut}"
+    return {"call": call, "pattern": pattern, "resolved_by": by, "rule": rule, "cells": cells, "votes": vs, "n_votes": n,
+            "mean_h": h, "override": override}
+
+
+def checkpoint2(r346: str, codon: str | None = None) -> dict:
+    """Checkpoint 2, RecN-346. Susceptible if leucine encoded by cta; Resistant if leucine encoded by ctg, or phenylalanine."""
+    cd = (codon or "").upper() or None
+    if r346 == "F":
+        return {"call": "Resistant", "residue": r346, "codon": cd, "text": "RecN-346 is phenylalanine (F)"}
+    if r346 == "L" and cd == "CTG":
+        return {"call": "Resistant", "residue": r346, "codon": cd, "text": "RecN-346 is leucine encoded by ctg"}
+    if r346 == "L" and cd == "CTA":
+        return {"call": "Susceptible", "residue": r346, "codon": cd, "text": "RecN-346 is leucine encoded by cta"}
+    if r346 == "L":
+        why = f"leucine encoded by {cd.lower()}, which is neither cta nor ctg" if cd else "leucine, codon not given, so ctg cannot be checked"
+        return {"call": "Susceptible", "residue": r346, "codon": cd, "text": f"RecN-346 is {why}: no resistant signal"}
+    return {"call": "Susceptible", "residue": r346, "codon": cd, "text": f"RecN-346 is {r346}, which the rules do not cover: no resistant signal"}
+
+
+def checkpoint3(qnrB: bool, qnrS: bool) -> dict:
+    """Checkpoint 3, PMQR genes. Resistant if qnrB2 or qnrS1 (or both) is present, Susceptible if both are absent."""
+    on = [n for n, v in (("qnrB2", qnrB), ("qnrS1", qnrS)) if v]
+    return {"call": "Resistant" if on else "Susceptible", "qnrB2": bool(qnrB), "qnrS1": bool(qnrS),
+            "text": (" and ".join(on) + " present") if on else "qnrB2 and qnrS1 both absent"}
+
+
+_CUT = [None]      # lets the calculation page score other <H> cutoffs without changing the one the site uses
+
+
+def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = None, cutoff: float | None = None) -> dict:
+    """aas = [g83, g87, p80, p84, r346]. The three checkpoints, then: Susceptible if all say Susceptible,
+    Resistant if any says Resistant."""
+    g83, g87, p80, p84, r346 = aas
+    _CUT[0] = cutoff
+    try:
+        c1 = checkpoint1(species, [g83, g87, p80, p84])
+    finally:
+        _CUT[0] = None
+    c2, c3 = checkpoint2(r346, recn_codon), checkpoint3(qnrB, qnrS)
+    if c1["call"] == "Resistant":
+        call, rule, decided = "Resistant", c1["rule"], c1["resolved_by"]
+    elif c2["call"] == "Resistant":
+        call, rule, decided = "Resistant", f"checkpoint 2: {c2['text']}", "checkpoint2"
+    elif c3["call"] == "Resistant":
+        call, rule, decided = "Resistant", f"checkpoint 3: {c3['text']}", "checkpoint3"
+    else:
+        call, rule, decided = "Susceptible", c1["rule"], c1["resolved_by"]
+    return {"call": call, "rule": rule, "votes": c1["votes"], "n_votes": c1["n_votes"], "mean_h": c1["mean_h"],
+            "override": c1["override"], "decided_by": decided,
+            "checkpoints": {"residues": c1, "recn": c2, "qnr": c3}}
 
 
 def h_block(aas4) -> dict:
@@ -160,58 +225,28 @@ def h_block(aas4) -> dict:
             "parc": blk(p, PARC_START, "ParC", (80, 84)), "mean": mean_h(aas4)}
 
 
-def _terms(pos: str, res: str, vote: bool):
-    """The words of the authors' residue-class table, each flagged when it describes this residue.
-    Returns (susceptible terms, resistant terms, susceptible suffix, resistant suffix)."""
-    charged = ACIDIC | BASIC
-    if pos in ("GyrA-83", "ParC-80"):
-        S, R, sS, sR = [("Polar residue with -OH group", res in POLAR_OH)], [("Hydrophobic", res in HYDROPHOBIC)], "", " residue"
-    elif pos == "GyrA-87":
-        S = [("Negatively charged", res in ACIDIC)]
-        R, sS, sR = [("Polar", res in POLAR_UNCHARGED), ("uncharged", res not in charged)], " residue", " residue"
-    else:
-        S = [("Negatively charged", res in ACIDIC and not vote)]
-        R, sS, sR = [("Uncharged", res not in charged), ("negatively charged", res in ACIDIC and vote)], " residue", " residue"
-    active = R if vote else S
-    if not any(hit for _, hit in active):      # no single word fits, so the whole cell is the match
-        active[:] = [(t, True) for t, _ in active]
-    return S, R, sS, sR
-
-
 def explain(species: str, aas, g: dict, ref4=None, qnr=(False, False), codon=None) -> dict:
-    """Three criteria behind a call, laid out like the authors' residue-class table.
-    1 residue class per position, 2 QRDR helix mean hydrophobicity against the cutoff, 3 septatype overrides."""
-    g83, g87, p80, p84, _ = aas
+    """The three checkpoints behind a call, laid out like the authors' residue-class table, plus the <H> worked out
+    for the cases where the residue classes alone do not decide checkpoint 1."""
+    c1, c2, c3 = g["checkpoints"]["residues"], g["checkpoints"]["recn"], g["checkpoints"]["qnr"]
     pos = []
-    for v, (name, s_txt, r_txt), res in zip(g["votes"], ROWS, (g83, g87, p80, p84)):
-        note = ""
-        if name in ("GyrA-83", "ParC-80") and res not in POLAR_OH and res not in HYDROPHOBIC:
-            note = "no -OH group, counted as resistant"
-        elif name == "GyrA-87" and res in BASIC:
-            note = "positively charged, counted as resistant"
-        elif name == "ParC-84" and res in BASIC:
-            note = "positively charged, counted as resistant"
-        elif name == "ParC-84" and res in ACIDIC:
-            note = ("acidic, but ParC-80 is hydrophobic: counted as resistant" if v["vote"]
-                    else "acidic, and ParC-80 is not hydrophobic: stays susceptible")
-        S, R, sS, sR = _terms(name, res, v["vote"])
-        fmt = lambda terms, suf: [{"text": t, "hit": h} for t, h in terms]  # noqa: E731
-        pos.append({"position": name, "residue": res, "class": aa_class(res), "column": "resistant" if v["vote"] else "susceptible",
+    for cell, (name, s_txt, r_txt) in zip(c1["cells"], ROWS):
+        fs, fr, res = cell["fits_s"], cell["fits_r"], cell["residue"]
+        column = "both" if fs and fr else "susceptible" if fs else "resistant" if fr else "neither"
+        note = {"both": "fits both classes", "neither": "fits neither class"}.get(column, "")
+        pos.append({"position": name, "residue": res, "class": aa_class(res), "column": column, "fits_susceptible": fs, "fits_resistant": fr,
                     "susceptible": s_txt, "resistant": r_txt,
-                    "susceptible_parts": fmt(S, sS), "susceptible_suffix": sS,
-                    "resistant_parts": fmt(R, sR), "resistant_suffix": sR, "note": note})
+                    "susceptible_parts": [{"text": t, "hit": h} for t, h in cell["S"]], "susceptible_suffix": cell["sS"],
+                    "resistant_parts": [{"text": t, "hit": h} for t, h in cell["R"]], "resistant_suffix": cell["sR"], "note": note})
     sample = h_block([p["residue"] for p in pos])
     ref = h_block(list(ref4) if ref4 else list(WILD4))
-    voters = [v["position"] for v in g["votes"] if v["vote"]]
-    met = {"qnr": bool(qnr[0] or qnr[1]),
-           "sonnei_gyr": species == "ssonnei" and len(voters) == 1 and voters[0] in ("GyrA-83", "GyrA-87"),
-           "sonnei_recn": species == "ssonnei" and aas[4] == "F",
-           "senterica_ctg": species == "senterica" and [g83, g87, p80, p84] == list("FDSE") and (codon or "").upper() == "CTG"}
-    ov = [{"key": k, "text": t, "fired": g["override"] == k, "met": met[k]} for k, sp, t in OVERRIDES if sp in (None, species)]
     return {"decided_by": g["decided_by"], "n_resistant_positions": g["n_votes"], "positions": pos,
+            "checkpoints": {"residues": {"call": c1["call"], "pattern": c1["pattern"], "resolved_by": c1["resolved_by"], "rule": c1["rule"],
+                                         "n_votes": c1["n_votes"], "override": c1["override"]},
+                            "recn": c2, "qnr": c3},
             "hydrophobicity": {"gyr": sample["gyr"], "parc": sample["parc"], "mean": sample["mean"], "cutoff": H_CUTOFF,
                                "side": "above" if sample["mean"] > H_CUTOFF else "at_or_below"},
-            "reference": ref, "overrides": ov, "grammar_call": g["call"], "rule": g["rule"]}
+            "reference": ref, "grammar_call": g["call"], "rule": g["rule"]}
 
 
 def mechanism(aas) -> list[dict]:
