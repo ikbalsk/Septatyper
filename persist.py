@@ -52,7 +52,7 @@ def export_backup() -> dict:
 def import_backup(data: dict) -> dict:
     """Re-insert submissions that are not there yet and re-apply the approved ones."""
     if not isinstance(data, dict) or not isinstance(data.get("submissions"), list):
-        raise ValueError("This does not look like a Ceprotyper backup.")
+        raise ValueError("This does not look like a Ciprotyper backup.")
     db = rules.conn()
     added = applied = skipped = 0
     problems: list[str] = []
@@ -97,7 +97,7 @@ def _gh():
     branch = os.environ.get("BACKUP_GITHUB_BRANCH", "")
     url = f"{API}/repos/{repo}/contents/{path}" + (f"?ref={branch}" if branch else "")
     h = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
-         "User-Agent": "Ceprotyper-backup"}
+         "User-Agent": "Ciprotyper-backup"}
     return url, h, branch
 
 
@@ -126,7 +126,7 @@ def save_now() -> None:
             url, h, branch = _gh()
             for _ in range(2):                       # one retry if the file changed under us
                 sha, _raw = _github_read()
-                body = {"message": "Ceprotyper backup", "content": base64.b64encode(payload).decode()}
+                body = {"message": "Ciprotyper backup", "content": base64.b64encode(payload).decode()}
                 if sha:
                     body["sha"] = sha
                 if branch:

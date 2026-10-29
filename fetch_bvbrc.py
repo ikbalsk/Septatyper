@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.config import DB_PATH, SEED_DB  # noqa: E402
 
 API = "https://www.bv-brc.org/api"
-UA = {"User-Agent": "Ceprotyper/2.0 (research)", "Accept": "application/json"}
+UA = {"User-Agent": "Ciprotyper/2.0 (research)", "Accept": "application/json"}
 BATCH = 50
 
 

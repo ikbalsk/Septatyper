@@ -1,4 +1,4 @@
-/* Ceprotyper front end. No framework. All server text goes through esc(). */
+/* Ciprotyper front end. No framework. All server text goes through esc(). */
 "use strict";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -133,7 +133,7 @@ function drawBatch(done, total, unit = "file") {
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing ${unit} ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
     <div class="scroll"><table><tr><th>${unit === "genome" ? "Genome" : "File"}</th><th>Septatype</th><th>ST</th><th>Call</th><th>Call from</th><th>Support</th></tr>${rows}</table></div>
     ${working ? "" : `<div class="actions no-print"><button class="btn solid" data-act="bcsv" type="button">Download CSV</button><button class="btn line" data-act="print" type="button">Print or save as PDF</button></div><p class="muted" style="font-size:.85rem">Tap a row for the full result.</p>`}
-    <p class="print-only">Ceprotyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
+    <p class="print-only">Ciprotyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
 }
 async function runBatch(species, habitat) {
   if (!PFILES.length) throw new Error("Choose at least one FASTA file.");
@@ -168,15 +168,16 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
   if (act === "print") printNow();
-  else if (act === "csv" && LAST) download("ceprotyper_result.csv", toCsv([flat(LAST, LAST._name || "result")]), "text/csv");
-  else if (act === "json" && LAST) download("ceprotyper_result.json", JSON.stringify(LAST, null, 2), "application/json");
-  else if (act === "bcsv") download("ceprotyper_batch.csv", toCsv(BATCH.map(x => flat(x.res, x.name, x.error))), "text/csv");
+  else if (act === "csv" && LAST) download("ciprotyper_result.csv", toCsv([flat(LAST, LAST._name || "result")]), "text/csv");
+  else if (act === "json" && LAST) download("ciprotyper_result.json", JSON.stringify(LAST, null, 2), "application/json");
+  else if (act === "bcsv") download("ciprotyper_batch.csv", toCsv(BATCH.map(x => flat(x.res, x.name, x.error))), "text/csv");
   else if (act === "detail") { const x = BATCH[+b.dataset.i]; if (x && x.res) { $("#bdetail").innerHTML = renderResult(x.res); $("#bdetail").scrollIntoView({ behavior: "smooth" }); } }
 });
 
 const SITE_LC = {};
 const PROT = { gyrA: "GyrA", parC: "ParC", recN: "RecN" };
 const f2 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(2);
+const SYNTAX = [["GyrA-83", "S Y T", "F L I W"], ["GyrA-87", "D N E", "N D G Y A E"], ["ParC-80", "S Y T", "I F W"], ["ParC-84", "D E", "E V D"]];
 const f3 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(3);
 /* QRDR helix as a strip of letters; the four tetratype positions are marked */
 const helixStrip = b => `<span class="helix">${b.values.map(v => `<span class="${v.sub ? "sub" : ""}">${esc(v.residue)}</span>`).join("")}</span>`;
@@ -185,9 +186,9 @@ const helixLines = (label, v) => `<p class="formula wrap">${label} GyrA helix ${
     <p class="formula wrap">${label} ParC helix ${v.parc.start}-${v.parc.end} ${helixStrip(v.parc)} sum ${f2(v.parc.sum)} / ${v.parc.n} = <b>${f3(v.parc.mean)}</b></p>
     <p class="formula wrap">${label} &lt;H&gt; = (${f3(v.gyr.mean)} + ${f3(v.parc.mean)}) / 2 = <b>${f3(v.mean)}</b></p>`;
 function critTable(positions) {
-  const cell = (parts, suffix, cls) => parts.map(t => t.hit ? `<span class="${cls}">${esc(t.text)}</span>` : esc(t.text)).join(" or ") + esc(suffix);
-  return `<div class="scroll"><table><tr><th>Position</th><th>Residue</th><th>Susceptible</th><th>Resistant</th></tr>${positions.map(x =>
-    `<tr><td class="nw"><b>${esc(x.position)}</b></td><td class="mono">${esc(x.residue)}${x.note ? `<span class="alias">${esc(x.note)}</span>` : ""}</td><td>${cell(x.susceptible_parts, x.susceptible_suffix, "hl-s")}</td><td>${cell(x.resistant_parts, x.resistant_suffix, "hl-r")}</td></tr>`).join("")}</table></div>`;
+  const chips = (list, side) => list.map(c => `<span class="rchip${c.hit ? " hit " + side : ""}${c.exception ? " exc" : ""}">${esc(c.residue)}${c.exception ? "<small>exception</small>" : ""}</span>`).join("");
+  return `<div class="scroll"><table class="rtab"><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>${positions.map(x =>
+    `<tr><td class="nw"><b>${esc(x.position)}</b><span class="alias">sample: ${esc(x.residue)}</span></td><td>${chips(x.susceptible, "s")}</td><td>${chips(x.resistant, "r")}</td></tr>`).join("")}</table></div>`;
 }
 /* number line: sample and reference <H> against the cutoff; extra = typical resistant and susceptible isolates */
 function hChart(sample, ref, cutoff, extra) {
@@ -213,10 +214,11 @@ function whyBlock(p) {
   const k = c.checkpoints, r1 = k.residues, hy = c.hydrophobicity, rf = c.reference, dec = c.decided_by, res = c.positions.map(x => x.residue).join("");
   const intro = p.tier === "grammar" ? "Call from the three checkpoints, because this septatype is new." : `Call from the database majority rule${c.grammar_call !== p.call ? `. The three checkpoints alone would say ${esc(c.grammar_call)}` : ""}.`;
   const tag = on => on ? `<span class="tag">decides</span>` : "";
-  const why1 = r1.override ? `${r1.pattern ? "The four residues fit the susceptible classes, but " : "The four residues fit neither complete pattern. "}${esc(r1.rule)}: counted Resistant. This is an extra rule from the reference isolates, not one of the three checkpoints.`
-    : r1.pattern ? `All four residues fit the ${r1.pattern} classes.`
-    : r1.resolved_by === "hydrophobicity" ? `The four residues fit neither complete pattern, so the written rules do not decide. One position votes Resistant, so the QRDR helix mean &lt;H&gt; settles it.`
-    : `The four residues fit neither complete pattern, so the written rules do not decide. The residue votes settle it: ${r1.n_votes} of 4 positions vote Resistant.`;
+  const exc = (r1.exceptions || []).length ? ` (exception: the ParC pair S-K)` : "";
+  const why1 = r1.override ? `${r1.pattern ? "All four residues are in the Susceptible column, but " : "The four residues are not all in one column. "}${esc(r1.rule)}: counted Resistant. This is an extra rule from the reference isolates, not one of the three checkpoints.`
+    : r1.pattern ? `All four residues are in the ${r1.pattern === "resistant" ? "Resistant" : "Susceptible"} column${exc}.`
+    : r1.resolved_by === "hydrophobicity" ? `The four residues are not all in one column, so the written rules do not decide. One position votes Resistant, so the QRDR helix mean &lt;H&gt; settles it.`
+    : `The four residues are not all in one column, so the written rules do not decide. The residue votes settle it: ${r1.n_votes} of 4 positions vote Resistant.`;
   const hBlock = r1.resolved_by === "hydrophobicity" ? `${hChart(hy.mean, rf.mean, hy.cutoff)}
     ${helixLines("Sample", hy)}${helixLines("Reference", rf)}
     <p class="muted small" style="margin:4px 0">Every residue of the GyrA and ParC helices counts. Your residues at the four tetratype positions are marked red. Means are rounded to three decimals.</p>
@@ -235,7 +237,7 @@ function whyBlock(p) {
 function renderResult(r, extra) {
   const p = r.prediction, a = r.analysis;
   LAST = r;
-  let h = `<div class="band result"><p class="print-only">Ceprotyper report, ${new Date().toLocaleDateString()}. ${esc(r.species_name)}, ${esc(SITE[r.habitat] || r.habitat)}. ${esc(r._name || "")}</p>`;
+  let h = `<div class="band result"><p class="print-only">Ciprotyper report, ${new Date().toLocaleDateString()}. ${esc(r.species_name)}, ${esc(SITE[r.habitat] || r.habitat)}. ${esc(r._name || "")}</p>`;
   if (r.bvbrc) h += `<p class="small muted" style="margin:0 0 8px">BV-BRC genome <a href="${esc(r.bvbrc.url)}" target="_blank" rel="noopener">${esc(r.bvbrc.genome_id)}</a>: ${esc(r.bvbrc.genome_name)}${r.bvbrc.country ? ", " + esc(r.bvbrc.country) : ""}${r.bvbrc.year ? ", " + esc(r.bvbrc.year) : ""}${r.bvbrc.isolation_source ? ". Source: " + esc(r.bvbrc.isolation_source) : ""}.</p>`;
   if (!p) {
     h += `<h3>No call could be made</h3><p>A complete septatype could not be built from this input.</p>`;
@@ -266,7 +268,7 @@ function renderResult(r, extra) {
         h += `<h3>Those reference isolates, by ST</h3><div class="scroll"><table><tr><th>ST</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th></th></tr>${p.reference_sts.map(x => `<tr><td class="mono">${esc(x.st)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${mine && x.st === mine ? "<b>your genome</b>" : ""}</td></tr>`).join("")}</table></div>`;
         if (mine && !p.reference_sts.some(x => x.st === mine)) h += `<p class="muted small">Your genome (${esc(mine)}) is not one of these STs.</p>`;
       }
-      if (cs.length) h += `<details><summary>Those reference isolates, by country and source</summary><div class="scroll"><table><tr><th>Country</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th><th>Sources</th></tr>${cs.map(x => `<tr><td>${esc(x.country)}</td><td class="stat">${x.n}</td><td class="stat">${x.n_resistant}</td><td class="stat">${x.n_susceptible}</td><td>${Object.entries(x.sites).map(([k, n]) => `${esc(SITE_LC[k] || String(k).toLowerCase())} ${n}`).join(", ")}</td></tr>`).join("")}</table></div></details>`;
+      if (cs.length) h += `<details><summary>Those reference isolates, by country and source</summary><div class="scroll"><table><tr><th>Country</th><th>Isolates</th><th>Source and phenotype</th></tr>${cs.map(x => `<tr><td>${esc(x.country)}</td><td class="stat">${x.n}</td><td>${Object.entries(x.site_phenotypes || {}).sort((a, b) => b[1].n - a[1].n).map(([k, v]) => { const nm = String(SITE_LC[k] || k); return `<span class="nw">${esc(nm.charAt(0).toUpperCase() + nm.slice(1))} ${v.n} (R-${v.r}, S-${v.s})</span>`; }).join(", ")}</td></tr>`).join("")}</table></div></details>`;
     } else if (p.similar && p.similar.length) {
       h += `<p class="muted" style="margin-top:12px">Known septatypes with the same GyrA/ParC tetratype:</p><div class="scroll"><table><tr><th>Septatype</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th></tr>${p.similar.map(x => `<tr><td class="mono">${esc(x.septatype)}</td><td>${x.n_isolates}</td><td>${x.n_resistant}</td><td>${x.n_susceptible}</td></tr>`).join("")}</table></div>`;
     }
@@ -383,14 +385,14 @@ async function loadBrowse() {
     const arrow = k => BS.sort === k ? (BS.desc ? " &#9660;" : " &#9650;") : "";
     const th = (k, t, rs = "") => `<th class="sort" data-k="${k}"${rs ? ` rowspan="2"` : ""}>${t}${arrow(k)}</th>`;
     const pubLink = u => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, ""))}</a>` : "-";
-    $("#btable").innerHTML = `<thead><tr>${th("genome_id", "Genome ID", 1)}${th("species", "Species and source", 1)}${th("country", "Country", 1)}${th("septatype", "Septatype", 1)}${th("pred", "Ceprotyper predicted phenotype", 1)}<th class="grp" colspan="2">BV-BRC Phenotype Info</th>${th("submitter", "Submitter", 1)}${th("date", "Date", 1)}${th("affiliation", "Affiliation", 1)}<th rowspan="2">Publication</th></tr>
+    $("#btable").innerHTML = `<thead><tr>${th("genome_id", "Genome ID", 1)}${th("species", "Species and source", 1)}${th("country", "Country", 1)}${th("septatype", "Septatype", 1)}${th("pred", "Ciprotyper predicted phenotype", 1)}<th class="grp" colspan="2">BV-BRC Phenotype Info</th>${th("submitter", "Submitter", 1)}${th("date", "Date", 1)}${th("affiliation", "Affiliation", 1)}<th rowspan="2">Publication</th></tr>
       <tr>${th("lab", "Lab")}${th("bv", "Computationally predicted")}</tr></thead><tbody>` +
       (d.rows.length ? d.rows.map(r => `<tr>
         <td class="nw">${r.bvbrc_url ? `<a href="${esc(r.bvbrc_url)}" target="_blank" rel="noopener">${esc(r.genome_id)}</a>` : esc(r.genome_id)}<span class="alias">${esc(r.genome_name || r.isolate_name)}</span></td>
         <td class="nw"><i>${esc(SHORT[r.species])}</i><span class="alias">${esc(SITE[r.habitat])}${r.source === "community" ? ", community" : ""}</span></td>
         <td class="nw">${esc(r.country || "-")}</td>
         <td class="mono nw">${mutSep(r.septatype)}</td>
-        <td class="nw">${r.septatyper_call ? badge(r.septatyper_call, 1) : "-"} ${r.star ? `<span class="star" title="Ceprotyper matches the laboratory phenotype. The BV-BRC computational prediction does not.">&#9733;</span>` : ""}</td>
+        <td class="nw">${r.septatyper_call ? badge(r.septatyper_call, 1) : "-"} ${r.star ? `<span class="star" title="Ciprotyper matches the laboratory phenotype. The BV-BRC computational prediction does not.">&#9733;</span>` : ""}</td>
         <td>${badge(r.lab_phenotype, 1)}</td>
         <td>${r.bvbrc_call ? badge(r.bvbrc_call, 1) : `<span class="muted" title="Not loaded yet">-</span>`}</td>
         <td class="nw">${esc(r.submitter || "-")}</td>
@@ -552,7 +554,7 @@ INIT.theory = async () => {
     const b = s.benchmark, rows = s.rows.filter(x => x.habitat !== "ALL");
     let h = `<h3 style="font-size:1rem">Majority rule and grammar against laboratory phenotype</h3><div class="scroll"><table><tr><th>Species</th><th>Source</th><th>Isolates</th><th>Majority rule</th><th>Grammar only</th></tr>${rows.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${esc(SITE[x.habitat])}</td><td class="stat">${fmt(x.n_isolates)}</td><td class="stat">${x.accuracy}%</td><td class="stat">${x.grammar_accuracy}%</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">Both are scored on the founding isolates the rules were built from. They describe the reference set, not independent performance. The grammar only calls septatypes missing from the database.</p>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Head to head with BV-BRC computational predictions</h3>`;
-    if (b.loaded) h += `<p class="stat">${fmt(b.compared)} isolates have a BV-BRC computational prediction. Ceprotyper matches the lab result in ${fmt(b.septatyper_ok)} (${(100 * b.septatyper_ok / b.compared).toFixed(1)}%) and BV-BRC in ${fmt(b.bvbrc_ok)} (${(100 * b.bvbrc_ok / b.compared).toFixed(1)}%). Ceprotyper matches the laboratory phenotype where BV-BRC does not in ${fmt(b.wins)} isolates. The reverse happens in ${fmt(b.losses)}.</p><div class="scroll"><table><tr><th>Genome</th><th>Septatype</th><th>Lab</th><th>BV-BRC</th><th>Ceprotyper</th></tr>${b.examples.map(x => `<tr><td>${esc(x.genome_id)}<span class="alias">${esc(x.isolate_name)}</span></td><td class="mono">${esc(x.septatype)}</td><td>${badge(x.lab_phenotype, 1)}</td><td>${badge(x.bvbrc_call, 1)}</td><td>${badge(x.septatyper_call, 1)}</td></tr>`).join("")}</table></div>`;
+    if (b.loaded) h += `<p class="stat">${fmt(b.compared)} isolates have a BV-BRC computational prediction. Ciprotyper matches the lab result in ${fmt(b.septatyper_ok)} (${(100 * b.septatyper_ok / b.compared).toFixed(1)}%) and BV-BRC in ${fmt(b.bvbrc_ok)} (${(100 * b.bvbrc_ok / b.compared).toFixed(1)}%). Ciprotyper matches the laboratory phenotype where BV-BRC does not in ${fmt(b.wins)} isolates. The reverse happens in ${fmt(b.losses)}.</p><div class="scroll"><table><tr><th>Genome</th><th>Septatype</th><th>Lab</th><th>BV-BRC</th><th>Ciprotyper</th></tr>${b.examples.map(x => `<tr><td>${esc(x.genome_id)}<span class="alias">${esc(x.isolate_name)}</span></td><td class="mono">${esc(x.septatype)}</td><td>${badge(x.lab_phenotype, 1)}</td><td>${badge(x.bvbrc_call, 1)}</td><td>${badge(x.septatyper_call, 1)}</td></tr>`).join("")}</table></div>`;
     else h += `<div class="info">BV-BRC predictions have not been loaded yet, so the head-to-head comparison is empty. They load automatically when the server can reach BV-BRC.</div>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Susceptible tetratype S-D-S-E, split by qnr</h3><div class="scroll"><table><tr><th>Species</th><th>qnrB</th><th>qnrS</th><th>Isolates</th><th>Resistant</th></tr>${s.edgecases.wildtype_tetratype_by_qnr.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${x.qnrB2 ? "yes" : "no"}</td><td>${x.qnrS1 ? "yes" : "no"}</td><td class="stat">${x.n}</td><td class="stat">${x.res} (${Math.round(100 * x.res / x.n)}%)</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">A qnr gene on a susceptible baseline is usually resistant, but not always. A gene found in sequence may not be expressed.</p>`;
     $("#t-valid").innerHTML = h;
@@ -570,7 +572,7 @@ INIT.calc = async () => {
   catch (e) { $("#calc-body").innerHTML = `<div class="band"><div class="err">${esc(e.message)}</div></div>`; return; }
   const rows = aa.rows.slice().sort((a, b) => a.hydrophobicity - b.hydrophobicity);
   const wt = cs.wild_type, rs = cs.resistant_reference, cut = cs.cutoff;
-  const ctab = () => `<div class="scroll"><table class="step"><tr><th class="num">Cutoff</th><th class="num">Whole grammar, all isolates</th><th class="num">&lt;H&gt; alone, all isolates</th><th class="num">&lt;H&gt; alone, single-vote isolates</th></tr>${cs.grammar_all.map((x, i) => `<tr${x.cutoff === cut ? ' class="hit-row"' : ""}><td class="num">${x.cutoff.toFixed(x.cutoff === cut ? 3 : 2)}${x.cutoff === cut ? " (used by the site)" : x.cutoff === wt.mean ? " (wild type)" : ""}</td><td class="num">${x.accuracy}%</td><td class="num">${cs.all[i].accuracy}%</td><td class="num">${cs.single_vote[i].accuracy}%</td></tr>`).join("")}</table></div>`;
+  const ctab = () => `<div class="scroll"><table class="step"><tr><th class="num">Cutoff</th><th class="num">Whole grammar, all isolates</th><th class="num">&lt;H&gt; alone, all isolates</th><th class="num">&lt;H&gt; alone, where it decides</th></tr>${cs.grammar_all.map((x, i) => `<tr${x.cutoff === cut ? ' class="hit-row"' : ""}><td class="num">${x.cutoff.toFixed(x.cutoff === cut ? 3 : 2)}${x.cutoff === cut ? " (used by the site)" : x.cutoff === wt.mean ? " (wild type)" : ""}</td><td class="num">${x.accuracy}%</td><td class="num">${cs.all[i].accuracy}%</td><td class="num">${cs.single_vote[i].accuracy}%</td></tr>`).join("")}</table></div>`;
   $("#calc-body").innerHTML = `
   <div class="band"><h3>1. The hydrophobicity scale</h3>
     <p>Each amino acid has a hydrophobicity value H from the scale in the paper (the Eisenberg normalised consensus scale). Negative means hydrophilic, positive means hydrophobic.</p>
@@ -585,24 +587,21 @@ INIT.calc = async () => {
     <div><label for="calc-ref">Reference residues</label><input type="text" id="calc-ref" maxlength="4" value="${esc(startRef)}" class="mono-in"></div></div>
     <div id="calc-steps"></div></div>
   <div class="band" id="calc-cutoff"><h3>3. Where the cutoff comes from</h3>
-    <p><b>The cutoff is the midpoint between two reference helices.</b> The susceptible wild-type residues ${esc(wt.residues.split("").join("-"))} give a GyrA helix mean of ${f3(wt.gyr.mean)} and a ParC helix mean of ${f3(wt.parc.mean)}, so &lt;H&gt; = <b>${f3(wt.mean)}</b>. The resistant reference residues ${esc(rs.residues.split("").join("-"))} (the commonest fully changed tetratype) give ${f3(rs.gyr.mean)} and ${f3(rs.parc.mean)}, so &lt;H&gt; = <b>${f3(rs.mean)}</b>. The midpoint is (${f3(wt.mean)} + ${f3(rs.mean)}) / 2 = <b>${f3(cut)}</b>. When the four residues fit neither complete pattern and exactly one position votes Resistant, the sample counts as Resistant only if its &lt;H&gt; is above this value. The helices are mostly oily residues, so both values are above zero. The cutoff is set from these two reference helices, not by searching the isolates for the best score.</p>
-    <p><b>Why not the wild-type value alone?</b> At ${f3(wt.mean)} a single change such as F-D-S-E (&lt;H&gt; 0.327) would count as Resistant whatever the codon, which contradicts checkpoint 2 for <i>S. enterica</i>, where only the ctg codon makes it resistant. The whole grammar scores ${cs.grammar_all.find(x => x.cutoff === wt.mean).accuracy}% at ${f3(wt.mean)} and ${cs.grammar_all.find(x => x.cutoff === cut).accuracy}% at ${f3(cut)}.</p>
+    <p><b>The cutoff is the midpoint between two reference helices.</b> The susceptible wild-type residues ${esc(wt.residues.split("").join("-"))} give a GyrA helix mean of ${f3(wt.gyr.mean)} and a ParC helix mean of ${f3(wt.parc.mean)}, so &lt;H&gt; = <b>${f3(wt.mean)}</b>. The resistant reference residues ${esc(rs.residues.split("").join("-"))} (the commonest fully changed tetratype) give ${f3(rs.gyr.mean)} and ${f3(rs.parc.mean)}, so &lt;H&gt; = <b>${f3(rs.mean)}</b>. The midpoint is (${f3(wt.mean)} + ${f3(rs.mean)}) / 2 = <b>${f3(cut)}</b>. When the four residues are not all in one column of the table and exactly one position votes Resistant, the sample counts as Resistant only if its &lt;H&gt; is above this value. The helices are mostly oily residues, so both values are above zero. The cutoff is set from these two reference helices, not by searching the isolates for the best score.</p>
+    <p><b>How much it matters.</b> &lt;H&gt; settles a call only where the four residues are not all in one column of the table and exactly one position votes Resistant. That is ${fmt(cs.n_single_vote)} of the ${fmt(cs.n_isolates)} reference isolates (${fmt(cs.single_vote_resistant)} resistant). The whole grammar scores ${cs.grammar_all.find(x => x.cutoff === wt.mean).accuracy}% with the wild-type value ${f3(wt.mean)} as cutoff and ${cs.grammar_all.find(x => x.cutoff === cut).accuracy}% with ${f3(cut)}.</p>
+    <p><b>Agreement with the paper.</b> The paper reports &lt;H&gt; of 0.27 to 0.32 for the susceptible tetratypes (S-D-S-E, S-N-S-E, Y-D-S-E, S-Y-S-E, L-D-S-E) and 0.40 to 0.48 for the resistant ones (L-N-I-E, F-N-I-E, I-D-I-E, I-N-I-E, L-G-I-E, I-Y-I-E, F-A-I-E, L-N-I-V), with F-N-S-K an exception at 0.297. This calculation gives the same values (for example S-D-S-E ${f3(wt.mean)}, L-N-I-E ${f3(rs.mean)}). The cutoff ${f3(cut)} lies in the gap between the two groups, above L-D-S-E (0.322) and F-D-S-E (0.327).</p>
     <p><b>Check against the data.</b> Across the ${fmt(cs.n_isolates)} reference isolates the mean &lt;H&gt; is <b>${f3(cs.mean_resistant)}</b> for resistant and <b>${f3(cs.mean_susceptible)}</b> for susceptible isolates. The values run from ${f3(cs.range[0])} to ${f3(cs.range[1])}. The two groups differ on average, but only by a small step.</p>
-    <p>Accuracy at each cutoff, scored on the reference isolates the rules were built from. The first column is the whole grammar (the three checkpoints, with &lt;H&gt; settling single votes). The other two use &lt;H&gt; alone. The ${fmt(cs.n_single_vote)} single-vote isolates (${fmt(cs.single_vote_resistant)} resistant) are the ones where &lt;H&gt; actually decides.</p>${ctab()}
-    <p style="margin-top:12px">Any cutoff from about 0.34 upward scores the same as the site's cutoff, because it turns every single-vote call into susceptible. On the single-vote isolates &lt;H&gt; alone is a weak separator (best ${cs.best_single_vote.accuracy}% on this grid), so it is only a last tie-breaker.</p>
+    <p>Accuracy at each cutoff, scored on the reference isolates the rules were built from. The first column is the whole grammar (the three checkpoints, with &lt;H&gt; settling single votes). The other two use &lt;H&gt; alone. The ${fmt(cs.n_single_vote)} isolates where &lt;H&gt; decides (${fmt(cs.single_vote_resistant)} resistant) are the last column.</p>${ctab()}
+    <p style="margin-top:12px">Where &lt;H&gt; decides it is a weak separator (best ${cs.best_single_vote.accuracy}% on this grid).${cs.h_decided_max !== null && cs.h_decided_max <= cut ? " At the site's cutoff every isolate it decides is called Susceptible, so on these data it works as a last tie-breaker toward Susceptible." : ""}</p>
     <p class="muted" style="font-size:.9rem;margin-top:8px">The grammar is only a fallback. When a septatype was seen in the reference isolates, the majority rule is used instead. These tables describe the reference set. They are not a validation.</p></div>
   <div class="band"><h3>4. The three checkpoints</h3>
-    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. The isolate is <b>susceptible</b> if all four residues fall in the Susceptible classes, and <b>resistant</b> if all four fall in the Resistant classes.</p>
-    <div class="scroll"><table><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>
-    <tr><td>GyrA-83</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
-    <tr><td>GyrA-87</td><td>Negatively charged or polar residue</td><td>Uncharged or negatively charged residue</td></tr>
-    <tr><td>ParC-80</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
-    <tr><td>ParC-84</td><td>Negatively charged residue</td><td>Hydrophobic or negatively charged residue</td></tr></table></div>
-    <p class="muted small" style="margin-top:6px">Polar residues are S, T, Y, N and Q. -OH residues are S, T and Y. G, P and C are counted as hydrophobic (an assumption). A residue can fit both columns, for example a negatively charged residue at GyrA-87 or ParC-84. The other positions then decide, which is the context sensitivity.</p>
+    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. The isolate is <b>susceptible</b> if all four residues are in the Susceptible column, and <b>resistant</b> if all four are in the Resistant column.</p>
+    <div class="scroll"><table class="rtab"><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>${SYNTAX.map(([p, a, b]) => `<tr><td class="nw"><b>${p}</b></td><td>${a.split(" ").map(x => `<span class="rchip">${x}</span>`).join("")}</td><td>${b.split(" ").map(x => `<span class="rchip">${x}</span>`).join("")}</td></tr>`).join("")}</table></div>
+    <p class="muted small" style="margin-top:6px">A residue can be in both columns (D at GyrA-87, E at ParC-84), so the four positions are read together, which is the context sensitivity. One exception counts as Resistant: the ParC pair S-K (S at ParC-80 together with K at ParC-84, the F-N-S-K tetratype). S alone is the susceptible S-E state, and K alone is not listed. In a result the exception appears in the table only when your sample carries the whole pair. The residues follow the paper's Table S6 and Fig. 6.</p>
     <p><b>Checkpoint 2.</b> RecN-346. Susceptible if it is leucine (L) encoded by cta. Resistant if it is leucine encoded by ctg, or phenylalanine (F). Other codons, and an unknown codon, give no resistant signal.</p>
     <p><b>Checkpoint 3.</b> PMQR genes. Susceptible if both qnrB2 and qnrS1 are absent. Resistant if either or both are present.</p>
     <p><b>Combined.</b> Susceptible if all checkpoints say susceptible. Resistant if any checkpoint says resistant.</p>
-    <p class="muted" style="font-size:.9rem">The written checkpoint 1 gives no answer when the four residues fit neither complete pattern (for example L-D-S-E, where GyrA-83 fits Resistant and ParC-80 fits Susceptible). There the residue votes decide (two or more positions outside the Susceptible classes: Resistant; none: Susceptible), and one vote is settled by &lt;H&gt; as in section 3. This is an assumption added by the site. <i>S. sonnei</i> also keeps one extra rule from the reference isolates: a single change at GyrA-83 or GyrA-87 counts as Resistant.</p></div>`;
+    <p class="muted" style="font-size:.9rem">The table gives no answer when the four residues are not all in one column (for example L-D-S-E, where L at GyrA-83 is in the Resistant column but S at ParC-80 is in the Susceptible column). There the residue votes decide (two or more positions outside the Susceptible column: Resistant; none: Susceptible), and one vote is settled by &lt;H&gt; as in section 3. This is an assumption added by the site. <i>S. sonnei</i> also keeps one extra rule from the reference isolates: a single change at GyrA-83 or GyrA-87 counts as Resistant.</p></div>`;
   const htab = b => `<div class="scroll"><table class="step"><tr><th>${esc(b.gene)} helix ${b.start}-${b.end}</th><th>Residue</th><th class="num">H</th></tr>${b.values.map(x => `<tr${x.sub ? ' class="hit-row"' : ""}><td>${esc(x.position)}</td><td class="mono">${esc(x.residue)}</td><td class="num">${f2(x.h)}</td></tr>`).join("")}<tr><td colspan="2">Sum of ${b.n}</td><td class="num">${f2(b.sum)}</td></tr><tr><td colspan="2"><b>${esc(b.gene)} mean = sum / ${b.n}</b></td><td class="num"><b>${f3(b.mean)}</b></td></tr></table></div>`;
   const side = (t, v) => `<div><h3 style="font-size:1rem">${t}</h3>${htab(v.gyr)}${htab(v.parc)}<p class="formula wrap">&lt;H&gt; = (${f3(v.gyr.mean)} + ${f3(v.parc.mean)}) / 2 = <b>${f3(v.mean)}</b></p></div>`;
   const draw = async () => {
@@ -612,8 +611,8 @@ INIT.calc = async () => {
     try {
       const c = await api(`/api/v1/grammar?residues=${r}&reference=${rf}`), hy = c.hydrophobicity, rr = c.reference;
       el.innerHTML = `<div class="row2">${side("Sample", hy)}${side("Reference", rr)}</div>${hChart(hy.mean, rr.mean, hy.cutoff, { res: cs.mean_resistant, sus: cs.mean_susceptible })}
-        <p>Sample &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} the cutoff of ${f3(hy.cutoff)}, which points to <b>${hy.side === "above" ? "resistant" : "susceptible"}</b>. ${c.checkpoints.residues.resolved_by === "hydrophobicity" ? "Here it settles checkpoint 1, because the four residues fit neither complete pattern and exactly one position votes Resistant." : "It does not settle this sample: " + (c.checkpoints.residues.pattern ? "the residue classes below do." : esc(c.checkpoints.residues.rule) + ".")}</p>
-        <p><b>Checkpoint 1 says ${esc(c.checkpoints.residues.call)}.</b> ${c.checkpoints.residues.pattern ? `All four residues fit the ${c.checkpoints.residues.pattern} classes.` : "The four residues fit neither complete pattern."}</p>${critTable(c.positions)}`;
+        <p>Sample &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} the cutoff of ${f3(hy.cutoff)}, which points to <b>${hy.side === "above" ? "resistant" : "susceptible"}</b>. ${c.checkpoints.residues.resolved_by === "hydrophobicity" ? "Here it settles checkpoint 1, because the four residues are not all in one column and exactly one position votes Resistant." : "It does not settle this sample: " + (c.checkpoints.residues.pattern ? "the residue classes below do." : esc(c.checkpoints.residues.rule) + ".")}</p>
+        <p><b>Checkpoint 1 says ${esc(c.checkpoints.residues.call)}.</b> ${c.checkpoints.residues.pattern ? `All four residues are in the ${c.checkpoints.residues.pattern === "resistant" ? "Resistant" : "Susceptible"} column.` : "The four residues are not all in one column."}</p>${critTable(c.positions)}`;
     } catch (e) { el.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
   $("#calc-in").oninput = draw; $("#calc-ref").oninput = draw;

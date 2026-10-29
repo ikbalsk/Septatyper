@@ -1,4 +1,4 @@
-"""Ceprotyper API (v1) and web interface.
+"""Ciprotyper API (v1) and web interface.
 
 Modules: A predict | B browse + benchmark | C community submission + curation | D theory and validation.
 All SQL is parameterised. Uploaded sequences are analysed in a temporary folder and deleted.
@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from . import bvbrc, countries, grammar, persist, rules, septatype
 from .config import ADMIN_TOKEN, HABITATS, MAX_UPLOAD_MB, SOURCES, SPECIES
 
-app = FastAPI(title="Ceprotyper API", version="2.0",
+app = FastAPI(title="Ciprotyper API", version="2.0",
               description="Ciprofloxacin resistance prediction and isolate repository for Enterobacterales.")
 STATIC = Path(__file__).parent / "static"
 AA = set("ACDEFGHIKLMNPQRSTVWY")
@@ -197,7 +197,7 @@ def predict_bvbrc(m: BvbrcReq):
         if detected:
             species = detected
         elif named:      # the record names another organism: never guess
-            raise HTTPException(400, f"BV-BRC calls this genome '{name}', which is not one of the four species Ceprotyper covers.")
+            raise HTTPException(400, f"BV-BRC calls this genome '{name}', which is not one of the four species Ciprotyper covers.")
         else:
             species = m.fallback_species
             if species not in SPECIES:
@@ -352,7 +352,7 @@ def aminoacids():
 # ----------------------------------------------------------------- downloads
 SITE_NAMES = {k: label for k, label, _ in SOURCES} | {"ALL": "Source not stated"}
 CSV_COLUMNS = [("genome_id", "Genome ID"), ("genome_name", "Genome name"), ("species_name", "Species"), ("source_name", "Isolation source"),
-               ("country", "Country"), ("septatype", "Septatype"), ("septatyper_call", "Ceprotyper predicted phenotype"),
+               ("country", "Country"), ("septatype", "Septatype"), ("septatyper_call", "Ciprotyper predicted phenotype"),
                ("lab_phenotype", "BV-BRC Phenotype Info: Lab"), ("bvbrc_call", "BV-BRC Phenotype Info: Computationally predicted"),
                ("submitter", "Submitter"), ("date_display", "Date"), ("affiliation", "Affiliation"), ("publication", "Publication"),
                ("st", "ST"), ("year_raw", "Year"), ("community", "Community submission")]
@@ -361,7 +361,7 @@ CSV_COLUMNS = [("genome_id", "Genome ID"), ("genome_name", "Genome name"), ("spe
 def _download(kind: str, f: dict):
     rows = rules.isolates_query(f, limit=False)["rows"]
     if kind == "json":
-        return JSONResponse(rows, headers={"Content-Disposition": "attachment; filename=ceprotyper_isolates.json"})
+        return JSONResponse(rows, headers={"Content-Disposition": "attachment; filename=ciprotyper_isolates.json"})
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow([h for _, h in CSV_COLUMNS])
@@ -370,7 +370,7 @@ def _download(kind: str, f: dict):
                  community="yes" if r.get("source") == "community" else "no")
         w.writerow(["" if r.get(k) is None else r.get(k) for k, _ in CSV_COLUMNS])
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
-                             headers={"Content-Disposition": "attachment; filename=ceprotyper_isolates.csv"})
+                             headers={"Content-Disposition": "attachment; filename=ciprotyper_isolates.csv"})
 
 
 @app.get("/api/v1/download/{kind}")
@@ -391,7 +391,7 @@ def bvbrc_lookup(genome_id: str):
     url = ("https://www.bv-brc.org/api/genome/?" + urllib.parse.quote(f"eq(genome_id,{genome_id})&select(genome_id,genome_name)", safe="=&(),")
            + "&http_accept=application/json")
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Ceprotyper/2.0"}), timeout=8) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Ciprotyper/2.0"}), timeout=8) as r:
             data = json.loads(r.read().decode())
     except Exception as e:  # network, timeout, bad JSON
         return {"found": False, "genome_id": genome_id, "reason": f"BV-BRC could not be reached ({type(e).__name__})."}
@@ -473,7 +473,7 @@ def decide(d: Decision):
 
 @app.get("/api/v1/admin/backup", dependencies=[Depends(admin)])
 def backup_download():
-    return JSONResponse(persist.export_backup(), headers={"Content-Disposition": "attachment; filename=ceprotyper_backup.json"})
+    return JSONResponse(persist.export_backup(), headers={"Content-Disposition": "attachment; filename=ciprotyper_backup.json"})
 
 
 @app.post("/api/v1/admin/restore", dependencies=[Depends(admin)])

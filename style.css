@@ -239,3 +239,16 @@ label.per select{width:auto;padding:3px 6px}
 @media (hover:hover) and (pointer:fine){.bt-wrap{overscroll-behavior:contain}}
 #p-browse .band.fhide .filters,#p-browse .band.fhide .checks{display:none}
 @media (max-width:700px){.bt-wrap{max-height:max(260px,calc(100vh - 160px));max-height:max(260px,calc(100dvh - 160px))}}
+
+/* checkpoint 1 table: residues only, the sample's residue lit and blinking */
+table.rtab td{vertical-align:middle}
+.rchip{display:inline-block;min-width:1.7em;margin:2px 2px 2px 0;padding:2px 5px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);font:600 .85rem var(--mono);text-align:center;vertical-align:middle}
+.rchip small{display:block;font:600 .52rem var(--sans);text-transform:uppercase;letter-spacing:.04em;margin-top:1px}
+.rchip.exc{border-style:dashed}
+.rchip.hit{animation:rchip-blink 1.1s ease-in-out infinite}
+.rchip.hit.s{background:var(--sus-bg);border-color:var(--sus);color:var(--sus);box-shadow:0 0 0 2px var(--sus-bg)}
+.rchip.hit.r{background:var(--res-bg);border-color:var(--res);color:var(--res);box-shadow:0 0 0 2px var(--res-bg)}
+@keyframes rchip-blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.25;transform:scale(1.08)}}
+@media (prefers-reduced-motion:reduce){.rchip.hit{animation:none}}
+table.rtab td:not(:first-child){white-space:nowrap}
+table.rtab th,table.rtab td{padding:5px 6px}

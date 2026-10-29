@@ -118,11 +118,12 @@ def reference_countries(db, species: str, habitat: str, sep: str) -> list[dict]:
                           GROUP BY 1, habitat""", args).fetchall()
     by = {}
     for r in rows:
-        d = by.setdefault(r["country"], {"country": r["country"], "n": 0, "n_resistant": 0, "n_susceptible": 0, "sites": {}})
+        d = by.setdefault(r["country"], {"country": r["country"], "n": 0, "n_resistant": 0, "n_susceptible": 0, "sites": {}, "site_phenotypes": {}})
         d["n"] += r["n"]
         d["n_resistant"] += r["r"]
         d["n_susceptible"] += r["n"] - r["r"]
         d["sites"][r["habitat"]] = r["n"]
+        d["site_phenotypes"][r["habitat"]] = {"n": r["n"], "r": r["r"], "s": r["n"] - r["r"]}
     return sorted(by.values(), key=lambda d: (-d["n"], d["country"]))
 
 
@@ -521,7 +522,9 @@ def cutoff_stats() -> dict:
     groups = []
     for t in rows:
         a = t["tetratype"].split("-")
-        groups.append((grammar.mean_h(a), sum(1 for v in grammar.votes(*a) if v["vote"]), t["r"], t["s"]))
+        nv = sum(1 for v in grammar.votes(*a) if v["vote"])
+        # <H> decides only where the four residues are not all in one column of the table and exactly one position votes Resistant
+        groups.append((grammar.mean_h(a), nv, t["r"], t["s"], grammar.checkpoint1("ecoli", a)["pattern"] is None and nv == 1))
     n_r, n_s = sum(g[2] for g in groups), sum(g[3] for g in groups)
     cut = grammar.H_CUTOFF
     grid = sorted({round(0.20 + 0.02 * i, 2) for i in range(16)} | {cut, grammar.H_WILD})
@@ -535,7 +538,7 @@ def cutoff_stats() -> dict:
         return out, tot
 
     allt, tot_all = table(groups)
-    one = [g for g in groups if g[1] == 1]
+    one = [g for g in groups if g[4]]
     onet, tot_one = table(one)
     best = lambda t: max(t, key=lambda x: (x["accuracy"], -abs(x["cutoff"] - cut)))  # noqa: E731
     hs = [g[0] for g in groups]
@@ -563,5 +566,5 @@ def cutoff_stats() -> dict:
             "mean_susceptible": round(sum(g[0] * g[3] for g in groups) / n_s, 3),
             "all": allt, "best_all": best(allt), "n_single_vote": tot_one,
             "single_vote": onet, "best_single_vote": best(onet) if one else None,
-            "grammar_all": gram, "best_grammar_all": best(gram),
+            "grammar_all": gram, "best_grammar_all": best(gram), "h_decided_max": max((g[0] for g in one), default=None),
             "single_vote_resistant": sum(g[2] for g in one)}

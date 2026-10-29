@@ -109,57 +109,62 @@ def votes(g83, g87, p80, p84) -> list[dict]:
 
 
 POS = ("GyrA-83", "GyrA-87", "ParC-80", "ParC-84")
-# The residue classes of checkpoint 1, in the paper's words
-ROWS = [("GyrA-83", "Polar residue with -OH group", "Hydrophobic residue"),
-        ("GyrA-87", "Negatively charged or polar residue", "Uncharged or negatively charged residue"),
-        ("ParC-80", "Polar residue with -OH group", "Hydrophobic residue"),
-        ("ParC-84", "Negatively charged residue", "Hydrophobic or negatively charged residue")]
+# Checkpoint 1, the syntax rules table: the residues that make each position Susceptible or Resistant.
+# A residue can sit in both columns (D at GyrA-87, E at ParC-84), so the four positions are read together.
+# The one exception counts as Resistant and is shown only when the sample carries it: the ParC pair S-K (Fig. 6b of the paper),
+# that is S at ParC-80 together with K at ParC-84. S alone (the susceptible S-E state) or K alone is not an exception.
+SUSCEPTIBLE_SET = {"GyrA-83": "SYT", "GyrA-87": "DNE", "ParC-80": "SYT", "ParC-84": "DE"}
+RESISTANT_SET = {"GyrA-83": "FLIW", "GyrA-87": "NDGYAE", "ParC-80": "IFW", "ParC-84": "EVD"}
+RESISTANT_EXCEPTION = {"ParC-80": "S", "ParC-84": "K"}      # one pair: both must be present
+ROWS = [(p, " ".join(SUSCEPTIBLE_SET[p]), " ".join(RESISTANT_SET[p])) for p in POS]
 
 
-def _parts(pos: str, res: str):
-    """The words of each class cell, each flagged when it describes this residue.
-    Returns (susceptible words, resistant words, susceptible suffix, resistant suffix)."""
-    if pos in ("GyrA-83", "ParC-80"):
-        return [("Polar residue with -OH group", res in POLAR_OH)], [("Hydrophobic", res in HYDROPHOBIC)], "", " residue"
-    if pos == "GyrA-87":
-        return ([("Negatively charged", res in ACIDIC), ("polar", res in POLAR_UNCHARGED)],
-                [("Uncharged", res not in ACIDIC | BASIC), ("negatively charged", res in ACIDIC)], " residue", " residue")
-    return [("Negatively charged", res in ACIDIC)], [("Hydrophobic", res in HYDROPHOBIC), ("negatively charged", res in ACIDIC)], " residue", " residue"
+def _cell(pos: str, res: str, pair: bool = False) -> dict:
+    """The two columns of one row of the table, each residue flagged when it is the sample's. An exception residue
+    is added to the Resistant column only when the sample carries the whole S-K pair (pair=True)."""
+    exc = RESISTANT_EXCEPTION.get(pos, "") if pair and res == RESISTANT_EXCEPTION.get(pos) else ""
+    return {"S": [{"residue": a, "hit": a == res, "exception": False} for a in SUSCEPTIBLE_SET[pos]],
+            "R": [{"residue": a, "hit": a == res, "exception": False} for a in RESISTANT_SET[pos]]
+                 + ([{"residue": exc, "hit": True, "exception": True}] if exc else []),
+            "fits_s": res in SUSCEPTIBLE_SET[pos], "fits_r": res in RESISTANT_SET[pos] or bool(exc), "exception": bool(exc)}
 
 
 def checkpoint1(species: str, aas4) -> dict:
-    """Checkpoint 1, the context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84.
-    Susceptible when all four residues fit the susceptible classes, Resistant when all four fit the resistant classes.
-    Where the four fit neither complete pattern the written rules are silent: the residue votes and <H> settle it (ASSUMPTION),
-    and S. sonnei keeps its extra single-change rule."""
+    """Checkpoint 1, the context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84, from the syntax rules table.
+    Susceptible when all four residues are in the Susceptible column, Resistant when all four are in the Resistant column
+    (the exception pair S-K included). Where the four fit neither, the written rules are silent: the residue votes and <H>
+    settle it (ASSUMPTION), and S. sonnei keeps its extra single-change rule."""
+    pair = aas4[2] == RESISTANT_EXCEPTION["ParC-80"] and aas4[3] == RESISTANT_EXCEPTION["ParC-84"]
     cells = []
     for pos, res in zip(POS, aas4):
-        S, R, sS, sR = _parts(pos, res)
-        fs, fr = any(h for _, h in S), any(h for _, h in R)
-        cells.append({"position": pos, "residue": res, "fits_s": fs, "fits_r": fr, "S": S, "R": R, "sS": sS, "sR": sR})
+        c = _cell(pos, res, pair)
+        cells.append({"position": pos, "residue": res, **c})
     pattern = "susceptible" if all(c["fits_s"] for c in cells) else "resistant" if all(c["fits_r"] for c in cells) else None
     vs = votes(*aas4)
     n = sum(1 for x in vs if x["vote"])
     h = mean_h(list(aas4))
     voter = next((x["position"] for x in vs if x["vote"]), None)
+    used_exc = [c["position"] for c in cells if c["exception"]] if pattern == "resistant" else []
     override = None
-    if species == "ssonnei" and n == 1 and voter in ("GyrA-83", "GyrA-87"):
+    if pattern == "resistant":
+        call, by = "Resistant", "pattern"
+        rule = "all four residues are in the Resistant column" + (" (exception: the ParC pair S-K)" if used_exc else "")
+    elif species == "ssonnei" and n == 1 and voter in ("GyrA-83", "GyrA-87"):
         call, by, override = "Resistant", "override", "sonnei_gyr"
-        rule = "S. sonnei single GyrA-83 or GyrA-87 change (L-D-S-E, S-Y-S-E pattern)"
-    elif pattern:
-        call, by = ("Susceptible", "pattern") if pattern == "susceptible" else ("Resistant", "pattern")
-        rule = f"all four residues fit the {pattern} pattern"
+        rule = "S. sonnei single GyrA-83 or GyrA-87 change"
+    elif pattern == "susceptible":
+        call, by, rule = "Susceptible", "pattern", "all four residues are in the Susceptible column"
     elif n >= 2:
-        call, by, rule = "Resistant", "votes", f"neither complete pattern; {n} of 4 positions vote Resistant"
+        call, by, rule = "Resistant", "votes", f"not all four in one column; {n} of 4 positions vote Resistant"
     elif n == 0:
-        call, by, rule = "Susceptible", "votes", "neither complete pattern; no position votes Resistant"
+        call, by, rule = "Susceptible", "votes", "not all four in one column; no position votes Resistant"
     else:
         cut = H_CUTOFF if _CUT[0] is None else _CUT[0]
         call = "Resistant" if h > cut else "Susceptible"
         by = "hydrophobicity"
-        rule = f"neither complete pattern; 1 vote, so the QRDR helix mean hydrophobicity {h} is {'above' if h > cut else 'at or below'} {cut}"
+        rule = f"not all four in one column; 1 vote, so the QRDR helix mean hydrophobicity {h} is {'above' if h > cut else 'at or below'} {cut}"
     return {"call": call, "pattern": pattern, "resolved_by": by, "rule": rule, "cells": cells, "votes": vs, "n_votes": n,
-            "mean_h": h, "override": override}
+            "mean_h": h, "override": override, "exceptions": used_exc}
 
 
 def checkpoint2(r346: str, codon: str | None = None) -> dict:
@@ -230,19 +235,20 @@ def explain(species: str, aas, g: dict, ref4=None, qnr=(False, False), codon=Non
     for the cases where the residue classes alone do not decide checkpoint 1."""
     c1, c2, c3 = g["checkpoints"]["residues"], g["checkpoints"]["recn"], g["checkpoints"]["qnr"]
     pos = []
-    for cell, (name, s_txt, r_txt) in zip(c1["cells"], ROWS):
-        fs, fr, res = cell["fits_s"], cell["fits_r"], cell["residue"]
+    for cell in c1["cells"]:
+        fs, fr = cell["fits_s"], cell["fits_r"]
         column = "both" if fs and fr else "susceptible" if fs else "resistant" if fr else "neither"
-        note = {"both": "fits both classes", "neither": "fits neither class"}.get(column, "")
-        pos.append({"position": name, "residue": res, "class": aa_class(res), "column": column, "fits_susceptible": fs, "fits_resistant": fr,
-                    "susceptible": s_txt, "resistant": r_txt,
-                    "susceptible_parts": [{"text": t, "hit": h} for t, h in cell["S"]], "susceptible_suffix": cell["sS"],
-                    "resistant_parts": [{"text": t, "hit": h} for t, h in cell["R"]], "resistant_suffix": cell["sR"], "note": note})
+        note = {"both": "in both columns", "neither": "in neither column"}.get(column, "")
+        if cell["exception"]:
+            note = "exception residue"
+        pos.append({"position": cell["position"], "residue": cell["residue"], "class": aa_class(cell["residue"]), "column": column,
+                    "fits_susceptible": fs, "fits_resistant": fr, "exception": cell["exception"],
+                    "susceptible": cell["S"], "resistant": cell["R"], "note": note})
     sample = h_block([p["residue"] for p in pos])
     ref = h_block(list(ref4) if ref4 else list(WILD4))
     return {"decided_by": g["decided_by"], "n_resistant_positions": g["n_votes"], "positions": pos,
             "checkpoints": {"residues": {"call": c1["call"], "pattern": c1["pattern"], "resolved_by": c1["resolved_by"], "rule": c1["rule"],
-                                         "n_votes": c1["n_votes"], "override": c1["override"]},
+                                         "n_votes": c1["n_votes"], "override": c1["override"], "exceptions": c1["exceptions"]},
                             "recn": c2, "qnr": c3},
             "hydrophobicity": {"gyr": sample["gyr"], "parc": sample["parc"], "mean": sample["mean"], "cutoff": H_CUTOFF,
                                "side": "above" if sample["mean"] > H_CUTOFF else "at_or_below"},

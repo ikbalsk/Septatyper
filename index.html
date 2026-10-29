@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#0b3c72">
-<meta name="description" content="Ceprotyper predicts ciprofloxacin resistance in Enterobacterales from gyrA, parC, recN and qnr sequence, and hosts a curated repository of 2,734 genomes.">
-<title>Ceprotyper: ciprofloxacin resistance from sequence</title>
+<meta name="description" content="Ciprotyper predicts ciprofloxacin resistance in Enterobacterales from gyrA, parC, recN and qnr sequence, and hosts a curated repository of 2,734 genomes.">
+<title>Ciprotyper: ciprofloxacin resistance from sequence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
 </head>
 <body>
 <header class="top"><div class="top-in">
-  <a class="brand" href="#/">Cepro<b>Typer</b></a>
+  <a class="brand" href="#/">Cipro<b>Typer</b></a>
   <nav id="nav" aria-label="Main">
     <a href="#/predict" data-p="predict">Predict</a>
     <a href="#/browse" data-p="browse">Browse</a>
@@ -32,7 +32,7 @@
 <section id="p-home" class="page">
   <div class="hero"><div class="hero-in">
     <h1>Read ciprofloxacin resistance from five codons and two genes.</h1>
-    <p>Upload a bacterial genome. Ceprotyper reads the GyrA, ParC and RecN positions and the qnr genes, builds the septatype and predicts the phenotype.</p>
+    <p>Upload a bacterial genome. Ciprotyper reads the GyrA, ParC and RecN positions and the qnr genes, builds the septatype and predicts the phenotype.</p>
     <div class="cta-row">
       <a class="btn primary" href="#/predict">Upload genome for septatyping</a>
       <a class="btn ghost" href="#/browse">Browse the isolates</a>
@@ -50,7 +50,7 @@
       <li><b>Read the codons</b>BLAST finds gyrA, parC and recN in your sequence and reads GyrA-83, GyrA-87, ParC-80, ParC-84 and RecN-346 as codons, so synonymous changes are kept.</li>
       <li><b>Find the qnr genes</b>qnrB and qnrS family genes count as present at 80% identity and 90% coverage.</li>
       <li><b>Build the septatype</b>The seven values join into one string, for example L-N-I-E-L-0-0.</li>
-      <li><b>Call the phenotype</b>The majority phenotype among reference isolates with that septatype wins. A new septatype is called by the three checkpoints (residue classes, RecN-346, qnr genes) and sent for curation.</li>
+      <li><b>Call the phenotype</b>The majority phenotype among reference isolates with that septatype wins. A new septatype is called by the three checkpoints (the residue table, RecN-346, qnr genes) and sent for curation.</li>
     </ol>
   </div>
   <div class="band">
@@ -61,7 +61,7 @@
   <div class="band modules">
     <h2>Four modules</h2>
     <a href="#/predict"><b>Predict</b><span>Upload or paste a sequence, or enter the residues, and get the septatype, the sequence type and the phenotype.</span></a>
-    <a href="#/browse"><b>Browse</b><span>Filter the repository by species, isolation source, ST, septatype, country and year. Compare lab, BV-BRC and Ceprotyper calls.</span></a>
+    <a href="#/browse"><b>Browse</b><span>Filter the repository by species, isolation source, ST, septatype, country and year. Compare lab, BV-BRC and Ciprotyper calls.</span></a>
     <a href="#/submit"><b>Submit</b><span>Contribute an isolate. Curators check the lab result against the prediction before it goes live.</span></a>
     <a href="#/theory"><b>Theory</b><span>The context-dependent grammar, an interactive view of the binding pocket and the validation figures.</span></a>
   </div>
@@ -144,7 +144,7 @@
       <div><label for="f-q">Search ID or name</label><input type="search" id="f-q"></div>
       <div><label for="f-src">Source</label><select id="f-src"><option value="">All</option><option value="founding">Founding set</option><option value="community">Community</option></select></div>
     </div>
-    <div class="checks" style="margin-top:0"><label><input type="checkbox" id="f-wins" disabled>Only where Ceprotyper matches the laboratory phenotype but the BV-BRC computational prediction does not</label></div>
+    <div class="checks" style="margin-top:0"><label><input type="checkbox" id="f-wins" disabled>Only where Ciprotyper matches the laboratory phenotype but the BV-BRC computational prediction does not</label></div>
     <div id="bv-note"></div>
     <div class="toolbar"><span id="b-count" class="muted"></span>
       <span><a class="btn line" id="dl-csv" href="#">Download CSV</a> <a class="btn line" id="dl-json" href="#">Download JSON</a> <button class="btn line" id="f-reset" type="button">Reset</button> <button class="btn line" id="f-toggle" type="button">Hide filters</button></span></div>
@@ -180,7 +180,7 @@
 
 <!-- SUBMIT -->
 <section id="p-submit" class="page">
-  <div class="page-head"><h2>Submit an isolate</h2><p>Curators compare your laboratory phenotype with the Ceprotyper prediction before the isolate is added. Only the derived genotype is kept. The genome file is deleted after analysis.</p></div>
+  <div class="page-head"><h2>Submit an isolate</h2><p>Curators compare your laboratory phenotype with the Ciprotyper prediction before the isolate is added. Only the derived genotype is kept. The genome file is deleted after analysis.</p></div>
   <div class="grid2">
     <form class="band" id="sf" autocomplete="off">
       <div class="row2">
@@ -232,22 +232,20 @@
     </div>
   </div>
   <div class="band"><h3>Grammar rules: three checkpoints</h3>
-    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. The isolate is <b>susceptible</b> if all four residues fall in the Susceptible classes and <b>resistant</b> if all four fall in the Resistant classes.</p>
-    <div class="scroll"><table>
-      <tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>
-      <tr><td>GyrA-83</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
-      <tr><td>GyrA-87</td><td>Negatively charged or polar residue</td><td>Uncharged or negatively charged residue</td></tr>
-      <tr><td>ParC-80</td><td>Polar residue with -OH group</td><td>Hydrophobic residue</td></tr>
-      <tr><td>ParC-84</td><td>Negatively charged residue</td><td>Hydrophobic or negatively charged residue</td></tr>
+    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. The isolate is <b>susceptible</b> if all four residues are in the Susceptible column and <b>resistant</b> if all four are in the Resistant column.</p>
+    <div class="scroll"><table class="rtab">
+      <tr><th>Phenotype</th><th>GyrA-83</th><th>GyrA-87</th><th>ParC-80</th><th>ParC-84</th></tr>
+      <tr><td><b>Susceptible</b></td><td>S, Y, T</td><td>D, N, E</td><td>S, Y, T</td><td>D, E</td></tr>
+      <tr><td><b>Resistant</b></td><td>F, L, I, W</td><td>N, D, G, Y, A, E</td><td>I, F, W<br><span class="muted">Exception: S</span></td><td>E, V, D<br><span class="muted">Exception: K</span></td></tr>
     </table></div>
-    <p class="muted" style="font-size:.9rem;margin-top:8px">A residue can fit both columns (a negatively charged residue at GyrA-87 or ParC-84), so the other positions decide. That is the context sensitivity.</p>
+    <p class="muted" style="font-size:.9rem;margin-top:8px">A residue can be in both columns (D at GyrA-87, E at ParC-84), so the four positions are read together. That is the context sensitivity. The two exceptions are one pair, S at ParC-80 together with K at ParC-84 (the F-N-S-K tetratype, Fig. 6b of the paper): S alone is the susceptible S-E state, and K alone is not listed. In a result, the exception appears only when the sample carries the whole pair, and the sample&#39;s residue blinks in the column where it is found. The residues are those of the paper&#39;s Table S6 (polar residue with -OH group, negatively charged or polar, hydrophobic, uncharged or negatively charged, hydrophobic or negatively charged) as observed or possible in Enterobacteriaceae. Source: Ghosh et al., <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">Scientific Reports, doi:10.1038/s41598-026-75690-y</a>.</p>
     <p><b>Checkpoint 2.</b> RecN-346. Susceptible if leucine (L) encoded by cta. Resistant if leucine encoded by ctg, or phenylalanine (F).</p>
     <p><b>Checkpoint 3.</b> PMQR genes. Susceptible if both qnrB2 and qnrS1 are absent. Resistant if either or both are present.</p>
     <p><b>Combined.</b> The isolate is predicted susceptible if all checkpoints consider it susceptible, and resistant if any checkpoint considers it resistant.</p>
     <p><a href="#/calc">See the worked calculation of the hydrophobicity value and the cutoff</a></p>
     <h3 style="margin-top:16px">Where the written rules are silent</h3>
-    <p>When the four residues fit neither complete pattern in checkpoint 1 (for example L-D-S-E), the rules above give no answer. The site then counts the positions outside the Susceptible classes: two or more mean Resistant and none means Susceptible. One position is settled by the QRDR helix mean hydrophobicity &lt;H&gt; (Eisenberg scale) against a cutoff of 0.334, the midpoint between the wild-type helices (S-D-S-E, 0.270) and the resistant reference helices (L-N-I-E, 0.397). &lt;H&gt; covers the whole GyrA helix (82-93, 12 residues) and ParC helix (80-90, 11 residues) with the sample&#39;s residues at positions 83, 87, 80 and 84: the GyrA mean is the sum over 12, the ParC mean is the sum over 11, and &lt;H&gt; is the average of the two. These steps are assumptions of the site, not part of the three written checkpoints. <i>S. sonnei</i> also keeps one extra rule taken from the reference isolates: a single change at GyrA-83 or GyrA-87 gives Resistant.</p>
-    <p class="muted">The checkpoints are only used for septatypes not seen in the reference isolates, and are shown next to every majority-rule call. Residue classes marked as assumptions (for example G, P and C counted as hydrophobic) are set in <code>app/grammar.py</code>. The RecN-346 codon is read from an uploaded genome or typed in by hand, and the reference isolates carry no codon, so checkpoint 2 for ctg could not be scored on them.</p>
+    <p>When the four residues are not all in one column in checkpoint 1 (for example L-D-S-E), the rules above give no answer. The site then counts the positions outside the Susceptible column: two or more mean Resistant and none means Susceptible. One position is settled by the QRDR helix mean hydrophobicity &lt;H&gt; (Eisenberg scale) against a cutoff of 0.334, the midpoint between the wild-type helices (S-D-S-E, 0.270) and the resistant reference helices (L-N-I-E, 0.397). &lt;H&gt; covers the whole GyrA helix (82-93, 12 residues) and ParC helix (80-90, 11 residues) with the sample&#39;s residues at positions 83, 87, 80 and 84: the GyrA mean is the sum over 12, the ParC mean is the sum over 11, and &lt;H&gt; is the average of the two. These steps are assumptions of the site, not part of the three written checkpoints. <i>S. sonnei</i> also keeps one extra rule taken from the reference isolates: a single change at GyrA-83 or GyrA-87 gives Resistant.</p>
+    <p class="muted">The checkpoints are only used for septatypes not seen in the reference isolates, and are shown next to every majority-rule call. The residue table is set in <code>app/grammar.py</code> (<code>SUSCEPTIBLE_SET</code>, <code>RESISTANT_SET</code> and <code>RESISTANT_EXCEPTION</code>). The RecN-346 codon is read from an uploaded genome or typed in by hand, and the reference isolates carry no codon, so checkpoint 2 for ctg could not be scored on them.</p>
   </div>
   <div class="band"><h3>Performance validation</h3><div id="t-valid"></div></div>
   <div class="band"><h3>Amino acid hydrophobicity (Eisenberg normalised consensus)</h3><div class="scroll"><table id="t-aa"></table></div></div>
@@ -255,7 +253,7 @@
 
 <!-- CALC -->
 <section id="p-calc" class="page">
-  <div class="page-head"><h2>How the call is calculated</h2><p>Residue classes, the QRDR helix hydrophobicity value and the cutoff, with worked numbers.</p></div>
+  <div class="page-head"><h2>How the call is calculated</h2><p>The residue table, the QRDR helix hydrophobicity value and the cutoff, with worked numbers.</p></div>
   <div id="calc-body"><div class="band muted">Loading</div></div>
 </section>
 
@@ -288,7 +286,7 @@
 
 <!-- ABOUT -->
 <section id="p-about" class="page">
-  <div class="page-head"><h2>About Ceprotyper</h2></div>
+  <div class="page-head"><h2>About Ciprotyper</h2></div>
   <div class="band">
     <h3>Method</h3>
     <p>The septatype combines the residues at GyrA-83, GyrA-87, ParC-80, ParC-84 and RecN-346 with the presence or absence of qnrB and qnrS family genes. Residues are read from codons so that synonymous changes, such as the RecN-346 cta and ctg codons in <i>Salmonella</i>, are kept. Genes are located with BLAST+ against reference genes for the chosen species, then aligned to that reference to read each codon. The qnr genes are detected with qnrB2 and qnrS1 reference alleles.</p>
@@ -329,7 +327,7 @@
 </section>
 
 </main>
-<footer>Ceprotyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
+<footer>Ciprotyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
 <script src="/static/app.js"></script>
 </body>
 </html>
