@@ -1,4 +1,4 @@
-"""SeptaTyper API (v1) and web interface.
+"""Ceprotyper API (v1) and web interface.
 
 Modules: A predict | B browse + benchmark | C community submission + curation | D theory and validation.
 All SQL is parameterised. Uploaded sequences are analysed in a temporary folder and deleted.
@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from . import bvbrc, countries, grammar, persist, rules, septatype
 from .config import ADMIN_TOKEN, HABITATS, MAX_UPLOAD_MB, SOURCES, SPECIES
 
-app = FastAPI(title="SeptaTyper API", version="2.0",
+app = FastAPI(title="Ceprotyper API", version="2.0",
               description="Ciprofloxacin resistance prediction and isolate repository for Enterobacterales.")
 STATIC = Path(__file__).parent / "static"
 AA = set("ACDEFGHIKLMNPQRSTVWY")
@@ -197,7 +197,7 @@ def predict_bvbrc(m: BvbrcReq):
         if detected:
             species = detected
         elif named:      # the record names another organism: never guess
-            raise HTTPException(400, f"BV-BRC calls this genome '{name}', which is not one of the four species SeptaTyper covers.")
+            raise HTTPException(400, f"BV-BRC calls this genome '{name}', which is not one of the four species Ceprotyper covers.")
         else:
             species = m.fallback_species
             if species not in SPECIES:
@@ -274,7 +274,7 @@ def _filters(species="", habitat="", st="", country="", septatype_="", tetratype
 def isolates(species: str = "", habitat: str = "", st: str = "", country: str = "", septatype: str = "",
              tetratype: str = "", phenotype: str = "", year_from: str = "", year_to: str = "", wins: bool = False,
              source: str = "", q: str = "", sort: str = "genome_id", desc: bool = False,
-             page: int = Query(1, ge=1), per_page: int = Query(25, ge=1, le=200)):
+             page: int = Query(1, ge=1), per_page: int = Query(25, ge=1, le=1000)):
     f = _filters(species, habitat, st, country, septatype, tetratype, phenotype, year_from, year_to, wins, source, q)
     r = rules.isolates_query(f, sort, desc, page, per_page)
     return {"total": r["total"], "page": page, "per_page": per_page, "rows": r["rows"]}
@@ -350,17 +350,27 @@ def aminoacids():
 
 
 # ----------------------------------------------------------------- downloads
+SITE_NAMES = {k: label for k, label, _ in SOURCES} | {"ALL": "Source not stated"}
+CSV_COLUMNS = [("genome_id", "Genome ID"), ("genome_name", "Genome name"), ("species_name", "Species"), ("source_name", "Isolation source"),
+               ("country", "Country"), ("septatype", "Septatype"), ("septatyper_call", "Ceprotyper predicted phenotype"),
+               ("lab_phenotype", "BV-BRC Phenotype Info: Lab"), ("bvbrc_call", "BV-BRC Phenotype Info: Computationally predicted"),
+               ("submitter", "Submitter"), ("date_display", "Date"), ("affiliation", "Affiliation"), ("publication", "Publication"),
+               ("st", "ST"), ("year_raw", "Year"), ("community", "Community submission")]
+
+
 def _download(kind: str, f: dict):
     rows = rules.isolates_query(f, limit=False)["rows"]
     if kind == "json":
-        return JSONResponse(rows, headers={"Content-Disposition": "attachment; filename=septatyper_isolates.json"})
+        return JSONResponse(rows, headers={"Content-Disposition": "attachment; filename=ceprotyper_isolates.json"})
     buf = io.StringIO()
-    cols = list(rows[0].keys()) if rows else list(rules.ISO_COLS)
-    w = csv.DictWriter(buf, fieldnames=cols)
-    w.writeheader()
-    w.writerows(rows)
+    w = csv.writer(buf)
+    w.writerow([h for _, h in CSV_COLUMNS])
+    for r in rows:
+        r = dict(r, species_name=SPECIES.get(r["species"], r["species"]), source_name=SITE_NAMES.get(r["habitat"], r["habitat"]),
+                 community="yes" if r.get("source") == "community" else "no")
+        w.writerow(["" if r.get(k) is None else r.get(k) for k, _ in CSV_COLUMNS])
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
-                             headers={"Content-Disposition": "attachment; filename=septatyper_isolates.csv"})
+                             headers={"Content-Disposition": "attachment; filename=ceprotyper_isolates.csv"})
 
 
 @app.get("/api/v1/download/{kind}")
@@ -381,7 +391,7 @@ def bvbrc_lookup(genome_id: str):
     url = ("https://www.bv-brc.org/api/genome/?" + urllib.parse.quote(f"eq(genome_id,{genome_id})&select(genome_id,genome_name)", safe="=&(),")
            + "&http_accept=application/json")
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "SeptaTyper/2.0"}), timeout=8) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Ceprotyper/2.0"}), timeout=8) as r:
             data = json.loads(r.read().decode())
     except Exception as e:  # network, timeout, bad JSON
         return {"found": False, "genome_id": genome_id, "reason": f"BV-BRC could not be reached ({type(e).__name__})."}
@@ -393,8 +403,9 @@ def bvbrc_lookup(genome_id: str):
 # --------------------------------------------------------------- submissions
 @app.post("/api/v1/submissions")
 def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = Form(""), genome_name: str = Form(""),
-           country: str = Form(""), year: str = Form(""), source_text: str = Form(""), mic: str = Form(""),
-           lab_phenotype: str = Form(""), email: str = Form(""), file: UploadFile | None = File(None),
+           country: str = Form(""), year: str = Form(""), source_text: str = Form(""),
+           lab_phenotype: str = Form(""), email: str = Form(""), submitter: str = Form(""), affiliation: str = Form(""),
+           publication: str = Form(""), file: UploadFile | None = File(None),
            sequence: str = Form(""), qnrB2: str = Form("auto"), qnrS1: str = Form("auto")):
     _check(species, habitat)
     if habitat == "ALL":
@@ -410,8 +421,18 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
         raise HTTPException(400, "Phenotype must be Resistant or Susceptible.")
     if year and not re.fullmatch(r"\d{4}", year.strip()):
         raise HTTPException(400, "Year must be four digits.")
-    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()):
+    if not submitter.strip():
+        raise HTTPException(400, "Enter the submitter's name.")
+    if not email.strip():
+        raise HTTPException(400, "Enter a contact email. Curators use it if they have a question.")
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email.strip()):
         raise HTTPException(400, "Email looks wrong.")
+    pub = publication.strip()
+    if pub:
+        if re.fullmatch(r"(?i)(doi:\s*)?10\.\d{4,9}/\S+", pub):
+            pub = "https://doi.org/" + re.sub(r"(?i)^doi:\s*", "", pub)
+        elif not re.fullmatch(r"https?://[^\s<>\"']{4,290}", pub):
+            raise HTTPException(400, "Publication should be a DOI (10.1038/...) or a web link starting with http.")
     if file is not None and file.filename:
         text = _read_upload(file)
     elif sequence.strip():
@@ -423,7 +444,8 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
     # keep only derived genotype data. The genome itself is never stored.
     d = dict(species=species, habitat=habitat, genome_id=genome_id.strip() or None, genome_name=genome_name.strip()[:200] or None,
              country=country_name, year=year.strip() or None, source_text=None,
-             mic=mic.strip()[:40] or None, lab_phenotype=lab_phenotype or None, email=email.strip() or None)
+             lab_phenotype=lab_phenotype or None, email=email.strip(), submitter=submitter.strip()[:120],
+             affiliation=affiliation.strip()[:200] or None, publication=pub or None)
     sub = rules.create_submission(d, result)
     return sub | {"result": result}
 
@@ -451,7 +473,7 @@ def decide(d: Decision):
 
 @app.get("/api/v1/admin/backup", dependencies=[Depends(admin)])
 def backup_download():
-    return JSONResponse(persist.export_backup(), headers={"Content-Disposition": "attachment; filename=septatyper_backup.json"})
+    return JSONResponse(persist.export_backup(), headers={"Content-Disposition": "attachment; filename=ceprotyper_backup.json"})
 
 
 @app.post("/api/v1/admin/restore", dependencies=[Depends(admin)])

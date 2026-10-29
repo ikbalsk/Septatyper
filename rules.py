@@ -7,6 +7,7 @@ import shutil
 import sqlite3
 import uuid
 
+from . import config
 from . import grammar
 from . import countries
 from .config import DB_PATH, HABITATS, SEED_DB, SPECIES
@@ -16,7 +17,31 @@ MIXED = 0.80          # majority share below this -> flag
 ISO_COLS = ("genome_id", "genome_name", "isolate_name", "species", "habitat", "lab_phenotype", "year_raw",
             "year_start", "year_end", "country", "iso3", "st", "gyrA_83", "gyrA_87", "parC_80", "parC_84",
             "recN_346", "qnrB2", "qnrS1", "septatype", "tetratype", "septatyper_call", "bvbrc_call",
-            "bvbrc_method", "source", "date_added")
+            "bvbrc_method", "source", "date_added", "submitter", "submitted_date", "affiliation", "publication")
+
+
+_MIGRATED = set()
+
+
+def _migrate(path) -> None:
+    """Bring a database made by an older version up to date: submitter, date, affiliation and publication columns,
+    with the founding isolates filled in. Safe to run on every start."""
+    db = sqlite3.connect(path)
+    try:
+        def cols(t):
+            return {r[1] for r in db.execute(f"PRAGMA table_info({t})")}
+        for c in ("submitter", "submitted_date", "affiliation", "publication"):
+            if c not in cols("isolates"):
+                db.execute(f"ALTER TABLE isolates ADD COLUMN {c} TEXT")
+        for c in ("submitter", "affiliation", "publication"):
+            if c not in cols("submissions"):
+                db.execute(f"ALTER TABLE submissions ADD COLUMN {c} TEXT")
+        db.execute("UPDATE isolates SET submitter=?, submitted_date=?, affiliation=?, publication=? "
+                   "WHERE source='founding' AND submitter IS NULL",
+                   (config.FOUNDING_SUBMITTER, config.FOUNDING_DATE, config.FOUNDING_AFFILIATION, config.FOUNDING_PUBLICATION))
+        db.commit()
+    finally:
+        db.close()
 
 
 def ensure_db():
@@ -26,6 +51,9 @@ def ensure_db():
         if not SEED_DB.exists():
             raise RuntimeError("Seed database missing. Run: python scripts/build_db.py")
         shutil.copy(SEED_DB, DB_PATH)
+    if str(DB_PATH) not in _MIGRATED:
+        _migrate(DB_PATH)
+        _MIGRATED.add(str(DB_PATH))
 
 
 def conn() -> sqlite3.Connection:
@@ -277,7 +305,17 @@ def _row_h(d: dict):
 
 
 SORTS = {"genome_id": "genome_id", "species": "species, habitat", "st": "st", "year": "year_start",
-         "country": "country", "septatype": "septatype", "lab": "lab_phenotype"}
+         "country": "country", "septatype": "septatype", "lab": "lab_phenotype", "pred": "septatyper_call",
+         "bv": "bvbrc_call", "submitter": "submitter", "date": "submitted_date", "affiliation": "affiliation"}
+
+
+def fmt_date(iso) -> str:
+    """2026-10-16 -> 16 October 2026"""
+    try:
+        d = datetime.date.fromisoformat(str(iso)[:10])
+        return f"{d.day} {d.strftime('%B %Y')}"
+    except (TypeError, ValueError):
+        return ""
 
 
 def isolates_query(f: dict, sort="genome_id", desc=False, page=1, per_page=25, limit=True):
@@ -319,6 +357,7 @@ def isolates_query(f: dict, sort="genome_id", desc=False, page=1, per_page=25, l
     for r in rows:
         d = dict(r)
         d["h_gyr"], d["h_parc"], d["h_qrdr"] = _row_h(d)
+        d["date_display"] = fmt_date(d.get("submitted_date"))
         d["star"] = bool(d["bvbrc_call"] and d["septatyper_call"] == d["lab_phenotype"] and d["bvbrc_call"] != d["lab_phenotype"])
         d["bvbrc_url"] = f"https://www.bv-brc.org/view/Genome/{d['genome_id']}" if not d["genome_id"].startswith("SUB-") else None
         out.append(d)
@@ -336,9 +375,12 @@ def create_submission(d: dict, result: dict) -> dict:
     job = uuid.uuid4().hex[:12]
     db = conn()
     try:
-        db.execute("INSERT INTO submissions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        db.execute("INSERT INTO submissions (job_id, created, status, species, habitat, genome_id, genome_name, country, year, "
+                   "source_text, lab_phenotype, email, submitter, affiliation, publication, septatype, tier, call, novel, matches, "
+                   "result_json, curator_note, decided) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                    (job, _now(), status, d["species"], d["habitat"], d.get("genome_id"), d.get("genome_name"),
-                    d.get("country"), d.get("year"), d.get("source_text"), d.get("mic"), lab, d.get("email"),
+                    d.get("country"), d.get("year"), d.get("source_text"), lab, d.get("email"),
+                    d.get("submitter"), d.get("affiliation"), d.get("publication"),
                     result.get("septatype"), pred.get("tier"), call, int(novel), matches,
                     json.dumps(result), None, None))
         db.commit()
@@ -351,8 +393,8 @@ def create_submission(d: dict, result: dict) -> dict:
 def list_queue(status: str = "") -> list[dict]:
     db = conn()
     try:
-        sql = ("SELECT job_id,created,status,species,habitat,genome_id,genome_name,country,year,source_text,mic,"
-               "lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided,result_json FROM submissions")
+        sql = ("SELECT job_id,created,status,species,habitat,genome_id,genome_name,country,year,source_text,"
+               "email,submitter,affiliation,publication,lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided,result_json FROM submissions")
         rows = db.execute(sql + (" WHERE status=?" if status else "") + " ORDER BY created DESC",
                           (status,) if status else ()).fetchall()
     finally:
@@ -416,7 +458,8 @@ def apply_approval(db, s) -> str:
     db.execute(f"INSERT INTO isolates ({','.join(ISO_COLS)}) VALUES ({','.join('?'*len(ISO_COLS))})",
                (gid, s["genome_name"], s["genome_name"] or gid, s["species"], s["habitat"], s["lab_phenotype"],
                 s["year"], ys, ys, country, iso3, mst, aas[0], aas[1], aas[2], aas[3], aas[4], int(aas[5]),
-                int(aas[6]), s["septatype"], "-".join(aas[:4]), s["call"], None, None, "community", _now()))
+                int(aas[6]), s["septatype"], "-".join(aas[:4]), s["call"], None, None, "community", _now(),
+                s["submitter"], str(s["created"] or _now())[:10], s["affiliation"], s["publication"]))
     # the approved isolate joins the rules table, so a new septatype becomes a known one
     for hab in {s["habitat"], "ALL"}:
         r = db.execute("SELECT * FROM septatypes WHERE species=? AND habitat=? AND septatype=?",

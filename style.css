@@ -217,3 +217,25 @@ a{text-decoration-thickness:1px;text-underline-offset:2px}
 .formula.wrap{white-space:normal;overflow-wrap:anywhere}
 .grid2>*,.mech>*,.row2>*{min-width:0}
 .res5 input{width:100%;min-width:0}
+
+/* Browse table: small text, header and horizontal scroll bar always in view */
+.bt-wrap{scroll-margin-top:70px;max-height:max(260px,calc(100vh - 390px));max-height:max(260px,calc(100dvh - 390px));overflow:auto;border:1px solid var(--line);border-radius:8px;}
+@supports not selector(::-webkit-scrollbar){.bt-wrap{scrollbar-width:auto;scrollbar-color:#8aa0b8 #e6edf5}}
+.bt-wrap::-webkit-scrollbar{height:14px;width:12px}
+.bt-wrap::-webkit-scrollbar-track{background:#e6edf5}
+.bt-wrap::-webkit-scrollbar-thumb{background:#8aa0b8;border-radius:7px;border:2px solid #e6edf5}
+table.bt{font-size:.72rem;width:max-content;min-width:100%}
+table.bt th,table.bt td{padding:4px 7px;line-height:1.3}
+table.bt th{font-size:.7rem;position:sticky;z-index:3;background:var(--th)}
+table.bt thead tr:first-child th{top:0}
+table.bt thead tr:nth-child(2) th{top:var(--h1,26px)}
+table.bt th.grp{text-align:center;border-bottom:1px solid var(--line)}
+table.bt td .alias{font-size:.66rem}
+table.bt .badge{font-size:.68rem;padding:1px 6px}
+table.bt td.wrap{white-space:normal;min-width:110px;max-width:190px}
+label.per{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:.82rem}
+label.per select{width:auto;padding:3px 6px}
+.pager{flex-wrap:wrap}
+@media (hover:hover) and (pointer:fine){.bt-wrap{overscroll-behavior:contain}}
+#p-browse .band.fhide .filters,#p-browse .band.fhide .checks{display:none}
+@media (max-width:700px){.bt-wrap{max-height:max(260px,calc(100vh - 160px));max-height:max(260px,calc(100dvh - 160px))}}

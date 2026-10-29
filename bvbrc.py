@@ -17,7 +17,7 @@ from collections import Counter
 from . import rules
 
 API = "https://www.bv-brc.org/api"
-UA = {"User-Agent": "SeptaTyper/2.1 (research)", "Accept": "application/json"}
+UA = {"User-Agent": "Ceprotyper/2.1 (research)", "Accept": "application/json"}
 BATCH = 50
 STATE = {"running": False, "done": 0, "total": 0, "error": None, "names": 0, "calls": 0, "evidence": {}}
 _LOCK = threading.Lock()

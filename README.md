@@ -1,4 +1,4 @@
-# SeptaTyper v2
+# Ceprotyper v2
 
 Ciprofloxacin resistance prediction and a curated repository of 2,734 Enterobacterales genomes
 (*E. coli*, *S. sonnei*, *S. enterica* subsp. I, *K. pneumoniae*).
@@ -6,8 +6,8 @@ Ciprofloxacin resistance prediction and a curated repository of 2,734 Enterobact
 | Module | What it does |
 |---|---|
 | A Predict | Upload or paste FASTA (or enter residues). BLAST finds gyrA, parC, recN and the qnr genes, codons are read, the septatype is built and the phenotype called. Shows the sample's MLST sequence type, the STs of the reference isolates behind the majority-rule call, the RecN-346 codon (cta/ctg flag), combined mean hydrophobicity <H>, and a plain-language reason. |
-| B Browse | Filter by species, site, ST, septatype, country, year. Dual-display Genome ID (BV-BRC link) with isolate name beneath. Lab, BV-BRC and SeptaTyper columns with a star where SeptaTyper matches the laboratory phenotype and the BV-BRC computational prediction does not. CSV/JSON download. Septatype-by-site bars and a country map. |
-| C Submit | Community form with BV-BRC name lookup. Submissions wait in a curation queue. New septatypes and phenotype/prediction disagreements are flagged. A curator approves or rejects. |
+| B Browse | Filter by species, site, ST, septatype, country, year. Columns: Genome ID (BV-BRC link, isolate name beneath), species and source, country, septatype, Ceprotyper predicted phenotype (star where it matches the laboratory result but the BV-BRC computational call does not), BV-BRC Phenotype Info (Lab, Computationally predicted), submitter, date, affiliation and publication link. 100 rows per page by default, 25 to 500 or a custom number up to 1000. Small text, a header that stays put while the rows scroll inside the table box, an always-visible horizontal scroll bar, and a Hide filters button to give the table room. The CSV follows the table columns. |
+| C Submit | Community form with BV-BRC name lookup. Submitter and contact email are required, the date is set automatically, affiliation and publication (a DOI or link) are optional. There is no MIC field. Submissions wait in a curation queue. New septatypes and phenotype/prediction disagreements are flagged. A curator approves or rejects. |
 | D Theory | The context-dependent grammar, an interactive schematic of the Mg2+ bridge, validation tables, edge cases. |
 
 REST API under `/api/v1` (interactive docs at `/docs`).
@@ -125,3 +125,16 @@ Only the first three have reference isolates. For any other source the call uses
 sources and says so, until curators approve submissions from that source. Submitters pick their country from a
 searchable list of all countries (`app/countries.py`, ISO 3166 with alpha-3 codes), so approved submissions from any
 country appear on the map. Approved submissions count in the analytics; pending and rejected ones do not.
+
+
+## Name and field names
+
+The tool is called Ceprotyper. The word *septatype* (the typing string such as S-D-S-E-L-0-0) is unchanged. Some internal names still carry the old
+spelling so that live databases and backups keep working: the database column and JSON field `septatyper_call`, the accuracy fields
+`septatyper_*` and the default backup file name `septatyper_backup.json` (set `BACKUP_GITHUB_PATH` to change it).
+
+## Submitter, date, affiliation and publication
+
+Every isolate has these four fields. The 2,734 founding isolates carry the values in `app/config.py` (`FOUNDING_*`): Ghosh et al, 16 October 2026,
+JISIASR, Kolkata, https://doi.org/10.1038/s41598-026-75690-y. A community submission stores what the submitter typed, with the date set to the
+day of submission. A database made by an older version is upgraded on start-up (columns added, founding isolates filled in).

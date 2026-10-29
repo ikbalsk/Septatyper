@@ -1,4 +1,4 @@
-/* SeptaTyper front end. No framework. All server text goes through esc(). */
+/* Ceprotyper front end. No framework. All server text goes through esc(). */
 "use strict";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -133,7 +133,7 @@ function drawBatch(done, total, unit = "file") {
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing ${unit} ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
     <div class="scroll"><table><tr><th>${unit === "genome" ? "Genome" : "File"}</th><th>Septatype</th><th>ST</th><th>Call</th><th>Call from</th><th>Support</th></tr>${rows}</table></div>
     ${working ? "" : `<div class="actions no-print"><button class="btn solid" data-act="bcsv" type="button">Download CSV</button><button class="btn line" data-act="print" type="button">Print or save as PDF</button></div><p class="muted" style="font-size:.85rem">Tap a row for the full result.</p>`}
-    <p class="print-only">SeptaTyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
+    <p class="print-only">Ceprotyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
 }
 async function runBatch(species, habitat) {
   if (!PFILES.length) throw new Error("Choose at least one FASTA file.");
@@ -168,9 +168,9 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
   if (act === "print") printNow();
-  else if (act === "csv" && LAST) download("septatyper_result.csv", toCsv([flat(LAST, LAST._name || "result")]), "text/csv");
-  else if (act === "json" && LAST) download("septatyper_result.json", JSON.stringify(LAST, null, 2), "application/json");
-  else if (act === "bcsv") download("septatyper_batch.csv", toCsv(BATCH.map(x => flat(x.res, x.name, x.error))), "text/csv");
+  else if (act === "csv" && LAST) download("ceprotyper_result.csv", toCsv([flat(LAST, LAST._name || "result")]), "text/csv");
+  else if (act === "json" && LAST) download("ceprotyper_result.json", JSON.stringify(LAST, null, 2), "application/json");
+  else if (act === "bcsv") download("ceprotyper_batch.csv", toCsv(BATCH.map(x => flat(x.res, x.name, x.error))), "text/csv");
   else if (act === "detail") { const x = BATCH[+b.dataset.i]; if (x && x.res) { $("#bdetail").innerHTML = renderResult(x.res); $("#bdetail").scrollIntoView({ behavior: "smooth" }); } }
 });
 
@@ -235,7 +235,7 @@ function whyBlock(p) {
 function renderResult(r, extra) {
   const p = r.prediction, a = r.analysis;
   LAST = r;
-  let h = `<div class="band result"><p class="print-only">SeptaTyper report, ${new Date().toLocaleDateString()}. ${esc(r.species_name)}, ${esc(SITE[r.habitat] || r.habitat)}. ${esc(r._name || "")}</p>`;
+  let h = `<div class="band result"><p class="print-only">Ceprotyper report, ${new Date().toLocaleDateString()}. ${esc(r.species_name)}, ${esc(SITE[r.habitat] || r.habitat)}. ${esc(r._name || "")}</p>`;
   if (r.bvbrc) h += `<p class="small muted" style="margin:0 0 8px">BV-BRC genome <a href="${esc(r.bvbrc.url)}" target="_blank" rel="noopener">${esc(r.bvbrc.genome_id)}</a>: ${esc(r.bvbrc.genome_name)}${r.bvbrc.country ? ", " + esc(r.bvbrc.country) : ""}${r.bvbrc.year ? ", " + esc(r.bvbrc.year) : ""}${r.bvbrc.isolation_source ? ". Source: " + esc(r.bvbrc.isolation_source) : ""}.</p>`;
   if (!p) {
     h += `<h3>No call could be made</h3><p>A complete septatype could not be built from this input.</p>`;
@@ -363,7 +363,7 @@ INIT.predict = () => {
 
 /* ------------------------------------------------------------------ browse */
 let BS = { page: 1, sort: "genome_id", desc: false }, BTOT = 0;
-const PER = 25;
+let PER = 100;
 function bfilters() {
   const f = { species: $("#f-sp").value, habitat: $("#f-hb").value, st: $("#f-st").value, country: $("#f-country").value, septatype: $("#f-sep").value.trim().toUpperCase(),
     phenotype: $("#f-ph").value, year_from: $("#f-y1").value, year_to: $("#f-y2").value, q: $("#f-q").value.trim(), source: $("#f-src").value };
@@ -380,20 +380,28 @@ async function loadBrowse() {
     $("#b-count").textContent = `${fmt(d.total)} isolates`;
     $("#b-page").textContent = `Page ${d.page} of ${Math.max(1, Math.ceil(d.total / PER))}`;
     $("#b-prev").disabled = d.page <= 1; $("#b-next").disabled = d.page * PER >= d.total;
-    const th = (k, t) => `<th class="sort" data-k="${k}">${t}${BS.sort === k ? (BS.desc ? " (desc)" : " (asc)") : ""}</th>`;
-    const bv = META.bvLoaded;
-    $("#btable").innerHTML = `<tr>${th("genome_id", "Genome ID and name")}${th("species", "Species and source")}${th("st", "ST")}${th("country", "Country, year")}${th("septatype", "Septatype")}<th title="Mean hydrophobicity of the whole GyrA and ParC QRDR helices, with this isolate's residues at the four positions">QRDR helix &lt;H&gt;</th>${th("lab", "Lab phenotype")}<th>BV-BRC computational phenotype</th><th>SeptaTyper</th></tr>` +
+    const arrow = k => BS.sort === k ? (BS.desc ? " &#9660;" : " &#9650;") : "";
+    const th = (k, t, rs = "") => `<th class="sort" data-k="${k}"${rs ? ` rowspan="2"` : ""}>${t}${arrow(k)}</th>`;
+    const pubLink = u => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(u.replace(/^https?:\/\//, ""))}</a>` : "-";
+    $("#btable").innerHTML = `<thead><tr>${th("genome_id", "Genome ID", 1)}${th("species", "Species and source", 1)}${th("country", "Country", 1)}${th("septatype", "Septatype", 1)}${th("pred", "Ceprotyper predicted phenotype", 1)}<th class="grp" colspan="2">BV-BRC Phenotype Info</th>${th("submitter", "Submitter", 1)}${th("date", "Date", 1)}${th("affiliation", "Affiliation", 1)}<th rowspan="2">Publication</th></tr>
+      <tr>${th("lab", "Lab")}${th("bv", "Computationally predicted")}</tr></thead><tbody>` +
       (d.rows.length ? d.rows.map(r => `<tr>
         <td class="nw">${r.bvbrc_url ? `<a href="${esc(r.bvbrc_url)}" target="_blank" rel="noopener">${esc(r.genome_id)}</a>` : esc(r.genome_id)}<span class="alias">${esc(r.genome_name || r.isolate_name)}</span></td>
         <td class="nw"><i>${esc(SHORT[r.species])}</i><span class="alias">${esc(SITE[r.habitat])}${r.source === "community" ? ", community" : ""}</span></td>
-        <td class="nw">${esc(r.st || "-")}</td>
-        <td class="nw">${esc(r.country || "-")}<span class="alias">${esc(r.year_raw || "-")}</span></td>
+        <td class="nw">${esc(r.country || "-")}</td>
         <td class="mono nw">${mutSep(r.septatype)}</td>
-        <td class="nw stat">${r.h_qrdr != null ? f3(r.h_qrdr) : "-"}${r.h_qrdr != null ? `<span class="alias">GyrA ${f3(r.h_gyr)}, ParC ${f3(r.h_parc)}</span>` : ""}</td>
+        <td class="nw">${r.septatyper_call ? badge(r.septatyper_call, 1) : "-"} ${r.star ? `<span class="star" title="Ceprotyper matches the laboratory phenotype. The BV-BRC computational prediction does not.">&#9733;</span>` : ""}</td>
         <td>${badge(r.lab_phenotype, 1)}</td>
         <td>${r.bvbrc_call ? badge(r.bvbrc_call, 1) : `<span class="muted" title="Not loaded yet">-</span>`}</td>
-        <td class="nw">${r.septatyper_call ? badge(r.septatyper_call, 1) : "-"} ${r.star ? `<span class="star" title="SeptaTyper matches the laboratory phenotype. The BV-BRC computational prediction does not.">&#9733;</span>` : ""}</td></tr>`).join("")
-        : `<tr><td colspan="9" class="muted">No isolates match these filters.</td></tr>`);
+        <td class="nw">${esc(r.submitter || "-")}</td>
+        <td class="nw">${esc(r.date_display || "-")}</td>
+        <td class="wrap">${esc(r.affiliation || "-")}</td>
+        <td class="nw">${pubLink(r.publication)}</td></tr>`).join("")
+        : `<tr><td colspan="11" class="muted">No isolates match these filters.</td></tr>`) + "</tbody>";
+    const wrap = $("#bt-wrap"), tr1 = $("#btable thead tr");
+    if (tr1) wrap.style.setProperty("--h1", tr1.offsetHeight + "px");
+    wrap.scrollTop = 0;
+    if (BS.jump) { BS.jump = false; wrap.scrollIntoView({ block: "start" }); }       // after a page or size change, bring the table back into view
     $$("#btable th.sort").forEach(h => h.onclick = () => { BS.desc = BS.sort === h.dataset.k ? !BS.desc : false; BS.sort = h.dataset.k; BS.page = 1; loadBrowse(); });
   } catch (e) { $("#btable").innerHTML = `<tr><td class="err">${esc(e.message)}</td></tr>`; }
 }
@@ -415,9 +423,13 @@ INIT.browse = async () => {
   $("#f-country").innerHTML = opts(withN(f.country), "All");
   bvNote();
   let t; const reload = () => { BS.page = 1; loadBrowse(); };
-  $$("#p-browse select, #p-browse input[type=number], #f-wins, #f-st").forEach(e => e.onchange = reload);
+  $$("#p-browse select:not(#b-per), #p-browse input[type=number]:not(#b-per-custom), #f-wins, #f-st").forEach(e => e.onchange = reload);
   $$("#p-browse input[type=search]:not(#f-st)").forEach(e => e.oninput = () => { clearTimeout(t); t = setTimeout(reload, 350); });
-  $("#b-prev").onclick = () => { BS.page--; loadBrowse(); }; $("#b-next").onclick = () => { BS.page++; loadBrowse(); };
+  $("#b-prev").onclick = () => { BS.page--; BS.jump = true; loadBrowse(); }; $("#b-next").onclick = () => { BS.page++; BS.jump = true; loadBrowse(); };
+  const setPer = v => { const n = Math.max(1, Math.min(1000, parseInt(v, 10) || 100)); if (n !== PER) { PER = n; BS.page = 1; BS.jump = true; loadBrowse(); } };
+  $("#b-per").onchange = e => { const c = e.target.value === "custom"; if (!c) $("#b-per-custom").value = ""; $("#b-per-custom").style.display = c ? "" : "none"; if (c) $("#b-per-custom").focus(); else setPer(e.target.value); };
+  $("#b-per-custom").onchange = e => { if (e.target.value) setPer(e.target.value); };
+  $("#f-toggle").onclick = () => { const band = $("#f-toggle").closest(".band"), hid = band.classList.toggle("fhide"); $("#f-toggle").textContent = hid ? "Show filters" : "Hide filters"; };
   $("#f-reset").onclick = () => { $$("#p-browse .filters select, #p-browse .filters input").forEach(e => e.value = ""); $("#f-wins").checked = false; reload(); };
   loadBrowse();
 };
@@ -462,6 +474,8 @@ INIT.analytics = async () => {
 
 /* ------------------------------------------------------------------ submit */
 INIT.submit = () => {
+  const setDate = () => { $("#s-date").value = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); };
+  setDate();
   $("#s-sp").innerHTML = opts(Object.entries(SP));
   $("#dl-country").innerHTML = META.countries.map(c => `<option value="${esc(c)}"></option>`).join("");
   const upd = () => { setSites($("#s-hb"), $("#s-sp").value, false); }; $("#s-sp").onchange = upd; upd();
@@ -477,12 +491,12 @@ INIT.submit = () => {
     try {
       const f = $("#s-file").files[0]; if (!f) throw new Error("Choose a genome FASTA file.");
       const fd = new FormData();
-      [["species", "#s-sp"], ["habitat", "#s-hb"], ["genome_id", "#s-gid"], ["country", "#s-country"], ["year", "#s-year"], ["mic", "#s-mic"], ["lab_phenotype", "#s-ph"], ["email", "#s-email"]].forEach(([k, s]) => fd.append(k, $(s).value.trim()));
+      [["species", "#s-sp"], ["habitat", "#s-hb"], ["genome_id", "#s-gid"], ["country", "#s-country"], ["year", "#s-year"], ["lab_phenotype", "#s-ph"], ["submitter", "#s-submitter"], ["affiliation", "#s-aff"], ["publication", "#s-pub"], ["email", "#s-email"]].forEach(([k, s]) => fd.append(k, $(s).value.trim()));
       fd.append("genome_name", $("#s-name").dataset.name || ""); fd.append("file", await maybeGzip(f));
       const r = await api("/api/v1/submissions", { method: "POST", body: fd });
       const msg = { needs_review: "Needs review: the septatype is new or the prediction disagrees with your laboratory result.", pending: "Pending: the prediction matches your result or no result was given. A curator will check it." }[r.status] || r.status;
       $("#s-result").innerHTML = renderResult(r.result, `<div class="info"><b>Submission ${esc(r.job_id)}</b><br>${esc(msg)}${r.matches === null ? " Without a laboratory phenotype the isolate cannot be approved." : ""}</div>`);
-      $("#sf").reset(); $("#s-name").textContent = ""; $("#s-name").dataset.name = ""; upd();
+      $("#sf").reset(); setDate(); $("#s-name").textContent = ""; $("#s-name").dataset.name = ""; upd();
     } catch (ex) { err.innerHTML = `<div class="err">${esc(ex.message)}</div>`; }
     finally { btn.disabled = false; btn.textContent = old; }
   };
@@ -538,7 +552,7 @@ INIT.theory = async () => {
     const b = s.benchmark, rows = s.rows.filter(x => x.habitat !== "ALL");
     let h = `<h3 style="font-size:1rem">Majority rule and grammar against laboratory phenotype</h3><div class="scroll"><table><tr><th>Species</th><th>Source</th><th>Isolates</th><th>Majority rule</th><th>Grammar only</th></tr>${rows.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${esc(SITE[x.habitat])}</td><td class="stat">${fmt(x.n_isolates)}</td><td class="stat">${x.accuracy}%</td><td class="stat">${x.grammar_accuracy}%</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">Both are scored on the founding isolates the rules were built from. They describe the reference set, not independent performance. The grammar only calls septatypes missing from the database.</p>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Head to head with BV-BRC computational predictions</h3>`;
-    if (b.loaded) h += `<p class="stat">${fmt(b.compared)} isolates have a BV-BRC computational prediction. SeptaTyper matches the lab result in ${fmt(b.septatyper_ok)} (${(100 * b.septatyper_ok / b.compared).toFixed(1)}%) and BV-BRC in ${fmt(b.bvbrc_ok)} (${(100 * b.bvbrc_ok / b.compared).toFixed(1)}%). SeptaTyper matches the laboratory phenotype where BV-BRC does not in ${fmt(b.wins)} isolates. The reverse happens in ${fmt(b.losses)}.</p><div class="scroll"><table><tr><th>Genome</th><th>Septatype</th><th>Lab</th><th>BV-BRC</th><th>SeptaTyper</th></tr>${b.examples.map(x => `<tr><td>${esc(x.genome_id)}<span class="alias">${esc(x.isolate_name)}</span></td><td class="mono">${esc(x.septatype)}</td><td>${badge(x.lab_phenotype, 1)}</td><td>${badge(x.bvbrc_call, 1)}</td><td>${badge(x.septatyper_call, 1)}</td></tr>`).join("")}</table></div>`;
+    if (b.loaded) h += `<p class="stat">${fmt(b.compared)} isolates have a BV-BRC computational prediction. Ceprotyper matches the lab result in ${fmt(b.septatyper_ok)} (${(100 * b.septatyper_ok / b.compared).toFixed(1)}%) and BV-BRC in ${fmt(b.bvbrc_ok)} (${(100 * b.bvbrc_ok / b.compared).toFixed(1)}%). Ceprotyper matches the laboratory phenotype where BV-BRC does not in ${fmt(b.wins)} isolates. The reverse happens in ${fmt(b.losses)}.</p><div class="scroll"><table><tr><th>Genome</th><th>Septatype</th><th>Lab</th><th>BV-BRC</th><th>Ceprotyper</th></tr>${b.examples.map(x => `<tr><td>${esc(x.genome_id)}<span class="alias">${esc(x.isolate_name)}</span></td><td class="mono">${esc(x.septatype)}</td><td>${badge(x.lab_phenotype, 1)}</td><td>${badge(x.bvbrc_call, 1)}</td><td>${badge(x.septatyper_call, 1)}</td></tr>`).join("")}</table></div>`;
     else h += `<div class="info">BV-BRC predictions have not been loaded yet, so the head-to-head comparison is empty. They load automatically when the server can reach BV-BRC.</div>`;
     h += `<h3 style="font-size:1rem;margin-top:18px">Susceptible tetratype S-D-S-E, split by qnr</h3><div class="scroll"><table><tr><th>Species</th><th>qnrB</th><th>qnrS</th><th>Isolates</th><th>Resistant</th></tr>${s.edgecases.wildtype_tetratype_by_qnr.map(x => `<tr><td><i>${esc(SHORT[x.species])}</i></td><td>${x.qnrB2 ? "yes" : "no"}</td><td>${x.qnrS1 ? "yes" : "no"}</td><td class="stat">${x.n}</td><td class="stat">${x.res} (${Math.round(100 * x.res / x.n)}%)</td></tr>`).join("")}</table></div><p class="muted" style="font-size:.85rem">A qnr gene on a susceptible baseline is usually resistant, but not always. A gene found in sequence may not be expressed.</p>`;
     $("#t-valid").innerHTML = h;
@@ -643,7 +657,8 @@ INIT.curate = () => {
       };
       $("#c-table").innerHTML = `<tr><th>Submission</th><th>Isolate</th><th>Septatype</th><th>ST</th><th>Prediction</th><th>Lab</th><th>Status</th><th>Decision</th></tr>` +
         (d.rows.length ? d.rows.map(r => `<tr><td class="nw">${esc(r.job_id)}<span class="alias">submitted ${esc(r.created)}</span></td>
-          <td>${esc(r.genome_id || "no ID")}<span class="alias">${esc(SHORT[r.species])}, ${esc(SITE[r.habitat])}, ${esc(r.country || "-")} ${esc(r.year || "")}</span></td>
+          <td>${esc(r.genome_id || "no ID")}<span class="alias">${esc(SHORT[r.species])}, ${esc(SITE[r.habitat])}, ${esc(r.country || "-")} ${esc(r.year || "")}</span>
+            <span class="alias">${esc(r.submitter || "-")}${r.affiliation ? ", " + esc(r.affiliation) : ""}${r.email ? " (" + esc(r.email) + ")" : ""}</span>${r.publication ? `<span class="alias"><a href="${esc(r.publication)}" target="_blank" rel="noopener">${esc(r.publication.replace(/^https?:\/\//, ""))}</a></span>` : ""}</td>
           <td class="mono nw">${mutSep(r.septatype)}${r.novel ? `<span class="alias">new septatype</span>` : ""}</td>
           <td class="nw">${esc(r.st || "-")}</td>
           <td>${r.call ? badge(r.call, 1) : "-"}<span class="alias">${esc(r.tier || "")}</span></td>

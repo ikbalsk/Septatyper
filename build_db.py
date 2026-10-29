@@ -17,7 +17,7 @@ from pathlib import Path
 import openpyxl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app import grammar  # noqa: E402
+from app import config, grammar  # noqa: E402
 from app.config import ROOT, SECTION_TO_SPECIES, SEED_DB  # noqa: E402
 
 XLSX = Path(os.environ.get("TABLE_S1", ROOT / "data" / "Table_S1.xlsx"))
@@ -37,7 +37,8 @@ CREATE TABLE isolates (
   country TEXT, iso3 TEXT, st TEXT,
   gyrA_83 TEXT, gyrA_87 TEXT, parC_80 TEXT, parC_84 TEXT, recN_346 TEXT, qnrB2 INTEGER, qnrS1 INTEGER,
   septatype TEXT, tetratype TEXT, septatyper_call TEXT,
-  bvbrc_call TEXT, bvbrc_method TEXT, source TEXT DEFAULT 'founding', date_added TEXT);
+  bvbrc_call TEXT, bvbrc_method TEXT, source TEXT DEFAULT 'founding', date_added TEXT,
+  submitter TEXT, submitted_date TEXT, affiliation TEXT, publication TEXT);
 CREATE INDEX ix_iso_a ON isolates(species, habitat, septatype);
 CREATE INDEX ix_iso_b ON isolates(st); CREATE INDEX ix_iso_c ON isolates(country);
 CREATE TABLE septatypes (
@@ -49,8 +50,8 @@ CREATE TABLE species_stats (species TEXT, habitat TEXT, n_isolates INTEGER, n_re
 CREATE TABLE aa_properties (aa TEXT PRIMARY KEY, name TEXT, hydrophobicity REAL, class TEXT, scale TEXT);
 CREATE TABLE submissions (
   job_id TEXT PRIMARY KEY, created TEXT, status TEXT, species TEXT, habitat TEXT,
-  genome_id TEXT, genome_name TEXT, country TEXT, year TEXT, source_text TEXT, mic TEXT, lab_phenotype TEXT,
-  email TEXT, septatype TEXT, tier TEXT, call TEXT, novel INTEGER, matches INTEGER, result_json TEXT,
+  genome_id TEXT, genome_name TEXT, country TEXT, year TEXT, source_text TEXT, lab_phenotype TEXT,
+  email TEXT, submitter TEXT, affiliation TEXT, publication TEXT, septatype TEXT, tier TEXT, call TEXT, novel INTEGER, matches INTEGER, result_json TEXT,
   curator_note TEXT, decided TEXT);
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 """
@@ -129,6 +130,9 @@ def main():
                     round(100 * correct / len(items), 1), round(100 * g_correct / len(items), 1)))
     for r in rows:
         r["septatyper_call"] = calls[(r["species"], r["habitat"], r["septatype"])]
+    for r in rows:
+        r.update(submitter=config.FOUNDING_SUBMITTER, submitted_date=config.FOUNDING_DATE,
+                 affiliation=config.FOUNDING_AFFILIATION, publication=config.FOUNDING_PUBLICATION)
     cols = list(rows[0].keys())
     db.executemany(f"INSERT INTO isolates ({','.join(cols)}) VALUES ({','.join(':'+c for c in cols)})", rows)
     for a, h in grammar.EISENBERG.items():

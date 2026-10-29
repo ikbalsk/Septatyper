@@ -49,3 +49,10 @@ SECTION_TO_SPECIES = {
 # residue expected in a wild-type, susceptible reference
 POSITIONS = (("gyrA", 83), ("gyrA", 87), ("parC", 80), ("parC", 84), ("recN", 346))
 WILD = {("gyrA", 83): "S", ("gyrA", 87): "D", ("parC", 80): "S", ("parC", 84): "E", ("recN", 346): "L"}
+
+
+# what the table says about the 2,734 founding isolates
+FOUNDING_SUBMITTER = "Ghosh et al"
+FOUNDING_DATE = "2026-10-16"                  # shown as 16 October 2026
+FOUNDING_AFFILIATION = "JISIASR, Kolkata"
+FOUNDING_PUBLICATION = "https://doi.org/10.1038/s41598-026-75690-y"

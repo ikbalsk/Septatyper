@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#0b3c72">
-<meta name="description" content="SeptaTyper predicts ciprofloxacin resistance in Enterobacterales from gyrA, parC, recN and qnr sequence, and hosts a curated repository of 2,734 genomes.">
-<title>SeptaTyper: ciprofloxacin resistance from sequence</title>
+<meta name="description" content="Ceprotyper predicts ciprofloxacin resistance in Enterobacterales from gyrA, parC, recN and qnr sequence, and hosts a curated repository of 2,734 genomes.">
+<title>Ceprotyper: ciprofloxacin resistance from sequence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
 </head>
 <body>
 <header class="top"><div class="top-in">
-  <a class="brand" href="#/">Septa<b>Typer</b></a>
+  <a class="brand" href="#/">Cepro<b>Typer</b></a>
   <nav id="nav" aria-label="Main">
     <a href="#/predict" data-p="predict">Predict</a>
     <a href="#/browse" data-p="browse">Browse</a>
@@ -32,7 +32,7 @@
 <section id="p-home" class="page">
   <div class="hero"><div class="hero-in">
     <h1>Read ciprofloxacin resistance from five codons and two genes.</h1>
-    <p>Upload a bacterial genome. SeptaTyper reads the GyrA, ParC and RecN positions and the qnr genes, builds the septatype and predicts the phenotype.</p>
+    <p>Upload a bacterial genome. Ceprotyper reads the GyrA, ParC and RecN positions and the qnr genes, builds the septatype and predicts the phenotype.</p>
     <div class="cta-row">
       <a class="btn primary" href="#/predict">Upload genome for septatyping</a>
       <a class="btn ghost" href="#/browse">Browse the isolates</a>
@@ -61,7 +61,7 @@
   <div class="band modules">
     <h2>Four modules</h2>
     <a href="#/predict"><b>Predict</b><span>Upload or paste a sequence, or enter the residues, and get the septatype, the sequence type and the phenotype.</span></a>
-    <a href="#/browse"><b>Browse</b><span>Filter the repository by species, isolation source, ST, septatype, country and year. Compare lab, BV-BRC and SeptaTyper calls.</span></a>
+    <a href="#/browse"><b>Browse</b><span>Filter the repository by species, isolation source, ST, septatype, country and year. Compare lab, BV-BRC and Ceprotyper calls.</span></a>
     <a href="#/submit"><b>Submit</b><span>Contribute an isolate. Curators check the lab result against the prediction before it goes live.</span></a>
     <a href="#/theory"><b>Theory</b><span>The context-dependent grammar, an interactive view of the binding pocket and the validation figures.</span></a>
   </div>
@@ -130,7 +130,7 @@
 
 <!-- BROWSE -->
 <section id="p-browse" class="page">
-  <div class="page-head"><h2>Browse the repository</h2><p>Genome IDs link to BV-BRC. The isolate name sits under each ID. The &lt;H&gt; column is the mean hydrophobicity of the whole GyrA and ParC QRDR helices, with the isolate&#39;s residues at the four positions.</p></div>
+  <div class="page-head"><h2>Browse the repository</h2><p>Genome IDs link to BV-BRC. The isolate name sits under each ID.</p></div>
   <div class="band">
     <div class="filters">
       <div><label for="f-sp">Species</label><select id="f-sp"><option value="">All</option></select></div>
@@ -144,12 +144,14 @@
       <div><label for="f-q">Search ID or name</label><input type="search" id="f-q"></div>
       <div><label for="f-src">Source</label><select id="f-src"><option value="">All</option><option value="founding">Founding set</option><option value="community">Community</option></select></div>
     </div>
-    <div class="checks" style="margin-top:0"><label><input type="checkbox" id="f-wins" disabled>Only where SeptaTyper matches the laboratory phenotype but the BV-BRC computational prediction does not</label></div>
+    <div class="checks" style="margin-top:0"><label><input type="checkbox" id="f-wins" disabled>Only where Ceprotyper matches the laboratory phenotype but the BV-BRC computational prediction does not</label></div>
     <div id="bv-note"></div>
     <div class="toolbar"><span id="b-count" class="muted"></span>
-      <span><a class="btn line" id="dl-csv" href="#">Download CSV</a> <a class="btn line" id="dl-json" href="#">Download JSON</a> <button class="btn line" id="f-reset" type="button">Reset</button></span></div>
-    <div class="scroll"><table id="btable"></table></div>
-    <div class="pager"><button class="btn line" id="b-prev">Previous</button><span id="b-page" class="muted"></span><button class="btn line" id="b-next">Next</button></div>
+      <span><a class="btn line" id="dl-csv" href="#">Download CSV</a> <a class="btn line" id="dl-json" href="#">Download JSON</a> <button class="btn line" id="f-reset" type="button">Reset</button> <button class="btn line" id="f-toggle" type="button">Hide filters</button></span></div>
+    <div class="scroll bt-wrap" id="bt-wrap"><table id="btable" class="bt"></table></div>
+    <div class="pager"><button class="btn line" id="b-prev">Previous</button><span id="b-page" class="muted"></span><button class="btn line" id="b-next">Next</button>
+      <label class="per" for="b-per">Rows per page <select id="b-per"><option>25</option><option>50</option><option selected>100</option><option>250</option><option>500</option><option value="custom">Custom...</option></select></label>
+      <input type="number" id="b-per-custom" min="1" max="1000" placeholder="1-1000" style="display:none;width:90px"></div>
   </div>
 </section>
 
@@ -178,7 +180,7 @@
 
 <!-- SUBMIT -->
 <section id="p-submit" class="page">
-  <div class="page-head"><h2>Submit an isolate</h2><p>Curators compare your laboratory phenotype with the SeptaTyper prediction before the isolate is added. Only the derived genotype is kept. The genome file is deleted after analysis.</p></div>
+  <div class="page-head"><h2>Submit an isolate</h2><p>Curators compare your laboratory phenotype with the Ceprotyper prediction before the isolate is added. Only the derived genotype is kept. The genome file is deleted after analysis.</p></div>
   <div class="grid2">
     <form class="band" id="sf" autocomplete="off">
       <div class="row2">
@@ -192,18 +194,21 @@
         <div><label for="s-country">Country (type to search)</label><input type="text" id="s-country" list="dl-country" placeholder="Start typing a country" autocomplete="off"><datalist id="dl-country"></datalist></div>
         <div><label for="s-year">Collection year</label><input type="text" id="s-year" inputmode="numeric" maxlength="4" placeholder="2024"></div>
       </div>
+      <div style="margin-bottom:12px"><label for="s-ph">Laboratory phenotype</label><select id="s-ph"><option value="">Not tested</option><option>Resistant</option><option>Susceptible</option></select></div>
       <div class="row2">
-        <div><label for="s-mic">Ciprofloxacin MIC (mg/L)</label><input type="text" id="s-mic"></div>
-        <div><label for="s-ph">Laboratory phenotype</label><select id="s-ph"><option value="">Not tested</option><option>Resistant</option><option>Susceptible</option></select></div>
+        <div><label for="s-submitter">Submitter (required)</label><input type="text" id="s-submitter" required maxlength="120" placeholder="Name of the submitter or group"></div>
+        <div><label for="s-date">Date</label><input type="text" id="s-date" readonly tabindex="-1" title="Set automatically when you submit"></div>
       </div>
-      <div style="margin-bottom:12px"><label for="s-email">Contact email (optional)</label><input type="email" id="s-email"></div>
+      <div style="margin-bottom:12px"><label for="s-aff">Affiliation (optional)</label><input type="text" id="s-aff" maxlength="200" placeholder="Institute, city"></div>
+      <div style="margin-bottom:12px"><label for="s-pub">Publication (optional)</label><input type="text" id="s-pub" maxlength="300" placeholder="DOI (10.1038/...) or web link"></div>
+      <div style="margin-bottom:12px"><label for="s-email">Contact email (required)</label><input type="email" id="s-email" required placeholder="name@institute.org"></div>
       <label for="s-file">Genome FASTA</label>
       <input type="file" id="s-file" accept=".fa,.fasta,.fna,.fas,.txt,.gz" style="margin-bottom:12px">
       <button class="btn solid block" id="s-go" type="submit">Submit for curation</button>
       <div id="s-err"></div>
       <p class="muted" style="font-size:.85rem;margin-top:10px">Trouble submitting or a question about a result? Write to <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>.</p>
     </form>
-    <div id="s-result"><div class="band muted">After you submit, the prediction and the status of your submission appear here. An isolate without a laboratory phenotype cannot be approved.</div></div>
+    <div id="s-result"><div class="band muted">After you submit, the prediction and the status of your submission appear here. An isolate without a laboratory phenotype cannot be approved. The submitter name and contact email are required. The date is set automatically and shown in the repository with your affiliation and publication.</div></div>
   </div>
 </section>
 
@@ -283,14 +288,14 @@
 
 <!-- ABOUT -->
 <section id="p-about" class="page">
-  <div class="page-head"><h2>About SeptaTyper</h2></div>
+  <div class="page-head"><h2>About Ceprotyper</h2></div>
   <div class="band">
     <h3>Method</h3>
     <p>The septatype combines the residues at GyrA-83, GyrA-87, ParC-80, ParC-84 and RecN-346 with the presence or absence of qnrB and qnrS family genes. Residues are read from codons so that synonymous changes, such as the RecN-346 cta and ctg codons in <i>Salmonella</i>, are kept. Genes are located with BLAST+ against reference genes for the chosen species, then aligned to that reference to read each codon. The qnr genes are detected with qnrB2 and qnrS1 reference alleles.</p>
     <h3>Sequence types</h3>
     <p>The sequence type (ST) of an uploaded genome is read with PubMLST schemes: Achtman for <i>E. coli</i>, <i>S. sonnei</i> and <i>S. enterica</i>, Diancourt for <i>K. pneumoniae</i>. An ST is given only when all seven alleles match exactly and the profile exists. Otherwise the nearest alleles are shown. The STs of the reference isolates come from Table S1. Scheme data were taken from the tseemann/mlst database (downloaded 2026-03-11) and the PubMLST website; cite PubMLST (Jolley et al. 2018).</p>
     <h3>Hydrophobicity (QRDR helix)</h3>
-    <p>The mean hydrophobicity &lt;H&gt; is read over the whole quinolone resistance-determining region helix of each enzyme: GyrA 82-93 (D<b>S</b>AVY<b>D</b>TIVRMA, 12 residues) and ParC 80-90 (<b>S</b>ACY<b>E</b>AMVLMA, 11 residues). The four tetratype positions (in bold) take the sample&#39;s residues and the others stay fixed. The GyrA helix mean is the sum of H over 12, the ParC helix mean is the sum over 11, and &lt;H&gt; = (GyrA mean + ParC mean) / 2. The Browse table and the CSV and JSON downloads give all three values for every isolate.</p>
+    <p>The mean hydrophobicity &lt;H&gt; is read over the whole quinolone resistance-determining region helix of each enzyme: GyrA 82-93 (D<b>S</b>AVY<b>D</b>TIVRMA, 12 residues) and ParC 80-90 (<b>S</b>ACY<b>E</b>AMVLMA, 11 residues). The four tetratype positions (in bold) take the sample&#39;s residues and the others stay fixed. The GyrA helix mean is the sum of H over 12, the ParC helix mean is the sum over 11, and &lt;H&gt; = (GyrA mean + ParC mean) / 2. The three values are also in the JSON download and the API for every isolate.</p>
     <h3>What the numbers mean</h3>
     <p>Reference accuracy is calculated on the 2,734 founding isolates that also define the rules. It is not independent validation. The grammar accuracy is also scored on these isolates, with rules written while looking at them.</p>
     <h3>Limits</h3>
@@ -324,7 +329,7 @@
 </section>
 
 </main>
-<footer>SeptaTyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
+<footer>Ceprotyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
 <script src="/static/app.js"></script>
 </body>
 </html>
