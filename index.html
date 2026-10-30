@@ -38,6 +38,7 @@
       <a class="btn ghost" href="#/browse">Browse the isolates</a>
     </div>
     <p class="counter">Currently hosting <b id="c-genomes">2,734</b> genomes across <b id="c-species">4</b> species, <b id="c-countries">28</b> countries and <b id="c-septa">64</b> septatypes.</p>
+    <p class="counter hero-credit">The database and the septatype scheme come from our study: Ghosh, A., Deb, P., Bose, P. <i>et al.</i> <i>Sci Rep</i> (2026), <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">doi:10.1038/s41598-026-75690-y</a>.</p>
     <p class="demo-label" id="demo-label">E. coli, same species, two septatypes</p>
     <div class="tiles" id="demo-tiles" aria-live="polite"></div>
     <div class="verdict"><span class="badge Susceptible" id="demo-badge">Susceptible</span><span id="demo-note" class="counter" style="margin:0"></span>
@@ -97,7 +98,7 @@
         <textarea id="bv-ids" placeholder="562.7710&#10;624.1885&#10;573.24308" style="min-height:96px"></textarea>
         <p class="muted" style="font-size:.9rem;margin-top:6px">Type one ID, or several separated by spaces, commas or new lines (up to 10). The assembly is fetched from BV-BRC and the species is read from its record. The species chosen above is used only if the record does not say. Needs a BV-BRC genome ID such as 562.7710, not a name.</p>
       </div>
-      <div id="m-paste" style="display:none"><label for="seq">Nucleotide FASTA</label><textarea id="seq" placeholder=">gyrA&#10;ATGAGCGAC..."></textarea></div>
+      <div id="m-paste" style="display:none"><label for="seq">Nucleotide FASTA</label><textarea id="seq" placeholder=">gyrA&#10;ATGAGCGAC..."></textarea><p class="muted" style="font-size:.85rem;margin:4px 0 0">Up to <span id="paste-mb">10</span> MB of pasted sequence, enough for a whole genome. For larger sequence upload a file.</p></div>
       <div id="m-gene">
         <details><summary>Gene sequences only? Set the qnr status yourself</summary>
           <p class="muted" style="font-size:.9rem">A gene-only file cannot show that a qnr gene is absent.</p>
@@ -288,6 +289,10 @@
 <section id="p-about" class="page">
   <div class="page-head"><h2>About Ciprotyper</h2></div>
   <div class="band">
+    <h3>Credit and how to cite</h3>
+    <p>The 2,734 founding isolates, the septatype scheme, the context-sensitive syntax rules and the hydrophobicity analysis behind Ciprotyper come from the following study. If you use Ciprotyper or its database, please cite it:</p>
+    <p class="cite-box" id="cite-text">Ghosh, A., Deb, P., Bose, P. <i>et al.</i> Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. <i>Sci Rep</i> (2026). <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">https://doi.org/10.1038/s41598-026-75690-y</a></p>
+    <p><button class="btn line" type="button" data-act="copycite">Copy citation</button> <span id="cite-done" class="muted small" aria-live="polite"></span></p>
     <h3>Method</h3>
     <p>The septatype combines the residues at GyrA-83, GyrA-87, ParC-80, ParC-84 and RecN-346 with the presence or absence of qnrB and qnrS family genes. Residues are read from codons so that synonymous changes, such as the RecN-346 cta and ctg codons in <i>Salmonella</i>, are kept. Genes are located with BLAST+ against reference genes for the chosen species, then aligned to that reference to read each codon. The qnr genes are detected with qnrB2 and qnrS1 reference alleles.</p>
     <h3>Sequence types</h3>
@@ -327,7 +332,7 @@
 </section>
 
 </main>
-<footer>Ciprotyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
+<footer><p class="credit-line">Ciprotyper and its database are based on: Ghosh, A., Deb, P., Bose, P. <i>et al.</i> Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. <i>Sci Rep</i> (2026). <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">https://doi.org/10.1038/s41598-026-75690-y</a></p>Ciprotyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
 <script src="/static/app.js"></script>
 </body>
 </html>

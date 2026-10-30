@@ -133,7 +133,7 @@ function drawBatch(done, total, unit = "file") {
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing ${unit} ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
     <div class="scroll"><table><tr><th>${unit === "genome" ? "Genome" : "File"}</th><th>Septatype</th><th>ST</th><th>Call</th><th>Call from</th><th>Support</th></tr>${rows}</table></div>
     ${working ? "" : `<div class="actions no-print"><button class="btn solid" data-act="bcsv" type="button">Download CSV</button><button class="btn line" data-act="print" type="button">Print or save as PDF</button></div><p class="muted" style="font-size:.85rem">Tap a row for the full result.</p>`}
-    <p class="print-only">Ciprotyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
+    <p class="print-only">Ciprotyper batch report, ${new Date().toLocaleDateString()}. Research use only. Based on Ghosh, A., Deb, P., Bose, P. et al. Sci Rep (2026), https://doi.org/10.1038/s41598-026-75690-y</p></div><div id="bdetail"></div>`;
 }
 async function runBatch(species, habitat) {
   if (!PFILES.length) throw new Error("Choose at least one FASTA file.");
@@ -168,6 +168,12 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
   if (act === "print") printNow();
+  else if (act === "copycite") {
+    const txt = $("#cite-text").innerText, done = $("#cite-done");
+    const ok = () => { done.textContent = "Copied."; setTimeout(() => { done.textContent = ""; }, 2500); };
+    const old = () => { const t = document.createElement("textarea"); t.value = txt; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); ok(); } catch (e) { done.textContent = "Select the text above and copy it."; } t.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, old); else old();
+  }
   else if (act === "csv" && LAST) download("ciprotyper_result.csv", toCsv([flat(LAST, LAST._name || "result")]), "text/csv");
   else if (act === "json" && LAST) download("ciprotyper_result.json", JSON.stringify(LAST, null, 2), "application/json");
   else if (act === "bcsv") download("ciprotyper_batch.csv", toCsv(BATCH.map(x => flat(x.res, x.name, x.error))), "text/csv");
@@ -214,19 +220,27 @@ function whyBlock(p) {
   const k = c.checkpoints, r1 = k.residues, hy = c.hydrophobicity, rf = c.reference, dec = c.decided_by, res = c.positions.map(x => x.residue).join("");
   const intro = p.tier === "grammar" ? "Call from the three checkpoints, because this septatype is new." : `Call from the database majority rule${c.grammar_call !== p.call ? `. The three checkpoints alone would say ${esc(c.grammar_call)}` : ""}.`;
   const tag = on => on ? `<span class="tag">decides</span>` : "";
+  const tagOn = tag;
   const exc = (r1.exceptions || []).length ? ` (exception: the ParC pair S-K)` : "";
   const why1 = r1.override ? `${r1.pattern ? "All four residues are in the Susceptible column, but " : "The four residues are not all in one column. "}${esc(r1.rule)}: counted Resistant. This is an extra rule from the reference isolates, not one of the three checkpoints.`
     : r1.pattern ? `All four residues are in the ${r1.pattern === "resistant" ? "Resistant" : "Susceptible"} column${exc}.`
     : r1.resolved_by === "hydrophobicity" ? `The four residues are not all in one column, so the written rules do not decide. One position votes Resistant, so the QRDR helix mean &lt;H&gt; settles it.`
     : `The four residues are not all in one column, so the written rules do not decide. The residue votes settle it: ${r1.n_votes} of 4 positions vote Resistant.`;
-  const hBlock = r1.resolved_by === "hydrophobicity" ? `${hChart(hy.mean, rf.mean, hy.cutoff)}
+  const usedH = r1.resolved_by === "hydrophobicity";
+  const hNote = usedH ? `The four residues are not all in one column and one position votes Resistant, so &lt;H&gt; against the cutoff settles checkpoint 1: ${hy.side === "above" ? "above the cutoff, Resistant" : "at or below the cutoff, Susceptible"}.`
+    : r1.override ? "Shown for information. The extra <i>S. sonnei</i> rule decides checkpoint 1 here, so &lt;H&gt; does not change the call."
+    : r1.pattern ? "Shown for information. The residue table decides checkpoint 1 here, so &lt;H&gt; does not change the call."
+    : "Shown for information. The residue votes decide checkpoint 1 here, so &lt;H&gt; does not change the call.";
+  const hBlock = `<div class="crit ${usedH ? (hy.side === "above" ? "hit" : "dim") : "dim"}"><h4>QRDR helix mean hydrophobicity &lt;H&gt; ${tagOn(usedH)}</h4>
+    <p class="muted small" style="margin:0 0 4px">${hNote}</p>${hChart(hy.mean, rf.mean, hy.cutoff)}
     ${helixLines("Sample", hy)}${helixLines("Reference", rf)}
     <p class="muted small" style="margin:4px 0">Every residue of the GyrA and ParC helices counts. Your residues at the four tetratype positions are marked red. Means are rounded to three decimals.</p>
-    <p class="small"><a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}">How is this calculated?</a> &nbsp; <a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}&s=cutoff">Why a cutoff of ${f3(hy.cutoff)}?</a></p>` : "";
+    <p class="small"><a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}">How is this calculated?</a> &nbsp; <a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}&s=cutoff">Why a cutoff of ${f3(hy.cutoff)}?</a></p></div>`;
   const dim = x => x === "Resistant" ? "hit" : "dim";
   let h = `<h3>Why ${esc(p.call)}</h3><p class="muted small">${intro} Highlighted is what applies to this sample.</p>`;
   h += `<div class="crit ${dim(r1.call)}"><h4>Checkpoint 1: residues at GyrA-83, GyrA-87, ParC-80 and ParC-84 ${badge(r1.call, 1)} ${tag(["pattern", "votes", "hydrophobicity", "override"].includes(dec))}</h4>${critTable(c.positions)}
-    <p style="margin:8px 0 0">${why1} <b>Checkpoint 1 says ${esc(r1.call)}.</b></p>${hBlock}</div>`;
+    <p style="margin:8px 0 0">${why1} <b>Checkpoint 1 says ${esc(r1.call)}.</b></p></div>`;
+  h += hBlock;
   h += `<div class="crit ${dim(k.recn.call)}"><h4>Checkpoint 2: RecN-346 ${badge(k.recn.call, 1)} ${tag(dec === "checkpoint2")}</h4>
     <p style="margin:0">${esc(k.recn.text)}.</p><p class="muted small" style="margin:6px 0 0">Susceptible: leucine encoded by cta. Resistant: leucine encoded by ctg, or phenylalanine.</p></div>`;
   h += `<div class="crit ${dim(k.qnr.call)}"><h4>Checkpoint 3: PMQR genes ${badge(k.qnr.call, 1)} ${tag(dec === "checkpoint3")}</h4>
@@ -287,7 +301,7 @@ function renderResult(r, extra) {
       `</table></div><p class="muted small" style="margin-top:8px">${a.input.records} sequence record(s), ${fmt(a.input.total_bp)} bp.</p></details>`;
   }
   if (p && p.novel) h += `<div class="info">This septatype is new for ${esc(SHORT[r.species])}. If you have the laboratory phenotype, <a href="#/submit">submit the isolate</a> so curators can add it.</div>`;
-  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div><p class="muted small">Research use only. Confirm with laboratory testing.</p></div>`;
+  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div><p class="muted small">Research use only. Confirm with laboratory testing.</p><p class="muted small credit-line">Ciprotyper is based on Ghosh, A., Deb, P., Bose, P. et al. <i>Sci Rep</i> (2026), <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">doi:10.1038/s41598-026-75690-y</a>.</p></div>`;
   return h;
 }
 INIT.predict = () => {
@@ -309,6 +323,7 @@ INIT.predict = () => {
     $("#m-manual").style.display = PMODE === "manual" ? "" : "none";
   });
   const drop = $("#drop"), fi = $("#file");
+  if ($("#paste-mb") && META.max_paste_mb) $("#paste-mb").textContent = META.max_paste_mb;
   const setF = f => { PFILE = f || null; $("#fname").textContent = f ? `${f.name} (${(f.size / 1048576).toFixed(1)} MB)` : ".fa .fasta .fna .gz, up to " + META.max_upload_mb + " MB"; };
   drop.onclick = () => fi.click();
   drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fi.click(); } };
@@ -352,7 +367,7 @@ INIT.predict = () => {
         const fd = new FormData();
         fd.append("species", species); fd.append("habitat", habitat); fd.append("qnrB2", $("#qb").value); fd.append("qnrS1", $("#qs").value);
         if (PMODE === "file") { if (!PFILE) throw new Error("Choose a FASTA file first."); if (PFILE.size > META.max_upload_mb * 1048576) throw new Error(`File is larger than ${META.max_upload_mb} MB.`); fd.append("file", await maybeGzip(PFILE)); }
-        else { if (!$("#seq").value.trim()) throw new Error("Paste a nucleotide sequence first."); fd.append("sequence", $("#seq").value); }
+        else { if (!$("#seq").value.trim()) throw new Error("Paste a nucleotide sequence first."); if ($("#seq").value.length > (META.max_paste_mb || 10) * 1048576) throw new Error(`The pasted sequence is larger than ${META.max_paste_mb || 10} MB. Upload it as a file instead.`); fd.append("sequence", $("#seq").value); }
         res = await api("/api/v1/predict", { method: "POST", body: fd });
       }
       res._name = PMODE === "manual" ? "manual entry" : PMODE === "paste" ? "pasted sequence" : (PFILE && PFILE.name) || "";

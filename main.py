@@ -23,7 +23,37 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import bvbrc, countries, grammar, persist, rules, septatype
-from .config import ADMIN_TOKEN, HABITATS, MAX_UPLOAD_MB, SOURCES, SPECIES
+from .config import ADMIN_TOKEN, HABITATS, MAX_PASTE_MB, MAX_UPLOAD_MB, SOURCES, SPECIES
+
+def _raise_form_field_limit(limit: int) -> None:
+    """Starlette's form parsers refuse any ordinary form field above 1 MB, which is where a pasted sequence arrives
+    ("Field exceeded maximum size of 1024KB" or "Part exceeded ..."). Raise it to `limit` bytes for both parsers (the multipart
+    one a browser uses, and the urlencoded one a script may use), for old and new Starlette alike. Uploaded files are not
+    affected, they have their own limit (MAX_UPLOAD_MB)."""
+    import inspect
+    from starlette import formparsers
+    for parser in (formparsers.MultiPartParser, formparsers.FormParser):
+        parser.max_part_size = limit                              # older Starlette: the class attribute is the limit
+        if "max_part_size" in inspect.signature(parser.__init__).parameters:
+            original = parser.__init__
+
+            def patched(self, *args, __original=original, **kwargs):     # newer Starlette: the caller passes its 1 MB default
+                if kwargs.get("max_part_size", 1048576) <= 1048576:
+                    kwargs["max_part_size"] = limit
+                __original(self, *args, **kwargs)
+            parser.__init__ = patched
+
+
+_raise_form_field_limit((MAX_PASTE_MB + 1) * 1024 * 1024)         # a little above MAX_PASTE_MB for the other form text
+
+
+def _pasted(sequence: str) -> str:
+    """A pasted sequence as FASTA text, refused above MAX_PASTE_MB."""
+    text = sequence if sequence.lstrip().startswith(">") else ">pasted\n" + sequence
+    if len(text) > MAX_PASTE_MB * 1024 * 1024:
+        raise HTTPException(413, f"Pasted sequence is larger than {MAX_PASTE_MB} MB. Upload it as a file instead (up to {MAX_UPLOAD_MB} MB).")
+    return text
+
 
 app = FastAPI(title="Ciprotyper API", version="2.0",
               description="Ciprofloxacin resistance prediction and isolate repository for Enterobacterales.")
@@ -150,7 +180,7 @@ def meta():
     return {"species": SPECIES, "habitats": HABITATS, "stats": s["rows"], "build": s["meta"],
             "sources": [{"key": k, "label": l, "short": sh} for k, l, sh in SOURCES], "countries": sorted(countries.COUNTRIES),
             "counts": {"genomes": n, "species": nsp, "septatypes": nsep, "countries": ncountry, "community": ncomm},
-            "references": septatype.refs_status(), "max_upload_mb": MAX_UPLOAD_MB,
+            "references": septatype.refs_status(), "max_upload_mb": MAX_UPLOAD_MB, "max_paste_mb": MAX_PASTE_MB,
             "curation_enabled": bool(ADMIN_TOKEN), "facets": rules.facets()}
 
 
@@ -162,9 +192,7 @@ def predict_upload(file: UploadFile | None = File(None), sequence: str = Form(""
     if file is not None and file.filename:
         text = _read_upload(file)
     elif sequence.strip():
-        text = sequence if sequence.lstrip().startswith(">") else ">pasted\n" + sequence
-        if len(text) > MAX_UPLOAD_MB * 1024 * 1024:
-            raise HTTPException(413, "Pasted text is too large.")
+        text = _pasted(sequence)
     else:
         raise HTTPException(400, "Provide a FASTA file or paste sequence.")
     analysis = _analyse_text(text, species, {"qnrB2": qnrB2, "qnrS1": qnrS1})
@@ -436,7 +464,7 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
     if file is not None and file.filename:
         text = _read_upload(file)
     elif sequence.strip():
-        text = sequence if sequence.lstrip().startswith(">") else ">pasted\n" + sequence
+        text = _pasted(sequence)
     else:
         raise HTTPException(400, "Provide a genome FASTA (file or pasted).")
     analysis = _analyse_text(text, species, {"qnrB2": qnrB2, "qnrS1": qnrS1})

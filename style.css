@@ -252,3 +252,10 @@ table.rtab td{vertical-align:middle}
 @media (prefers-reduced-motion:reduce){.rchip.hit{animation:none}}
 table.rtab td:not(:first-child){white-space:nowrap}
 table.rtab th,table.rtab td{padding:5px 6px}
+
+.hero-credit{font-size:.88rem;margin:-14px 0 20px}
+.hero-credit a{color:#fff}
+.cite-box{background:var(--th);border:1px solid var(--line);border-left:4px solid var(--blue,#1f5fae);border-radius:8px;padding:10px 12px;font-size:.93rem;overflow-wrap:anywhere}
+footer .credit-line{max-width:900px;margin:0 auto 8px;overflow-wrap:anywhere}
+.credit-line{overflow-wrap:anywhere}
+@media print{footer{display:block}}

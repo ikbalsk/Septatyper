@@ -9,6 +9,7 @@ DB_PATH = Path(os.environ.get("DB_PATH", DATA_DIR / "septatype.db"))      # live
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()   # phone keyboards and dashboards often add stray spaces
 REFS_DIR = Path(os.environ.get("REFS_DIR", ROOT / "refs"))
 MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "60"))
+MAX_PASTE_MB = int(os.environ.get("MAX_PASTE_MB", "10"))        # pasted sequence; the form parser itself stops at 1 MB unless raised (see main.py)
 BLAST_TIMEOUT_S = int(os.environ.get("BLAST_TIMEOUT_S", "180"))
 
 # internal key -> display name
