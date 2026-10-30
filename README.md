@@ -236,7 +236,7 @@ The tests embed real reference genes in synthetic genomes. They do not use real 
 
 ## 9. Licensing, data governance and compliance
 
-No licence file is included yet. Without one, the code remains under default copyright and cannot be legally reused. A licence must be chosen before release.
+No licence file is included yet.
 
 ### 9.1 Code
 
@@ -274,29 +274,6 @@ A licence for the published repository data (CSV and JSON) must be chosen, for e
 - The Submit page should state the licence under which submitted data are published, and should ask submitters to confirm that they may share the data and that it contains no patient-identifying information.
 - The backup repository contains emails and must remain private.
 - The statement that genomes are not stored must remain true.
-
-### 9.5 Regulatory and publication points
-
-- The tool must keep its "research use only" label. Clinical use would fall under in-vitro-diagnostic regulation in most jurisdictions.
-- Where a journal requires it, the use of AI-assisted code must be declared in the manuscript.
-- Required citations: Ghosh et al.; BLAST+; Biopython; PubMLST; Eisenberg et al. 1984; BV-BRC.
-- Code identifiers and the backup file name still use the earlier name "septatyper". Confirm that the product name is free of conflicts before wider promotion.
-
----
-
-## 10. Release checklist
-
-1. Choose and add a code licence and a data licence.
-2. Publish the privacy notice and add submission consent text.
-3. Validate on independent, real genomes with laboratory phenotypes, and report the result. Repair `validate_genomes.py` first.
-4. Test BV-BRC identifier mode and the bulk annotation with a known identifier (for example 562.7710).
-5. Set `ADMIN_TOKEN` and the private GitHub backup, and confirm the last-saved time on the curation page.
-6. Correct the CSV export. Consider rate limiting and self-hosting or integrity-checking the CDN assets.
-7. Confirm the cutoff, residue classes and exception pair against the source article.
-8. Pin dependency versions. Correct the test count and the version label.
-9. Add all citations.
-
----
 
 ## 11. Glossary
 
