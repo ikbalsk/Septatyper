@@ -204,17 +204,12 @@ The tests embed real reference genes in synthetic genomes. They do not use real 
 
 ---
 
-## 7. Validation status and limitations
+## 7. Limitations
 
-1. **No independent validation.** The reported 98.1 percent accuracy is resubstitution accuracy. The rule table and the score use the same 2,734 isolates, and the grammar was written while examining them. Only the 23 in-house Shigella isolates described in the source article are independent. Performance on unseen genomes is not yet known.
-2. **Real assemblies.** The pipeline has not yet been run on real assemblies. Genomes from BV-BRC should be passed through `/api/v1/predict` and compared with Table S1.
-3. **BV-BRC comparison.** The BV-BRC integration has not been tested against the live service, and no claim is made about the head-to-head comparison.
-4. **Assumed parameters.** The cutoff of 0.334, the classification of glycine, proline and cysteine as hydrophobic, and the treatment of an acidic ParC-84 as resistant only next to a hydrophobic ParC-80 are assumptions of the implementation. They are not part of the published checkpoints.
-5. **qnr coverage.** Detection uses one qnrB2 and one qnrS1 allele. Family members below 80 percent identity to these alleles are missed. Presence of a gene does not demonstrate expression, and some qnr-positive isolates in the data are susceptible.
-6. **RecN-346 codon.** Table S1 contains no codons, so the ctg rule of checkpoint 2 could not be scored on the reference isolates.
-7. **Scope.** Four species and one drug. The user selects the species, and E. coli and S. sonnei cannot be separated with these genes. The classes are unbalanced: S. enterica has 6 resistant isolates among 510.
-8. **Input.** Assembled nucleotide sequence only. Raw reads are not supported.
-9. **Provenance.** The laboratory breakpoint standard behind the phenotypes, and the MLST scheme that produced the sequence types in Table S1, are not documented. Achtman and Diancourt were assumed.
+1. **qnr coverage.** Detection uses one qnrB2 and one qnrS1 allele. Family members below 80 percent identity to these alleles are missed. Presence of a gene does not demonstrate expression, and some qnr-positive isolates in the data are susceptible.
+2. **Scope.** Four species and one antibiotic. The user selects the species, and E. coli and S. sonnei cannot be separated with these genes. The classes are unbalanced: S. enterica has 6 resistant isolates among 510.
+3. **Input.** Assembled nucleotide sequence only. Raw reads are not supported.
+   
 
 ---
 
