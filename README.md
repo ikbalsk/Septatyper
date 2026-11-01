@@ -1,291 +1,181 @@
-# Ciprotyper
+# Ciprotyper v3.5
 
-A prediction tool and a curated repository for ciprofloxacin resistance in Enterobacterales. It predicts resistance from five codons and two plasmid-borne genes, and it holds a reference repository of 2,734 genomes.
+Ciprofloxacin resistance prediction and a curated repository of 2,734 Enterobacterales genomes
+(*E. coli*, *S. sonnei*, *S. enterica* subsp. I, *K. pneumoniae*).
 
----
-
-## 1. Overview
-
-Ciprotyper is three things in one service: a web server, a REST API and a curated repository. As a web server and API it predicts the ciprofloxacin phenotype (Resistant or Susceptible) of a bacterial isolate from assembled nucleotide sequence. It supports *Escherichia coli*, *Shigella sonnei*, *Salmonella enterica* subsp. I and *Klebsiella pneumoniae*.
-
-The method is based on the septatype, a seven-field genotype described in Ghosh et al., Scientific Reports, doi:10.1038/s41598-026-75690-y. The first four fields are the residues at GyrA-83, GyrA-87, ParC-80 and ParC-84. The fifth is the residue at RecN-346. The last two record the presence (1) or absence (0) of qnrB2 and qnrS1. An example is `L-N-I-E-L-0-0`.
-
-Every call is explained as three checkpoints. The server also reports the MLST sequence type of the sample.
-
-**Repository.** The service keeps a curated repository of reference isolates. Each record holds the genome identifier (linked to BV-BRC), species, isolation source, country, year, sequence type, the five residues and qnr status, the septatype, the laboratory phenotype, the Ciprotyper call, the BV-BRC computational call, and the submitter, date, affiliation and publication. Users can filter and browse the records, view them by country and septatype, and download them as CSV or JSON. Anyone can submit a new isolate. A curator checks each submission, and only approved isolates join the repository and update the prediction rules. Only derived genotype data are stored, never the genome.
-
-**Intended use:** research only. The tool is not a diagnostic device and has not been validated for clinical use.
-
-| Item | Value |
+| Module | What it does |
 |---|---|
-| Reference isolates | 2,734 (E. coli 400, S. sonnei 334, S. enterica 510, K. pneumoniae 1,490) |
-| Resistant isolates | 1,682 (E. coli 193, S. sonnei 151, S. enterica 6, K. pneumoniae 1,319) |
-| Isolation sources | Stool 1,105; urine 1,231; respiratory 398 |
-| Distinct septatypes | 64 |
-| Countries | 28 |
-| Accuracy of the majority rule on the reference set | 98.1 percent (resubstitution, see section 7) |
-| Implementation | Python 3.12, FastAPI, SQLite, NCBI BLAST+, Biopython; plain JavaScript front end |
+| A Predict | Upload or paste FASTA (or enter residues). BLAST finds gyrA, parC, recN and the qnr genes, codons are read, the septatype is built and the phenotype called. Shows the sample's MLST sequence type, the STs of the reference isolates behind the majority-rule call, the RecN-346 codon (cta/ctg flag), combined mean hydrophobicity <H>, and a plain-language reason. |
+| B Browse | Filter by species, site, ST, septatype, country, year. Columns: Genome ID (BV-BRC link, isolate name beneath), species and source, country, septatype, Ciprotyper predicted phenotype (star where it matches the laboratory result but the BV-BRC computational call does not), BV-BRC Phenotype Info (Lab, Computationally predicted), submitter, date, affiliation and publication link. 100 rows per page by default, 25 to 500 or a custom number up to 1000. Small text, a header that stays put while the rows scroll inside the table box, an always-visible horizontal scroll bar, and a Hide filters button to give the table room. The CSV follows the table columns. |
+| C Submit | Community form with BV-BRC name lookup. Submitter and contact email are required, the date is set automatically, affiliation and publication (a DOI or link) are optional. There is no MIC field. Submissions wait in a curation queue. New septatypes and phenotype/prediction disagreements are flagged. A curator approves or rejects. |
+| D Theory | The context-dependent grammar, an interactive schematic of the Mg2+ bridge, validation tables, edge cases. |
 
----
+REST API under `/api/v1` (interactive docs at `/docs`).
 
-## 2. Methods
+## How a call is made
 
-### 2.1 Sequence analysis
+1. **Database majority rule** (the paper's rule). If the septatype was seen for that species and site,
+   the majority phenotype of those isolates is the call. Ties go to Susceptible. Reproduces the paper's accuracies.
+2. **Three checkpoints** (fallback only, also shown next to every majority call). Checkpoint 1 follows the syntax rules table: GyrA-83,
+   GyrA-87, ParC-80 and ParC-84 are Susceptible if all four residues are in the Susceptible column (S,Y,T | D,N,E | S,Y,T | D,E) and Resistant
+   if all four are in the Resistant column (F,L,I,W | N,D,G,Y,A,E | I,F,W | E,V,D, with the pair S at ParC-80 plus K at ParC-84 as the one exception, as in Fig. 6b of the paper). The residues follow the paper's Table S6 and Fig. 6. The table
+   is `SUSCEPTIBLE_SET`, `RESISTANT_SET` and `RESISTANT_EXCEPTION` (a pair) in `app/grammar.py`. Checkpoint 2: RecN-346 is Susceptible if L encoded by cta,
+   Resistant if L encoded by ctg or F. Checkpoint 3: Resistant if qnrB2 or qnrS1 is present. The isolate is Susceptible if all checkpoints are
+   Susceptible and Resistant if any is. Where the four residues are not all in one column the written rules are silent, so the site counts
+   positions outside the Susceptible column (two or more: Resistant, none: Susceptible) and settles one position with the QRDR helix `<H>`.
+   *S. sonnei* keeps one extra rule from the data (a single GyrA-83 or GyrA-87 change is Resistant). The result is flagged as new and sent to curation.
 
-1. **Input.** Nucleotide FASTA, plain or gzip-compressed (`.fa .fasta .fna .fas .txt .gz`), up to 60 MB by default. Other input modes are pasted text, a batch of up to ten files, a BV-BRC genome identifier, and manual entry of the five residues.
-2. **Validation.** The file must parse as FASTA. If fewer than 90 percent of bases are A, C, G, T or N, the input is rejected as protein.
-3. **Gene location.** `makeblastdb` and `blastn` (e-value 1e-20) locate gyrA, parC and recN using one species-specific reference record per gene. A hit is accepted at 75 percent identity or higher. A warning is issued below 92 percent identity or below 90 percent coverage.
-4. **Codon reading.** The matched region is extracted (reverse-complemented if on the minus strand) and globally aligned to the reference with the Biopython pairwise aligner (match 2, mismatch -3, gap open -8, gap extend -1). The codons at the five positions are read through the alignment. A position with a gap, a stop or an ambiguous base is not called and produces a warning. Reading codons rather than residues preserves synonymous differences, which matter at RecN-346.
-5. **qnr detection.** qnrB2 and qnrS1 reference alleles are searched with blastn. A gene is scored present at 80 percent identity or higher and 90 percent coverage or higher. For gene-only input the user may set presence manually, because absence cannot be shown from a partial file.
-6. **MLST.** Schemes from PubMLST: Achtman for E. coli, S. sonnei and S. enterica, and Diancourt for K. pneumoniae. Four spread-out alleles per locus locate the locus. The matching window is cut out and looked up exactly in a dictionary of known alleles. Only a locus without an exact hit is searched again against its full allele set. A sequence type is reported only if all seven alleles match exactly and the profile exists in the scheme. A failure in typing never prevents the prediction.
-7. **Septatype assembly.** The seven values are joined with hyphens. If any of the five residues cannot be read, no septatype and no call are produced.
+## Run locally
 
-### 2.2 Phenotype call
-
-**Tier 1: majority rule.** If the septatype has been observed for the same species and isolation source, the most frequent laboratory phenotype among those reference isolates is the call. Ties are resolved as Susceptible. If the septatype has not been observed for that source but has for the species, isolates from all sources are used and the result is flagged.
-
-**Tier 2: grammar.** Used for septatypes not seen before. Three checkpoints are evaluated, and they are also displayed beside every Tier 1 call.
-
-| Checkpoint | Rule |
-|---|---|
-| 1. Residue table | Susceptible if GyrA-83, GyrA-87, ParC-80 and ParC-84 all lie in the Susceptible column (S,Y,T / D,N,E / S,Y,T / D,E). Resistant if all four lie in the Resistant column (F,L,I,W / N,D,G,Y,A,E / I,F,W / E,V,D). One exception pair, S at ParC-80 with K at ParC-84, is Resistant. |
-| 2. RecN-346 | Susceptible if leucine encoded by `cta`. Resistant if leucine encoded by `ctg`, or phenylalanine. |
-| 3. qnr | Resistant if qnrB2 or qnrS1 is present. |
-
-The combined call is Susceptible only if all three checkpoints are Susceptible, and Resistant if any one is Resistant.
-
-**Rules added by the implementation.** Checkpoint 1 does not cover samples whose four residues do not fall in a single column (for example L-D-S-E). In that case the server counts the positions outside the Susceptible column. Two or more gives Resistant and none gives Susceptible. Exactly one is decided by the mean hydrophobicity of the QRDR helices (H) against a cutoff of 0.334. In addition, S. sonnei carries one rule derived from the data: a single change at GyrA-83 or GyrA-87 is Resistant.
-
-H is calculated on the Eisenberg normalised consensus scale. The GyrA helix covers residues 82 to 93 (12 residues) and the ParC helix covers residues 80 to 90 (11 residues), with the sample's residues placed at positions 83, 87, 80 and 84. H is the mean of the GyrA helix mean and the ParC helix mean. The wild-type helices (S-D-S-E) give 0.270, the resistant reference (L-N-I-E) gives 0.397, and the cutoff is their midpoint, 0.334. The cutoff was fixed from these two reference helices and was not tuned on the isolates.
-
-### 2.3 Submission and curation
-
-1. A user submits a genome with species, isolation source, submitter name and contact email (all required). Optional fields are a BV-BRC identifier, country, year, laboratory phenotype, affiliation and publication (DOI or link).
-2. The genome is analysed and deleted. Only the derived genotype, the entered metadata and the result are stored. The submission date is set by the server.
-3. A submission is marked "needs review" if its septatype is new, if its laboratory phenotype disagrees with the prediction, or if no call was possible. Otherwise it is "pending".
-4. A curator, authenticated by a shared token in the `X-Admin-Token` header, approves or rejects. Approval requires a laboratory phenotype and a complete septatype. It adds the isolate to the repository and updates the rule table, so a new septatype becomes known. An approved submission can later be rejected, which removes the isolate and its vote. A rejected submission can be approved again.
-5. Only approved submissions appear in Browse, the analytics and the map.
-
-### 2.4 BV-BRC integration
-
-- **Prediction by BV-BRC identifier.** The server retrieves the genome record and assembly from the BV-BRC API, determines the species from the record, analyses the assembly and discards it. A genome that BV-BRC assigns to another organism is refused and is not guessed. A genome that is one of the reference isolates is flagged, because its result is not an independent test. Only identifiers of the form `digits.digits` are accepted, and only the fixed BV-BRC host is contacted.
-- **Bulk annotation.** At start-up, unless `BVBRC_AUTOLOAD=0`, a background task retrieves official genome names and BV-BRC computational ciprofloxacin predictions for the reference isolates. This enables the BV-BRC column in Browse, the marker for isolates where Ciprotyper agrees with the laboratory result and BV-BRC does not, and the head-to-head table. The task fails softly.
-
-### 2.5 Persistence
-
-Free hosting discards local files on restart. Two mechanisms preserve submissions and curation decisions:
-
-- Manual download and restore of a JSON backup from the curation page.
-- Automatic backup to a private GitHub repository (`BACKUP_GITHUB_REPO`, `BACKUP_GITHUB_TOKEN`). The file is written about 8 seconds after each change and restored at start-up when no submissions are present.
-
-The backup contains derived genotypes, metadata, curator decisions and any contact emails, and never the genome. The repository must therefore be private.
-
----
-
-## 3. Architecture
-
-### 3.1 Components
-
-| File | Role |
-|---|---|
-| `main.py` | HTTP endpoints, upload handling, result cache, concurrency limit, admin authentication, static page |
-| `septatype.py` | Pipeline: FASTA parsing, BLAST, alignment, codon reading, qnr detection, septatype |
-| `grammar.py` | Residue tables, checkpoints, hydrophobicity, explanations |
-| `rules.py` | Database access, majority rule, statistics, browse queries, curation |
-| `mlst.py` | Sequence typing |
-| `bvbrc.py` | BV-BRC client |
-| `persist.py` | Backup and restore |
-| `config.py` | Paths, environment variables, species and source lists, founding-isolate metadata |
-| `countries.py` | ISO 3166 country names and alpha-3 codes |
-| `build_db.py` | Builds the seed database from `Table_S1.xlsx` |
-| `fetch_bvbrc.py` | Command-line version of the BV-BRC annotation |
-| `index.html`, `app.js`, `style.css` | Complete front end (ten pages, hash routing, no framework) |
-
-The Dockerfile places the application in `app/`, the front end in `app/static/`, the build scripts in `scripts/`, the table in `data/` and the reference sequences in `refs/`. The seed database is built at image build time.
-
-### 3.2 Database
-
-SQLite with the tables `isolates`, `septatypes` (the rule table, one row per species, source and septatype), `species_stats`, `aa_properties`, `submissions` and `meta`. A read-only seed database is built into the image. A live copy is created in `DATA_DIR` on first start and holds submissions.
-
-### 3.3 Reference sequences
-
-One reference record per species for each of gyrA, parC and recN (header format `gene|Species|accession`), and single qnrB2 and qnrS1 alleles (CP032523.1). Chromosomal accessions are CP058222.1 (E. coli), AAVEOC010000165.1, AAVEOC010000011.1 and AAVEOC010000127.1 (S. sonnei gyrA, parC and recN), CP163542.1 (S. enterica) and CP089383.1 (K. pneumoniae). The residues at the five positions in all records are S, D, S, E and L. MLST alleles and profiles were taken from the tseemann/mlst repository (download dated 2026-03-11).
-
-### 3.4 Web interface
-
-Home, Predict, Browse, Analytics, Submit, Theory, Calc (worked hydrophobicity calculation), API and data, About, and Curate (token protected).
-
----
-
-## 4. REST API
-
-A REST API is a set of web addresses that a program can call to get or send data over HTTP, without using the web page. Each address (endpoint) does one job and returns structured data (JSON). It lets users run predictions or download the repository from scripts. Base path `/api/v1`. Interactive documentation is served at `/docs`.
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /meta` | Species, sources, counts, reference status |
-| `POST /predict` | Form fields `species`, `habitat`, `file` or `sequence`, optional `qnrB2` and `qnrS1` (`auto`, `present`, `absent`) |
-| `POST /predict/bvbrc` | JSON with `genome_id`; one genome per call |
-| `POST /predict/manual` | JSON with five residues, qnr flags and optional `recN_codon` |
-| `GET /isolates`, `GET /isolates/{id}` | Filtered and paged isolates (up to 1000 per page) with `h_gyr`, `h_parc`, `h_qrdr` |
-| `GET /rules` | Rule table for a species and source |
-| `GET /grammar` | Checkpoints for supplied residues |
-| `GET /stats/accuracy`, `/stats/geography`, `/stats/septatypes`, `/stats/cutoff` | Summary statistics |
-| `GET /aminoacids` | Hydrophobicity scale |
-| `GET /download/csv`, `/download/json` | Export, optionally filtered |
-| `GET /bvbrc/{id}`, `GET /bvbrc-status` | Name lookup and loader status |
-| `POST /submissions` | Community submission |
-| `GET /admin/queue`, `POST /admin/decide`, `GET /admin/backup`, `POST /admin/restore`, `GET /admin/persist-status`, `POST /admin/bvbrc/load` | Curator functions (token required) |
-| `GET /healthz` | Health check |
-
-Status codes: 400 invalid input; 401 wrong token; 413 file too large; 429 server busy; 502 BV-BRC unreachable; 503 reference files missing or curation disabled.
-
----
-
-## 5. Installation and operation
-
-### 5.1 Local installation
-
-Requirements: Python 3.12, NCBI BLAST+, and the packages in `requirements.txt` (fastapi, uvicorn, python-multipart, biopython, openpyxl, httpx, pytest).
-
-```
-pip install -r requirements.txt
-sudo apt install ncbi-blast+
+```bash
+pip install -r requirements-dev.txt         # the runtime packages plus pytest; the production image installs requirements.txt only
+sudo apt install ncbi-blast+                 # or: conda install -c bioconda blast
 python scripts/build_db.py
-uvicorn app.main:app --reload
-python -m pytest tests
+uvicorn app.main:app --reload                # http://localhost:8000
+python -m pytest tests                       # the full test suite
 ```
 
-The application is served at http://localhost:8000.
+## Deploy on Render (free)
 
-### 5.2 Deployment
+1. Push the files to a **private** GitHub repository.
+2. Render, New, Web Service, pick the repo, Environment: Docker, Plan: Free.
+3. Environment variables: `ADMIN_TOKEN` = a long random string (turns on the curator page at `#/curate`).
+4. For permanent submissions, attach a disk mounted at `/srv/data` (paid plan) or host on an institute server:
+   `docker run -p 8000:8000 -v septa-data:/srv/data -e ADMIN_TOKEN=... septatyper`.
+   Without a disk, submissions and approved isolates are lost whenever the free instance restarts.
 
-The application is distributed as a Docker image and runs on any container host. On Render:
+## Fill the BV-BRC columns (once, needs internet)
 
-1. Place the project files in a private GitHub repository.
-2. Create a Web Service from the repository with Environment set to Docker and health check path `/healthz`.
-3. Set `ADMIN_TOKEN`. Optionally set the backup variables.
-4. Attach a persistent disk at `/srv/data` on a paid plan. On the free plan the service sleeps when idle and may take about a minute to resume, and local files are lost on restart.
+```bash
+python scripts/fetch_bvbrc.py --dry-run      # look at what BV-BRC returns first
+python scripts/fetch_bvbrc.py
+```
+This fills official genome names and BV-BRC computational ciprofloxacin predictions, which switches on the
+BV-BRC column, the gold star and the head-to-head table on the Theory page. On a hosted site, run it
+against the live database (`--db /srv/data/septatype.db`) from the server shell or a one-off job.
 
-The same image runs as a Hugging Face Docker Space with `PORT=7860` and `DATA_DIR=/tmp/septatype-data`. Storage there is also ephemeral, so the GitHub backup is advised.
+## Honest limits
 
-### 5.3 Configuration
+- **Not run on real genomes.** Tests use real reference genes in synthetic genomes (both strands, indels, qnr).
+  Run real BV-BRC genomes through `/api/v1/predict` and compare with Table S1 before release.
+- **`fetch_bvbrc.py` is untested** (BV-BRC was unreachable from the build environment). Use `--dry-run` first.
+- **Accuracy is resubstitution accuracy.** Rules and scores use the same 2,734 isolates. The grammar was written
+  while looking at the same data. Only the 23 in-house *Shigella* isolates in the paper are independent.
+- **Assumptions to confirm:** `<H>` is the mean Eisenberg hydrophobicity of the whole QRDR helices: GyrA 82-93 `D(S)AVY(D)TIVRMA` (sum over 12) and ParC 80-90 `(S)ACY(E)AMVLMA` (sum over 11), with the sample's residues at GyrA-83/87 and ParC-80/84, and `<H>` = (GyrA mean + ParC mean) / 2. G, P, C count as hydrophobic. The cutoff is 0.334, the midpoint between the wild-type helices S-D-S-E (0.270) and the resistant reference L-N-I-E (0.397). That rule was chosen after seeing that the wild-type value alone (0.270) turns *S. enterica* F-D-S-E resistant whatever the codon, so confirm the cutoff against the paper. References are one gene record per species (refs/gyrA.fasta, parC.fasta, recN.fasta) plus single qnrB2 and qnrS1 alleles, so qnr family members below 80% identity to those alleles would be missed.
+- **Not built:** raw-read input, Mol* 3D structures (a labelled schematic is used instead), user accounts, Celery job queue.
+- The Theory schematic is a reading of the grammar, not a structure. Align its wording with Figure 6.
+- Fonts and the map library load from CDNs. The site works without them (fallback fonts, table instead of map).
+- Declare AI-assisted code in the manuscript as required by the journal, and add a data licence.
 
-| Variable | Default | Meaning |
+## Sequence types (MLST)
+
+`app/mlst.py` types the uploaded sequence with PubMLST schemes: Achtman for *E. coli*, *S. sonnei* and *S. enterica*,
+Diancourt for *K. pneumoniae*. Alleles and profiles are in `refs/mlst_<scheme>.fasta` and `.txt` (taken from the
+tseemann/mlst database, downloaded 2026-03-11; cite PubMLST, Jolley et al. 2018, Wellcome Open Res 3:124).
+An ST is reported only when all seven alleles match exactly and the profile exists. Otherwise the nearest alleles
+are shown. Gene-only uploads cannot be typed. The reference STs shown for a majority-rule call are the `st`
+values of Table S1 for the isolates that carry the same septatype. Refresh the scheme files from the tseemann/mlst
+repository when PubMLST adds new alleles.
+
+## Speed and explanation panel (v2.2)
+
+- A 5 Mb genome is analysed in under a second on one CPU (was about 8 s). MLST now locates each locus with four
+  spread-out alleles and looks the exact window up in a dictionary, and only falls back to BLASTing a locus's
+  full allele set when it is not an exact hit. Browsers compress large uploads before sending, and the server
+  keeps the last 32 results so the same file is never analysed twice.
+- **Predict from a BV-BRC genome ID.** The Predict page has a "BV-BRC ID" tab. Type one ID (for example 562.7710) or up to 10 separated by
+  spaces, commas or new lines. For each ID the server asks BV-BRC for the genome record (`/api/v1/predict/bvbrc`, one genome per call, the page
+  loops through the list), reads the species from the record, downloads the assembly (FASTA output of the `genome_sequence` collection, with a JSON
+  fallback that rebuilds the FASTA), analyses it and discards it. One ID opens the full result, several give the batch table with CSV download.
+  A genome BV-BRC names as another organism is refused, never guessed. A genome that is one of the 2,734 reference isolates is flagged, because
+  its call is not an independent test. Only IDs of the form `digits.digits` are ever put in a URL, and only on the fixed BV-BRC host. The tests
+  fake the two BV-BRC calls: the real download could not be tried from the build environment, so test it once from the live site with a known ID.
+- The result explains each call in three criteria, laid out like the manuscript's residue-class table:
+  checkpoint 1 as a two-column residue table (Susceptible, Resistant) in which the sample's residue is lit and blinks, with the QRDR helix <H> worked out when the table leaves it open, checkpoint 2 RecN-346 and checkpoint 3 qnr, then the combined call.
+  The criterion that decides the sample is highlighted and pulses.
+- `#/calc` shows the worked calculation of the QRDR helix `<H>` for any four residues (every helix residue, the GyrA mean over 12, the ParC mean over 11, the average of the two), where the 0.334 cutoff comes from, and a data check of it against the reference isolates (`/api/v1/stats/cutoff`, which also scores the whole grammar at each cutoff). `<H>` alone is weak when exactly one position is in the Resistant column, so it is only a last tie-breaker. Browse and the CSV/JSON downloads give `h_gyr`, `h_parc` and `h_qrdr` for every isolate.
+
+## Curation lists
+
+The curator page (`#/curate`) has Needs review, Pending, Approved, Rejected and All lists with counts. An approved
+submission can be rejected later: its isolate leaves the repository and its vote leaves the rules table. A rejected
+submission can be approved again. Contact for suggestions and problems: ikbalsk.personal@gmail.com.
+
+## Keeping submissions on a free plan
+
+Free hosting forgets its files when the server restarts. Two free ways to keep community submissions and curation decisions:
+
+1. **Manual:** on the curation page, tap **Download backup** now and then, and **Restore from backup file** after a restart.
+2. **Automatic, through a private GitHub repository:**
+   1. Create a new **private** repository, for example `septatyper-data`.
+   2. In GitHub, Settings, Developer settings, Fine-grained tokens: create a token for that one repository with
+      **Contents: Read and write**.
+   3. In Render, open the service, Environment, and add `BACKUP_GITHUB_REPO` = `your-name/septatyper-data` and
+      `BACKUP_GITHUB_TOKEN` = the token. Optional: `BACKUP_GITHUB_BRANCH` and `BACKUP_GITHUB_PATH`.
+   4. The server saves a few seconds after every submission or decision and restores at start-up when it has no
+      submissions. The curation page shows the backup status.
+
+The backup holds the derived genotype, metadata, decisions and any e-mail addresses people gave, never the genome, so
+keep the repository private. Approved submissions are replayed on restore. A backup problem never blocks the site.
+
+## Isolation sources and countries
+
+The isolation source is a drop-down in Predict, Browse and Submit: stool (fecal), urine, respiratory, blood, wound or
+skin, cerebrospinal fluid, abdominal, genital tract, environment, food, animal and other (plus "unknown" in Predict).
+Only the first three have reference isolates. For any other source the call uses the isolates of that species from all
+sources and says so, until curators approve submissions from that source. Submitters pick their country from a
+searchable list of all countries (`app/countries.py`, ISO 3166 with alpha-3 codes), so approved submissions from any
+country appear on the map. Approved submissions count in the analytics; pending and rejected ones do not.
+
+
+## Name and field names
+
+The tool is called Ciprotyper. The word *septatype* (the typing string such as S-D-S-E-L-0-0) is unchanged. Some internal names still carry the old
+spelling so that live databases and backups keep working: the database column and JSON field `septatyper_call`, the accuracy fields
+`septatyper_*` and the default backup file name `septatyper_backup.json` (set `BACKUP_GITHUB_PATH` to change it).
+
+## Submitter, date, affiliation and publication
+
+Every isolate has these four fields. The 2,734 founding isolates carry the values in `app/config.py` (`FOUNDING_*`): Ghosh et al, 16 October 2026,
+JISIASR, Kolkata, https://doi.org/10.1038/s41598-026-75690-y. A community submission stores what the submitter typed, with the date set to the
+day of submission. A database made by an older version is upgraded on start-up (columns added, founding isolates filled in).
+
+
+## Pasted sequence size
+
+A pasted sequence can be up to 10 MB (`MAX_PASTE_MB`), enough for a whole genome; above that the page and the API say so and ask for a file upload
+(up to `MAX_UPLOAD_MB`, 60 MB). Starlette's form parsers stop at 1 MB for ordinary form fields, which is where pasted text arrives, so
+`app/main.py` raises that limit (`_raise_form_field_limit`) for both the multipart parser a browser uses and the urlencoded one a script may use.
+
+## Credit
+
+Ciprotyper and its database are based on:
+
+Ghosh, A., Deb, P., Bose, P. *et al.* Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Sci Rep* (2026).
+https://doi.org/10.1038/s41598-026-75690-y
+
+The citation is in the page footer, on the home page, in a "Credit and how to cite" box on the About page (with a copy button), on the Theory page,
+at the bottom of every result and in the printed batch report. Please cite it if you use Ciprotyper or its data.
+
+
+## Safety settings and what changed in v3.5
+
+All are environment variables on the server; the defaults are meant to leave normal use untouched.
+
+| Setting | Default | What it does |
 |---|---|---|
-| `ADMIN_TOKEN` | empty | Curator token. An empty value disables curation. |
-| `DATA_DIR` | `/srv/data` in Docker | Location of the live database |
-| `DB_PATH`, `SEED_DB`, `REFS_DIR` | derived | Path overrides |
-| `PORT` | 8000 | Listening port |
-| `MAX_UPLOAD_MB` | 60 | Upload limit |
-| `BLAST_TIMEOUT_S` | 180 | Time limit per BLAST call |
-| `BVBRC_AUTOLOAD` | 1 | Set to 0 to disable the start-up BV-BRC task |
-| `BACKUP_GITHUB_REPO`, `_TOKEN`, `_BRANCH`, `_PATH` | none | Automatic backup. The token needs Contents read and write access to that one repository. |
+| `RATE_SUBMIT_PER_HOUR` | 20 | Submissions allowed per visitor per hour (`0` = no limit). Attempts count even if the form was incomplete. |
+| `RATE_PREDICT_PER_HOUR` | 0 (off) | Genome predictions, including BV-BRC ID lookups, per visitor per hour. Off by default; set it if the site is abused. |
+| `ADMIN_MAX_FAILS`, `ADMIN_LOCK_S` | 10, 900 | After this many wrong curator tokens from one address, that address waits 15 minutes. |
+| `REFRESH_DB_ON_START` | 1 | When the server is updated with a new seed, bring the founding data of an already saved database up to date (see below). `0` turns it off. |
+| `MAX_PASTE_MB` | 10 | Largest pasted sequence. |
 
-Parameters set in code: identity and coverage thresholds (`septatype.py`); `LOW_SUPPORT = 5` and `MIXED = 0.80` (`rules.py`); `H_CUTOFF`, `SUSCEPTIBLE_SET`, `RESISTANT_SET` and `RESISTANT_EXCEPTION` (`grammar.py`).
+A visitor is identified by the first address in `X-Forwarded-For`, else the connecting address. The limits are in memory and reset when the server restarts. They are spam control, not a security boundary.
 
-### 5.4 Updating a running service
-
-Push the changed files to the repository and let the host rebuild. Confirm that every file named in the Dockerfile is present.
-
-The live database is copied from the seed only when it does not exist. On a persistent disk, later changes to `build_db.py` or `Table_S1.xlsx` do not reach an existing live database, because the start-up migration only adds missing columns. Back up, remove the live database and let it rebuild, or add a versioned migration.
-
-### 5.5 Refreshing reference data
-
-MLST files can be replaced from the tseemann/mlst repository when PubMLST adds alleles. Reference genes follow the header convention in section 3.3. After any change to Table S1, run `build_db.py` again.
-
----
-
-## 6. Testing
-
-The suite (`tests/test_pipeline.py`, `tests/conftest.py`) contains 54 test functions. They cover reproduction of the published accuracy and counts, grammar checkpoints and boundary cases, wild-type and resistant synthetic genomes (including reverse-strand genes and indels), qnr detection, gzip equivalence, MLST with real alleles, submission, approval, rejection and re-approval, backup and restore with a simulated GitHub endpoint, BV-BRC with a simulated API, per-species references, hydrophobicity arithmetic and upgrade of an older database.
-
-The tests embed real reference genes in synthetic genomes. They do not use real assemblies, and the BV-BRC service is simulated. They show that the software behaves as designed. They do not measure predictive performance.
-
----
-
-## 7. Limitations
-
-1. **qnr coverage.** Detection uses one qnrB2 and one qnrS1 allele. Family members below 80 percent identity to these alleles are missed. Presence of a gene does not demonstrate expression, and some qnr-positive isolates in the data are susceptible.
-2. **Scope.** Four species and one antibiotic. The user selects the species, and E. coli and S. sonnei cannot be separated with these genes. The classes are unbalanced: S. enterica has 6 resistant isolates among 510.
-3. **Input.** Assembled nucleotide sequence only. Raw reads are not supported.
-   
-
----
-
-## 8. Known issues and maintenance notes
-
-| # | Severity | Issue | Recommended action |
-|---|---|---|---|
-| 1 | Medium | CSV export writes user-entered fields (submitter, affiliation, genome name, publication) without neutralising a leading `=`, `+`, `-` or `@`. This allows formula injection when the file is opened in a spreadsheet. | Prefix such cells with an apostrophe on export. |
-| 2 | Medium | A live database on a persistent disk is not refreshed from a new seed (section 5.4). | Add a versioned migration. |
-| 3 | Medium | `scripts/validate_genomes.py` selects a column `phenotype`, but the column is `lab_phenotype`. The script will fail. | Correct and test it. |
-| 4 | Medium | `scripts/fetch_references.py` writes `refs/<species>/<gene>.fasta` and qnr family files, which the application does not read. | Update or remove. |
-| 5 | Low | The project README states 13 tests, and the suite has 54. | Correct the text. |
-| 6 | Low | Version labels are inconsistent (README v2, FastAPI 2.0, User-Agent 2.0 and 2.1). | Use a single version string. |
-| 7 | Low | `@app.on_event("startup")` is deprecated in current FastAPI. | Move to lifespan handlers. |
-| 8 | Low | The in-memory result cache is modified by several threads without a lock. | Add a lock. |
-| 9 | Low | `/admin/bvbrc/load` returns an unclear `started` value. | Return the actual result. |
-| 10 | Low | Dependencies are unpinned, and pytest is installed in the production image. | Pin versions and separate development requirements. |
-
-**Security controls in place:** parameterised SQL with allow-listed column and sort names; strict identifier validation and a fixed host for BV-BRC requests; HTML escaping of all server text in the page; constant-time token comparison; upload size and decompression limits; deletion of uploaded genomes; a limit of two concurrent analyses; subprocess calls without a shell; no use of browser storage.
-
-**Security gaps:** no rate limiting or spam control on `/submissions` and `/predict`; a single shared curator token without lockout or an audit trail; Google Fonts and the Plotly library loaded from third-party CDNs without integrity checks; submissions lost on restart when the backup variables are not set.
-
----
-
-## 9. Licensing, data governance and compliance
-
-No licence file is included yet.
-
-### 9.1 Code
-
-- Add a `LICENSE` file. MIT or Apache-2.0 permit broad reuse. GPL-3.0 requires derivatives to remain open.
-- Confirm the copyright holder under the institute's policy on software written by staff or students.
-- No third-party code is copied into the repository.
-
-### 9.2 Dependencies
-
-| Component | Licence |
-|---|---|
-| FastAPI, openpyxl, pytest, Plotly.js | MIT |
-| Uvicorn, httpx | BSD-3-Clause |
-| python-multipart | Apache-2.0 |
-| Biopython | Biopython License (permissive) |
-| NCBI BLAST+ | US government work, public domain |
-| JetBrains Mono, Public Sans (loaded from Google Fonts) | SIL Open Font License |
-| `python:3.12-slim` base image | PSF and Debian package licences |
-
-### 9.3 Data
-
-| Data | Source | Requirement |
-|---|---|---|
-| Table S1 (2,734 isolates) | Ghosh et al., Scientific Reports | Follow the licence of the source article and attribute it. Founding records carry the submitter, date, affiliation and DOI. |
-| MLST alleles and profiles | PubMLST (Jolley et al. 2018) via tseemann/mlst | Follow the PubMLST data terms and cite PubMLST. Only the data files are used, not the tseemann/mlst code. |
-| Reference genes and qnr alleles | GenBank accessions listed in section 3.3 | Open sequence data. Cite the accessions. |
-| BV-BRC records and genomes | BV-BRC API | Follow the BV-BRC terms of use and request limits. Genomes are processed and discarded, not redistributed. |
-| Hydrophobicity scale | Eisenberg et al. 1984 | Cite. |
-
-A licence for the published repository data (CSV and JSON) must be chosen, for example CC BY 4.0, and stated on the site.
-
-### 9.4 Personal data and submissions
-
-- The service stores submitter names and contact emails. A privacy notice stating purpose, retention and a contact for deletion should be published. Depending on user location, the GDPR (EU and UK) or the DPDP Act (India) may apply.
-- The Submit page should state the licence under which submitted data are published, and should ask submitters to confirm that they may share the data and that it contains no patient-identifying information.
-- The backup repository contains emails and must remain private.
-- The statement that genomes are not stored must remain true.
-
-## 11. Glossary
-
-**Septatype:** seven-field genotype string. **Tetratype:** its first four residues. **QRDR:** quinolone resistance-determining region. **H:** mean hydrophobicity of the QRDR helices. **ST:** MLST sequence type. **Founding isolates:** the 2,734 isolates of Table S1. **Resubstitution accuracy:** accuracy measured on the data used to build the rules. **Curation queue:** submissions awaiting a curator decision.
-
----
-
-## References
-
-1. Ghosh et al. Scientific Reports. doi:10.1038/s41598-026-75690-y.
-2. Camacho C, et al. BLAST+: architecture and applications. BMC Bioinformatics 2009;10:421.
-3. Cock PJA, et al. Biopython: freely available Python tools for computational molecular biology and bioinformatics. Bioinformatics 2009;25:1422.
-4. Jolley KA, Bray JE, Maiden MCJ. Open-access bacterial population genomics: BIGSdb software, the PubMLST.org website and their applications. Wellcome Open Res 2018;3:124.
-5. Eisenberg D, Schwarz E, Komaromy M, Wall R. Analysis of membrane and surface protein sequences with the hydrophobic moment plot. J Mol Biol 1984;179:125.
-6. Olson RD, et al. Introducing the Bacterial and Viral Bioinformatics Resource Center (BV-BRC). Nucleic Acids Res 2023;51:D678.
+- **Saved databases.** On a server with a persistent disk, the saved database used to keep the founding data it was first copied with. Now, when the seed changes (a new `Table_S1.xlsx`, new rules or scores), the first start after the update saves a copy of the old database in `backups/` next to it (the last 3 are kept), replaces the founding isolates and the rule tables, and keeps everything the community added, including its votes. If anything goes wrong nothing changes and the site starts as before. On a server without a persistent disk the database is copied fresh from the seed each time, so nothing is needed.
+- **Who decided.** Each approval or rejection records the time and the address, plus the name the curator typed in the optional "Your name" box (`audit_log` table, and shown in the queue). There is still one shared token, so the name is what the curator chooses to enter.
+- **Spreadsheets.** In the CSV downloads, text that starts with `=`, `+`, `-` or `@` gets a leading apostrophe so Excel cannot run it as a formula.
+- **Map library.** Plotly 2.35.2 is now served with the site (`static/plotly.min.js`, MIT licence). If that file is missing, the page falls back to the jsDelivr copy only with a fixed integrity hash, so a changed file is refused. Google Fonts still load from Google (a stylesheet cannot be given an integrity hash; it cannot run code).
+- **Backups.** If the GitHub backup is not set, the Curation page now shows a clear warning that submissions and approvals are lost when the server restarts (unless it has a persistent disk).
+- **Pinned packages.** `requirements.txt` holds the exact versions the tests ran against; `pytest` and `httpx` moved to `requirements-dev.txt`.
+- **Scripts.** `scripts/validate_genomes.py` uses the right column (`lab_phenotype`). `scripts/fetch_references.py` now writes the layout the app reads (`refs/gyrA.fasta` with one record per species, `qnrB2.fasta`, `qnrS1.fasta`), one reference record per gene as the shipped files were cut, and never touches `refs/` unless run with `--install`.

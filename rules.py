@@ -6,6 +6,7 @@ import json
 import shutil
 import sqlite3
 import uuid
+from pathlib import Path
 
 from . import config
 from . import grammar
@@ -23,6 +24,18 @@ ISO_COLS = ("genome_id", "genome_name", "isolate_name", "species", "habitat", "l
 _MIGRATED = set()
 
 
+def _stamp_seed(path) -> None:
+    """Remember which seed a saved database was copied from."""
+    db = sqlite3.connect(path)
+    try:
+        built = (db.execute("SELECT value FROM meta WHERE key='built'").fetchone() or [None])[0]
+        if built:
+            db.execute("INSERT OR REPLACE INTO meta VALUES ('seed_built', ?)", (built,))
+            db.commit()
+    finally:
+        db.close()
+
+
 def _migrate(path) -> None:
     """Bring a database made by an older version up to date: submitter, date, affiliation and publication columns,
     with the founding isolates filled in. Safe to run on every start."""
@@ -33,15 +46,73 @@ def _migrate(path) -> None:
         for c in ("submitter", "submitted_date", "affiliation", "publication"):
             if c not in cols("isolates"):
                 db.execute(f"ALTER TABLE isolates ADD COLUMN {c} TEXT")
-        for c in ("submitter", "affiliation", "publication"):
+        for c in ("submitter", "affiliation", "publication", "decided_by"):
             if c not in cols("submissions"):
                 db.execute(f"ALTER TABLE submissions ADD COLUMN {c} TEXT")
+        db.execute("CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, who TEXT, ip TEXT, "
+                   "action TEXT, job_id TEXT, detail TEXT)")
         db.execute("UPDATE isolates SET submitter=?, submitted_date=?, affiliation=?, publication=? "
                    "WHERE source='founding' AND submitter IS NULL",
                    (config.FOUNDING_SUBMITTER, config.FOUNDING_DATE, config.FOUNDING_AFFILIATION, config.FOUNDING_PUBLICATION))
         db.commit()
     finally:
         db.close()
+
+
+def _refresh_from_seed(path) -> None:
+    """A saved database keeps the founding data it was copied with. When the server is updated with a new seed (new rules,
+    new scores, corrected Table S1), bring the founding part of the saved database up to date, keeping everything the
+    community added. A copy of the old database is saved first (DB folder / backups, the last 3 are kept). If anything fails,
+    nothing is changed. Skipped when the saved database already comes from this seed or REFRESH_DB_ON_START=0."""
+    if not config.REFRESH_DB_ON_START or not Path(SEED_DB).exists():
+        return
+    live = sqlite3.connect(path)
+    try:
+        seed = sqlite3.connect(SEED_DB)
+        try:
+            built = (seed.execute("SELECT value FROM meta WHERE key='built'").fetchone() or [None])[0]
+        finally:
+            seed.close()
+        have = (live.execute("SELECT value FROM meta WHERE key='seed_built'").fetchone() or [None])[0]
+        if not built or have == built:
+            return
+        backups = Path(path).parent / "backups"
+        backups.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, backups / f"{Path(path).name}.{datetime.datetime.now(datetime.timezone.utc):%Y%m%dT%H%M%SZ}.bak")
+        for old in sorted(backups.glob(f"{Path(path).name}.*.bak"))[:-3]:
+            old.unlink(missing_ok=True)
+        live.execute("ATTACH DATABASE ? AS seed", (str(SEED_DB),))
+        live.execute("BEGIN")
+        try:
+            icols = [c for c in (x[1] for x in live.execute("PRAGMA main.table_info(isolates)"))
+                     if c in {x[1] for x in live.execute("PRAGMA seed.table_info(isolates)")}]
+            cl = ",".join(icols)
+            live.execute("DELETE FROM main.isolates WHERE source='founding'")
+            live.execute(f"INSERT INTO main.isolates ({cl}) SELECT {cl} FROM seed.isolates WHERE source='founding'")
+            for t in ("septatypes", "species_stats", "aa_properties"):
+                live.execute(f"DELETE FROM main.{t}")
+                live.execute(f"INSERT INTO main.{t} SELECT * FROM seed.{t}")
+            # votes of the isolates the community added stay in the rules table
+            for sp, hab, sep, tet, phen in live.execute(
+                    "SELECT species, habitat, septatype, tetratype, lab_phenotype FROM main.isolates WHERE source='community'").fetchall():
+                for h in {hab, "ALL"}:
+                    row = live.execute("SELECT n_resistant, n_susceptible FROM main.septatypes WHERE species=? AND habitat=? AND septatype=?",
+                                       (sp, h, sep)).fetchone()
+                    res_, sus_ = (row[0], row[1]) if row else (0, 0)
+                    res_, sus_ = (res_ + 1, sus_) if phen == "Resistant" else (res_, sus_ + 1)
+                    live.execute("INSERT OR REPLACE INTO main.septatypes VALUES (?,?,?,?,?,?,?,?,?,?)",
+                                 (sp, h, sep, tet, res_ + sus_, res_, sus_, "R" if res_ > sus_ else "S",
+                                  max(res_, sus_) / (res_ + sus_), grammar.mean_h(sep.split("-")[:4])))
+            live.execute("DELETE FROM main.meta")
+            live.execute("INSERT INTO main.meta SELECT * FROM seed.meta")
+            live.execute("UPDATE main.meta SET value='0' WHERE key='bvbrc_loaded'")           # the BV-BRC comparison is loaded again
+            live.execute("INSERT OR REPLACE INTO main.meta VALUES ('seed_built', ?)", (built,))
+            live.execute("COMMIT")
+        except Exception:
+            live.execute("ROLLBACK")
+            raise
+    finally:
+        live.close()
 
 
 def ensure_db():
@@ -51,8 +122,13 @@ def ensure_db():
         if not SEED_DB.exists():
             raise RuntimeError("Seed database missing. Run: python scripts/build_db.py")
         shutil.copy(SEED_DB, DB_PATH)
+        _stamp_seed(DB_PATH)
     if str(DB_PATH) not in _MIGRATED:
         _migrate(DB_PATH)
+        try:
+            _refresh_from_seed(DB_PATH)
+        except Exception as e:                      # never stop the site over this: the old data stays, a backup was saved
+            print(f"WARNING: could not refresh the saved database from the new seed ({type(e).__name__}: {e}). It is unchanged.")
         _MIGRATED.add(str(DB_PATH))
 
 
@@ -395,7 +471,7 @@ def list_queue(status: str = "") -> list[dict]:
     db = conn()
     try:
         sql = ("SELECT job_id,created,status,species,habitat,genome_id,genome_name,country,year,source_text,"
-               "email,submitter,affiliation,publication,lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided,result_json FROM submissions")
+               "email,submitter,affiliation,publication,lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided,decided_by,result_json FROM submissions")
         rows = db.execute(sql + (" WHERE status=?" if status else "") + " ORDER BY created DESC",
                           (status,) if status else ()).fetchall()
     finally:
@@ -476,7 +552,18 @@ def apply_approval(db, s) -> str:
     return gid
 
 
-def decide(job_id: str, action: str, note: str = "") -> dict:
+def audit(who: str, ip: str, action: str, job_id: str, detail: str = "") -> None:
+    """One line in the audit log: who (the name the curator typed, if any), from which address, did what to which submission."""
+    db = conn()
+    try:
+        db.execute("INSERT INTO audit_log (at, who, ip, action, job_id, detail) VALUES (?,?,?,?,?,?)",
+                   (_now(), (who or "")[:80], (ip or "")[:80], action, job_id, (detail or "")[:300]))
+        db.commit()
+    finally:
+        db.close()
+
+
+def decide(job_id: str, action: str, note: str = "", by: str = "") -> dict:
     """approve: pending, needs review or rejected -> approved. reject: pending, needs review or approved -> rejected.
     Rejecting an approved submission removes its isolate again and takes its vote out of the rules."""
     db = conn()
@@ -490,8 +577,8 @@ def decide(job_id: str, action: str, note: str = "") -> dict:
                 raise ValueError("Already rejected")
             if status == "approved":
                 _revoke(db, s)
-            db.execute("UPDATE submissions SET status='rejected', curator_note=?, decided=? WHERE job_id=?",
-                       (note or ("Rejected after approval" if status == "approved" else ""), _now(), job_id))
+            db.execute("UPDATE submissions SET status='rejected', curator_note=?, decided=?, decided_by=? WHERE job_id=?",
+                       (note or ("Rejected after approval" if status == "approved" else ""), _now(), by or None, job_id))
             db.commit()
             _persist()
             return {"status": "rejected", "revoked": status == "approved"}
@@ -502,8 +589,8 @@ def decide(job_id: str, action: str, note: str = "") -> dict:
         if s["lab_phenotype"] not in ("Resistant", "Susceptible") or not s["septatype"]:
             raise ValueError("Cannot approve without a laboratory phenotype and a complete septatype.")
         gid = apply_approval(db, s)
-        db.execute("UPDATE submissions SET status='approved', curator_note=?, decided=? WHERE job_id=?",
-                   (note, _now(), job_id))
+        db.execute("UPDATE submissions SET status='approved', curator_note=?, decided=?, decided_by=? WHERE job_id=?",
+                   (note, _now(), by or None, job_id))
         db.commit()
         _persist()
         return {"status": "approved", "genome_id": gid}

@@ -30,7 +30,7 @@ ISO3 = {"USA": "USA", "Australia": "AUS", "United Kingdom": "GBR", "India": "IND
 
 SCHEMA = """
 DROP TABLE IF EXISTS isolates; DROP TABLE IF EXISTS septatypes; DROP TABLE IF EXISTS species_stats;
-DROP TABLE IF EXISTS aa_properties; DROP TABLE IF EXISTS submissions; DROP TABLE IF EXISTS meta;
+DROP TABLE IF EXISTS aa_properties; DROP TABLE IF EXISTS submissions; DROP TABLE IF EXISTS meta; DROP TABLE IF EXISTS audit_log;
 CREATE TABLE isolates (
   genome_id TEXT PRIMARY KEY, genome_name TEXT, isolate_name TEXT, species TEXT, habitat TEXT,
   lab_phenotype TEXT, year_raw TEXT, year_start INTEGER, year_end INTEGER, year_note TEXT,
@@ -52,7 +52,8 @@ CREATE TABLE submissions (
   job_id TEXT PRIMARY KEY, created TEXT, status TEXT, species TEXT, habitat TEXT,
   genome_id TEXT, genome_name TEXT, country TEXT, year TEXT, source_text TEXT, lab_phenotype TEXT,
   email TEXT, submitter TEXT, affiliation TEXT, publication TEXT, septatype TEXT, tier TEXT, call TEXT, novel INTEGER, matches INTEGER, result_json TEXT,
-  curator_note TEXT, decided TEXT);
+  curator_note TEXT, decided TEXT, decided_by TEXT);
+CREATE TABLE audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, who TEXT, ip TEXT, action TEXT, job_id TEXT, detail TEXT);
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 """
 

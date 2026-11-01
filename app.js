@@ -94,7 +94,7 @@ let PMODE = "file", PFILE = null;
 
 /* ------------------------------------------------------- exports and batch */
 let LAST = null, BATCH = [], PFILES = [];
-const csvCell = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+const csvCell = v => { let t = String(v ?? ""); if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; return `"${t.replace(/"/g, '""')}"`; };   // a leading apostrophe stops Excel running it as a formula
 const toCsv = rows => { const cols = Object.keys(rows[0]); return [cols.join(","), ...rows.map(r => cols.map(c => csvCell(r[c])).join(","))].join("\n"); };
 function flat(res, name, error) {
   const p = (res && res.prediction) || {}, a = (res && res.analysis) || {}, pos = a.positions || {}, cd = k => (pos[k] || {}).codon || "";
@@ -461,9 +461,19 @@ async function loadBars() {
     `<p class="muted" style="font-size:.85rem;margin-top:8px">Top 12 septatypes of ${fmt(d.total)} isolates. Bar length is the number of isolates from each isolation source.</p>`;
 }
 let plotlyP = null;
+const PLOTLY_CDN = "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js";
+const PLOTLY_SRI = "sha384-cCVCZkAjYNxaYKbM8lsArLznDF/SvMFr1jcZrvOpSTCa0W40ZAdLzHCEulnUa5i7";   // Plotly 2.35.2; the browser refuses any other file
+function addScript(src, sri) {
+  return new Promise((ok, no) => {
+    const e = document.createElement("script"); e.src = src;
+    if (sri) { e.integrity = sri; e.crossOrigin = "anonymous"; }
+    e.onload = () => (window.Plotly ? ok() : no(new Error("map library"))); e.onerror = () => no(new Error("map library"));
+    document.head.appendChild(e);
+  });
+}
 function loadPlotly() {
   if (window.Plotly) return Promise.resolve();
-  return plotlyP || (plotlyP = new Promise((ok, no) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"; s.onload = ok; s.onerror = () => no(new Error("map library")); document.head.appendChild(s); }));
+  return plotlyP || (plotlyP = addScript("/static/plotly.min.js").catch(() => addScript(PLOTLY_CDN, PLOTLY_SRI)).catch(e => { plotlyP = null; throw e; }));
 }
 async function loadMap() {
   const p = new URLSearchParams(); [["species", "#g-sp"], ["st", "#g-st"], ["septatype", "#g-sep"], ["phenotype", "#g-ph"]].forEach(([k, s]) => { if ($(s).value) p.set(k, $(s).value); });
@@ -677,14 +687,14 @@ INIT.curate = () => {
           <td class="nw">${esc(r.st || "-")}</td>
           <td>${r.call ? badge(r.call, 1) : "-"}<span class="alias">${esc(r.tier || "")}</span></td>
           <td>${r.lab_phenotype ? badge(r.lab_phenotype, 1) : "-"}${r.matches === 0 ? `<span class="alias">disagrees</span>` : ""}</td>
-          <td>${esc(LABEL[r.status] || r.status)}${r.decided ? `<span class="alias">decided ${esc(r.decided)}</span>` : ""}${r.curator_note ? `<span class="alias">${esc(r.curator_note)}</span>` : ""}</td>
+          <td>${esc(LABEL[r.status] || r.status)}${r.decided ? `<span class="alias">decided ${esc(r.decided)}${r.decided_by ? ` by ${esc(r.decided_by)}` : ""}</span>` : ""}${r.curator_note ? `<span class="alias">${esc(r.curator_note)}</span>` : ""}</td>
           <td>${actions(r)}</td></tr>`).join("")
           : `<tr><td colspan="8" class="muted">Nothing in this list.</td></tr>`);
       $$("#c-table button[data-a]").forEach(b => b.onclick = async () => {
         if (b.dataset.st === "approved" && !confirm("Reject this approved submission? Its isolate is removed from the repository and the rules.")) return;
         try {
           const res = await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value.trim() },
-            body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "" }) });
+            body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "", curator: (($("#c-name") || {}).value || "").trim() }) });
           LOADED.browse = false; LOADED.home = false; LOADED.analytics = false;
           if (b.dataset.a === "approve") META.counts.genomes += 1; else if (res.revoked) META.counts.genomes -= 1;
           load();
@@ -696,7 +706,8 @@ INIT.curate = () => {
     const tk = $("#c-token").value.trim(); if (!tk) return;
     try {
       const s = await api("/api/v1/admin/persist-status", { headers: { "X-Admin-Token": tk } });
-      $("#c-pst").textContent = s.github_backup ? `Automatic GitHub backup is on${s.last_saved ? `, last saved ${s.last_saved} UTC` : ", nothing saved yet"}${s.error ? `. Last problem: ${s.error}` : ""}.` : "Automatic GitHub backup is off (set BACKUP_GITHUB_REPO and BACKUP_GITHUB_TOKEN on the server).";
+      $("#c-pst").classList.toggle("warn-box", !s.github_backup);
+      $("#c-pst").textContent = s.github_backup ? `Automatic GitHub backup is on${s.last_saved ? `, last saved ${s.last_saved} UTC` : ", nothing saved yet"}${s.error ? `. Last problem: ${s.error}` : ""}.` : "Warning: automatic GitHub backup is off. Submissions and approvals are kept only on this server and are lost when it restarts, unless the server has a persistent disk. Set BACKUP_GITHUB_REPO and BACKUP_GITHUB_TOKEN on the server, or download a backup now.";
     } catch (e) { /* the sign-in message is shown by the queue */ }
   };
   $("#c-load").onclick = () => { load(); pstatus(); };

@@ -1,7 +1,7 @@
-fastapi>=0.110
-uvicorn[standard]>=0.29
-python-multipart>=0.0.9
-biopython>=1.83
-openpyxl>=3.1
-httpx>=0.27
-pytest>=8.0
+# Exactly the versions the test suite was run against. Update them together, run the tests, then deploy.
+fastapi==0.162.0
+starlette==1.10.0          # app/main.py raises Starlette's 1 MB form-field limit, so Starlette is pinned too
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+biopython==1.88
+openpyxl==3.1.5

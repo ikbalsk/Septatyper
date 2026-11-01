@@ -13,17 +13,22 @@ import os
 import re
 import tempfile
 import threading
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from fastapi import Body, Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
+from collections import deque
+from contextlib import asynccontextmanager
+
+from fastapi import Body, Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import bvbrc, countries, grammar, persist, rules, septatype
-from .config import ADMIN_TOKEN, HABITATS, MAX_PASTE_MB, MAX_UPLOAD_MB, SOURCES, SPECIES
+from .config import (ADMIN_LOCK_S, ADMIN_MAX_FAILS, ADMIN_TOKEN, HABITATS, MAX_PASTE_MB, MAX_UPLOAD_MB, RATE_PREDICT_PER_HOUR,
+                     RATE_SUBMIT_PER_HOUR, SOURCES, SPECIES, VERSION)
 
 def _raise_form_field_limit(limit: int) -> None:
     """Starlette's form parsers refuse any ordinary form field above 1 MB, which is where a pasted sequence arrives
@@ -55,7 +60,18 @@ def _pasted(sequence: str) -> str:
     return text
 
 
-app = FastAPI(title="Ciprotyper API", version="2.0",
+@asynccontextmanager
+async def _lifespan(_app):
+    """Start-up work, run once when the server starts."""
+    rules.ensure_db()
+    if os.environ.get("BVBRC_AUTOLOAD", "1") != "0" and not bvbrc.is_loaded():
+        bvbrc.start()
+    if persist.configured():
+        threading.Thread(target=persist.restore_if_configured, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Ciprotyper API", version=VERSION, lifespan=_lifespan,
               description="Ciprofloxacin resistance prediction and isolate repository for Enterobacterales.")
 STATIC = Path(__file__).parent / "static"
 AA = set("ACDEFGHIKLMNPQRSTVWY")
@@ -73,14 +89,16 @@ def _check(species: str, habitat: str):
 
 _CACHE: dict = {}          # (sha256, species, qnr overrides) -> analysis; the same file is never analysed twice
 _CACHE_MAX = 32
+_CACHE_LOCK = threading.Lock()   # requests run in several threads; every read and write of _CACHE takes this lock
 
 
 def _analyse_text(text: str, species: str, qnr: dict, name: str = "pasted"):
     """Write FASTA text or bytes to a temp file, run the pipeline, delete the file."""
     import hashlib
     key = (hashlib.sha256(text.encode()).hexdigest(), species, qnr.get("qnrB2"), qnr.get("qnrS1"))
-    if key in _CACHE:
-        return _CACHE[key]
+    with _CACHE_LOCK:
+        if key in _CACHE:
+            return _CACHE[key]
     if not BLAST_SLOTS.acquire(blocking=False):
         raise HTTPException(429, "The server is busy with other analyses. Try again in a minute.")
     try:
@@ -88,9 +106,10 @@ def _analyse_text(text: str, species: str, qnr: dict, name: str = "pasted"):
             path = Path(td) / "input.fa"
             path.write_text(text)
             res = septatype.analyse(path, species, qnr)
-            if len(_CACHE) >= _CACHE_MAX:
-                _CACHE.pop(next(iter(_CACHE)))
-            _CACHE[key] = res
+            with _CACHE_LOCK:
+                while len(_CACHE) >= _CACHE_MAX:
+                    _CACHE.pop(next(iter(_CACHE)), None)
+                _CACHE[key] = res
             return res
     except septatype.InputError as e:
         raise HTTPException(400, str(e))
@@ -137,20 +156,103 @@ def _result(species, habitat, analysis, sep):
             "habitat": habitat, "septatype": sep, "analysis": analysis, "prediction": pred, "warnings": warnings}
 
 
-def admin(x_admin_token: str = Header(default="")):
+# ------------------------------------------------------------------ rate limit and token lockout
+# In-memory and thread-safe (they reset when the server restarts). The visitor is the first address in X-Forwarded-For (what the
+# hosting proxy saw), else the connecting address. A visitor who sends a made-up X-Forwarded-For can dodge the limit: this is spam
+# control, not a security boundary.
+def _client_key(request) -> str:
+    fwd = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    return fwd or (request.client.host if request.client else "unknown")
+
+
+class RateLimiter:
+    """Sliding window: at most `limit` hits per `window_s` seconds for each key."""
+
+    def __init__(self):
+        self._hits: dict[str, deque] = {}
+        self._lock = threading.Lock()
+
+    def hit(self, key: str, limit: int, window_s: int, now: float | None = None) -> int:
+        """Record a hit. Returns 0 if it is allowed, else the seconds until it would be."""
+        if limit <= 0:
+            return 0
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            q = self._hits.setdefault(key, deque())
+            while q and now - q[0] >= window_s:
+                q.popleft()
+            if len(q) >= limit:
+                return max(1, int(window_s - (now - q[0])))
+            q.append(now)
+            if len(self._hits) > 5000:                                  # keep memory bounded
+                for k in [k for k, v in self._hits.items() if not v or now - v[-1] >= window_s]:
+                    self._hits.pop(k, None)
+            return 0
+
+
+class FailGate:
+    """Counts wrong tokens per key. After `max_fails` within `lock_s` seconds the key is paused for `lock_s` seconds."""
+
+    def __init__(self):
+        self._fails: dict[str, deque] = {}
+        self._lock = threading.Lock()
+
+    def wait(self, key: str, max_fails: int, lock_s: int, now: float | None = None) -> int:
+        """Seconds the key must still wait (0 = may try)."""
+        if max_fails <= 0:
+            return 0
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            q = self._fails.get(key)
+            if not q:
+                return 0
+            while q and now - q[0] >= lock_s:
+                q.popleft()
+            if len(q) >= max_fails:
+                return max(1, int(lock_s - (now - q[-1])))
+            return 0
+
+    def fail(self, key: str, now: float | None = None) -> None:
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            self._fails.setdefault(key, deque()).append(now)
+
+    def ok(self, key: str) -> None:
+        with self._lock:
+            self._fails.pop(key, None)
+
+
+_RATE = RateLimiter()
+_FAILS = FailGate()
+
+
+def admin(request: Request, x_admin_token: str = Header(default="")):
     if not ADMIN_TOKEN:
         raise HTTPException(503, "Curation is disabled: set the ADMIN_TOKEN environment variable on the server.")
+    key = _client_key(request)
+    wait = _FAILS.wait(key, ADMIN_MAX_FAILS, ADMIN_LOCK_S)
+    if wait:
+        raise HTTPException(429, f"Too many wrong curator tokens from this address. Try again in {max(1, wait // 60)} minute(s).",
+                            headers={"Retry-After": str(wait)})
     if not hmac.compare_digest(x_admin_token.strip().encode("utf-8"), ADMIN_TOKEN.encode("utf-8")):
+        _FAILS.fail(key)
         raise HTTPException(401, "Wrong curator token. Check it matches ADMIN_TOKEN in Render exactly.")
+    _FAILS.ok(key)
 
 
-@app.on_event("startup")
-def _startup():
-    rules.ensure_db()
-    if os.environ.get("BVBRC_AUTOLOAD", "1") != "0" and not bvbrc.is_loaded():
-        bvbrc.start()
-    if persist.configured():
-        threading.Thread(target=persist.restore_if_configured, daemon=True).start()
+def _limit(request: Request, kind: str, per_hour: int):
+    wait = _RATE.hit(f"{kind}:{_client_key(request)}", per_hour, 3600)
+    if wait:
+        raise HTTPException(429, f"Too many {kind} requests from this address. Try again in {max(1, wait // 60)} minute(s).",
+                            headers={"Retry-After": str(wait)})
+
+
+def limit_submit(request: Request):
+    _limit(request, "submission", RATE_SUBMIT_PER_HOUR)
+
+
+def limit_predict(request: Request):
+    _limit(request, "prediction", RATE_PREDICT_PER_HOUR)
 
 
 @app.get("/api/v1/bvbrc-status")
@@ -160,8 +262,10 @@ def bvbrc_status():
 
 @app.post("/api/v1/admin/bvbrc/load", dependencies=[Depends(admin)])
 def bvbrc_load():
-    started = bvbrc.start() if not bvbrc.STATE["running"] else None
-    return bvbrc.status() | {"started": not bvbrc.STATE["running"] or started is None}
+    already = bool(bvbrc.STATE["running"])
+    if not already:
+        bvbrc.start()
+    return bvbrc.status() | {"started": not already, "already_running": already}
 
 
 # --------------------------------------------------------------------- meta
@@ -185,7 +289,7 @@ def meta():
 
 
 # ------------------------------------------------------------------ predict
-@app.post("/api/v1/predict")
+@app.post("/api/v1/predict", dependencies=[Depends(limit_predict)])
 def predict_upload(file: UploadFile | None = File(None), sequence: str = Form(""), species: str = Form(...),
                    habitat: str = Form("ALL"), qnrB2: str = Form("auto"), qnrS1: str = Form("auto")):
     _check(species, habitat)
@@ -206,7 +310,7 @@ class BvbrcReq(BaseModel):
     habitat: str = "ALL"
 
 
-@app.post("/api/v1/predict/bvbrc")
+@app.post("/api/v1/predict/bvbrc", dependencies=[Depends(limit_predict)])
 def predict_bvbrc(m: BvbrcReq):
     """Predict from a BV-BRC genome ID: the assembly is fetched from BV-BRC, analysed and discarded. One genome per call."""
     gid = m.genome_id.strip()
@@ -386,6 +490,14 @@ CSV_COLUMNS = [("genome_id", "Genome ID"), ("genome_name", "Genome name"), ("spe
                ("st", "ST"), ("year_raw", "Year"), ("community", "Community submission")]
 
 
+def _csv_safe(v):
+    """A text cell that starts with = + - @ (or a tab or return) would run as a formula when the CSV is opened in Excel or Sheets.
+    A leading apostrophe makes it plain text. Numbers and empty cells are left alone."""
+    if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + v
+    return v
+
+
 def _download(kind: str, f: dict):
     rows = rules.isolates_query(f, limit=False)["rows"]
     if kind == "json":
@@ -396,7 +508,7 @@ def _download(kind: str, f: dict):
     for r in rows:
         r = dict(r, species_name=SPECIES.get(r["species"], r["species"]), source_name=SITE_NAMES.get(r["habitat"], r["habitat"]),
                  community="yes" if r.get("source") == "community" else "no")
-        w.writerow(["" if r.get(k) is None else r.get(k) for k, _ in CSV_COLUMNS])
+        w.writerow(["" if r.get(k) is None else _csv_safe(r.get(k)) for k, _ in CSV_COLUMNS])
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=ciprotyper_isolates.csv"})
 
@@ -419,7 +531,7 @@ def bvbrc_lookup(genome_id: str):
     url = ("https://www.bv-brc.org/api/genome/?" + urllib.parse.quote(f"eq(genome_id,{genome_id})&select(genome_id,genome_name)", safe="=&(),")
            + "&http_accept=application/json")
     try:
-        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Ciprotyper/2.0"}), timeout=8) as r:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": f"Ciprotyper/{VERSION}"}), timeout=8) as r:
             data = json.loads(r.read().decode())
     except Exception as e:  # network, timeout, bad JSON
         return {"found": False, "genome_id": genome_id, "reason": f"BV-BRC could not be reached ({type(e).__name__})."}
@@ -429,7 +541,7 @@ def bvbrc_lookup(genome_id: str):
 
 
 # --------------------------------------------------------------- submissions
-@app.post("/api/v1/submissions")
+@app.post("/api/v1/submissions", dependencies=[Depends(limit_submit)])
 def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = Form(""), genome_name: str = Form(""),
            country: str = Form(""), year: str = Form(""), source_text: str = Form(""),
            lab_phenotype: str = Form(""), email: str = Form(""), submitter: str = Form(""), affiliation: str = Form(""),
@@ -487,12 +599,16 @@ class Decision(BaseModel):
     job_id: str
     action: str
     note: str = ""
+    curator: str = ""          # optional: the name of the person deciding, kept in the record
 
 
 @app.post("/api/v1/admin/decide", dependencies=[Depends(admin)])
-def decide(d: Decision):
+def decide(d: Decision, request: Request):
+    who, ip = d.curator.strip()[:80], _client_key(request)
     try:
-        return rules.decide(d.job_id, d.action, d.note[:300])
+        out = rules.decide(d.job_id, d.action, d.note[:300], who)
+        rules.audit(who, ip, d.action, d.job_id, d.note)
+        return out
     except KeyError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:

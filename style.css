@@ -259,3 +259,4 @@ table.rtab th,table.rtab td{padding:5px 6px}
 footer .credit-line{max-width:900px;margin:0 auto 8px;overflow-wrap:anywhere}
 .credit-line{overflow-wrap:anywhere}
 @media print{footer{display:block}}
+.warn-box{background:var(--amber-bg);border:1px solid var(--amber);border-left:4px solid var(--amber);color:var(--ink);border-radius:8px;padding:8px 10px}
