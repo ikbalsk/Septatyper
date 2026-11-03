@@ -59,9 +59,13 @@ FOUNDING_AFFILIATION = "JISIASR, Kolkata"
 FOUNDING_PUBLICATION = "https://doi.org/10.1038/s41598-026-75690-y"
 
 # ---- release, safety limits (all can be changed with environment variables on the server)
-VERSION = "3.5"
+VERSION = "3.6"
 RATE_SUBMIT_PER_HOUR = int(os.environ.get("RATE_SUBMIT_PER_HOUR", "20"))     # submissions per visitor per hour; 0 = no limit
 RATE_PREDICT_PER_HOUR = int(os.environ.get("RATE_PREDICT_PER_HOUR", "0"))    # genome predictions per visitor per hour; 0 = no limit (default)
 ADMIN_MAX_FAILS = int(os.environ.get("ADMIN_MAX_FAILS", "10"))               # wrong curator tokens before a pause
 ADMIN_LOCK_S = int(os.environ.get("ADMIN_LOCK_S", "900"))                    # length of that pause in seconds
 REFRESH_DB_ON_START = os.environ.get("REFRESH_DB_ON_START", "1") != "0"      # bring founding data of a saved database up to the new seed
+
+# ---- identity rules for a genome of the chosen species
+CP1_MIN_ID = float(os.environ.get("CP1_MIN_ID", "90"))                  # gyrA, parC and recN must match the species reference at least this well for checkpoint 1
+MLST_SPECIES_MIN_ID = float(os.environ.get("MLST_SPECIES_MIN_ID", "95"))  # every MLST gene must match the species scheme at least this well, else "verify the species"

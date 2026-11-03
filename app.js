@@ -100,7 +100,7 @@ function flat(res, name, error) {
   const p = (res && res.prediction) || {}, a = (res && res.analysis) || {}, pos = a.positions || {}, cd = k => (pos[k] || {}).codon || "";
   const bv = (res && res.bvbrc) || {};
   return { file: name, bvbrc_genome_id: bv.genome_id || "", bvbrc_genome_name: bv.genome_name || "", bvbrc_url: bv.url || "", reference_isolate: bv.in_reference ? "yes" : (bv.genome_id ? "no" : ""), species: res ? res.species_name : "", isolation_source: res ? res.habitat : "", septatype: (res && res.septatype) || "",
-    call: error ? "Error" : (p.call || "No call"), basis: p.tier || "", n_isolates: p.n_isolates ?? "", n_resistant: p.n_resistant ?? "", n_susceptible: p.n_susceptible ?? "",
+    call: error ? "Error" : (p.call || "No call"), basis: p.tier || "", checkpoint1: a.checkpoint1 ? (a.checkpoint1.applicable ? "applied" : "not applied (low identity)") : "", species_check: (res && res.species_check && res.species_check.checked) ? (res.species_check.ok ? "ok" : "verify species") : "", n_isolates: p.n_isolates ?? "", n_resistant: p.n_resistant ?? "", n_susceptible: p.n_susceptible ?? "",
     sample_st: ((a.mlst || {}).st) || "", mlst_status: ((a.mlst || {}).status) || "",
     reference_sites: (p.reference_sites || []).map(x => `${x.habitat}:${x.n}`).join("; "),
     reference_countries: (p.reference_countries || []).map(x => `${x.country}:${x.n}`).join("; "),
@@ -121,13 +121,13 @@ async function maybeGzip(f) {      // smaller upload on a phone connection; the 
   try { const b = await new Response(f.stream().pipeThrough(new CompressionStream("gzip"))).blob(); return new File([b], f.name + ".gz", { type: "application/gzip" }); }
   catch (e) { return f; }
 }
-const TIER = { database: "Database", database_other_site: "Database (other source)", grammar: "Grammar (new)" };
+const TIER = { database: "Database", database_other_site: "Database (other source)", grammar: "Grammar (new)" , checkpoints_2_3: "Checkpoints 2 and 3 only" };
 function drawBatch(done, total, unit = "file") {
   const rows = BATCH.map((x, i) => {
     if (x.error) return `<tr><td>${esc(x.name)}</td><td colspan="5" class="muted">${esc(x.error)}</td></tr>`;
     const p = x.res.prediction;
     const bv = x.res.bvbrc, sub = bv ? `<span class="alias"><i>${esc(SHORT[x.res.species] || "")}</i> ${esc(bv.genome_name)}${bv.in_reference ? " (reference isolate)" : ""}</span>` : "";
-    return `<tr class="clk" data-act="detail" data-i="${i}"><td>${esc(x.name)}${sub}</td><td class="mono nw">${p ? mutSep(x.res.septatype) : "-"}</td><td class="nw">${esc(((x.res.analysis || {}).mlst || {}).st || "-")}</td><td>${p ? badge(p.call, 1) : "No call"}</td><td>${p ? esc(TIER[p.tier] || p.tier) : "-"}</td><td class="stat">${p && p.known ? p.n_resistant + " of " + p.n_isolates + " resistant" : "-"}</td></tr>`;
+    return `<tr class="clk" data-act="detail" data-i="${i}"><td>${esc(x.name)}${sub}</td><td class="mono nw">${p && x.res.septatype ? mutSep(x.res.septatype) : "-"}</td><td class="nw">${esc(((x.res.analysis || {}).mlst || {}).st || "-")}</td><td>${p ? badge(p.call, 1) : "No call"}${x.res.species_check && x.res.species_check.message ? `<span class="alias" style="color:var(--res)" title="${esc(x.res.species_check.message)}">verify species</span>` : ""}</td><td>${p ? esc(TIER[p.tier] || p.tier) : "-"}</td><td class="stat">${p && p.known ? p.n_resistant + " of " + p.n_isolates + " resistant" : "-"}</td></tr>`;
   }).join("");
   const working = done < total;
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing ${unit} ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
@@ -183,7 +183,10 @@ document.addEventListener("click", e => {
 const SITE_LC = {};
 const PROT = { gyrA: "GyrA", parC: "ParC", recN: "RecN" };
 const f2 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(2);
-const SYNTAX = [["GyrA-83", "S Y T", "F L I W"], ["GyrA-87", "D N E", "N D G Y A E"], ["ParC-80", "S Y T", "I F W"], ["ParC-84", "D E", "E V D"]];
+const SYNTAX = [["GyrA-83", "S Y T", "F L I W", "Polar residue with -OH group", "Hydrophobic residue"],
+  ["GyrA-87", "D N E", "N D G Y A E", "Negatively charged or polar residue", "Uncharged or negatively charged residue"],
+  ["ParC-80", "S Y T", "I F W", "Polar residue with -OH group", "Hydrophobic residue"],
+  ["ParC-84", "D E", "E V D", "Negatively charged residue", "Hydrophobic or negatively charged residue"]];
 const f3 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(3);
 /* QRDR helix as a strip of letters; the four tetratype positions are marked */
 const helixStrip = b => `<span class="helix">${b.values.map(v => `<span class="${v.sub ? "sub" : ""}">${esc(v.residue)}</span>`).join("")}</span>`;
@@ -194,7 +197,7 @@ const helixLines = (label, v) => `<p class="formula wrap">${label} GyrA helix ${
 function critTable(positions) {
   const chips = (list, side) => list.map(c => `<span class="rchip${c.hit ? " hit " + side : ""}${c.exception ? " exc" : ""}">${esc(c.residue)}${c.exception ? "<small>exception</small>" : ""}</span>`).join("");
   return `<div class="scroll"><table class="rtab"><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>${positions.map(x =>
-    `<tr><td class="nw"><b>${esc(x.position)}</b><span class="alias">sample: ${esc(x.residue)}</span></td><td>${chips(x.susceptible, "s")}</td><td>${chips(x.resistant, "r")}</td></tr>`).join("")}</table></div>`;
+    `<tr><td class="nw"><b>${esc(x.position)}</b><span class="alias">sample: ${esc(x.residue)}</span></td><td>${chips(x.susceptible, "s")}<div class="clabel">(${esc(x.susceptible_label || "")})</div></td><td>${chips(x.resistant, "r")}<div class="clabel">(${esc(x.resistant_label || "")})</div></td></tr>`).join("")}</table></div>`;
 }
 /* number line: sample and reference <H> against the cutoff; extra = typical resistant and susceptible isolates */
 function hChart(sample, ref, cutoff, extra) {
@@ -215,8 +218,21 @@ function hChart(sample, ref, cutoff, extra) {
     <text x="${lab(sample)}" y="30" text-anchor="middle" font-size="13" font-weight="600" fill="${col}" class="hs">Sample ${f3(sample)}</text>
     <text x="${lab(ref)}" y="${extra ? 90 : 82}" text-anchor="middle" font-size="12" fill="var(--muted)">Reference ${f3(ref)}</text>${ticks}</svg>`;
 }
+function whyNotApplied(p, c) {
+  const k = c.checkpoints, r1 = k.residues, dec = c.decided_by;
+  const dim = x => x === "Resistant" ? "hit" : "dim", tag = on => on ? `<span class="tag">decides</span>` : "";
+  let h = `<h3>Why ${esc(p.call)}</h3><p class="muted small">Call from checkpoints 2 and 3 only, because checkpoint 1 could not be applied.</p>`;
+  h += `<div class="crit dim"><h4>Checkpoint 1: residues at GyrA-83, GyrA-87, ParC-80 and ParC-84 <span class="tag off">not applied</span></h4><p style="margin:0">${esc(r1.rule)}</p></div>`;
+  h += `<div class="crit ${dim(k.recn.call)}"><h4>Checkpoint 2: RecN-346 ${k.recn.call === "Not determined" ? `<span class="tag off">not determined</span>` : badge(k.recn.call, 1)} ${tag(dec === "checkpoint2")}</h4>
+    <p style="margin:0">${esc(k.recn.text)}.</p><p class="muted small" style="margin:6px 0 0">Susceptible: leucine encoded by cta. Resistant: leucine encoded by ctg, or phenylalanine.</p></div>`;
+  h += `<div class="crit ${dim(k.qnr.call)}"><h4>Checkpoint 3: PMQR genes ${badge(k.qnr.call, 1)} ${tag(dec === "checkpoint3")}</h4>
+    <p style="margin:0">${esc(k.qnr.text.charAt(0).toUpperCase() + k.qnr.text.slice(1))}.</p><p class="muted small" style="margin:6px 0 0">Susceptible: both qnrB2 and qnrS1 absent. Resistant: either or both present.</p></div>`;
+  h += `<p class="small" style="margin:10px 0 0"><b>Combined:</b> resistant if checkpoint 2 or 3 is resistant, otherwise susceptible. Checkpoint 2 is ${esc(k.recn.call.toLowerCase())} and checkpoint 3 is ${esc(k.qnr.call.toLowerCase())}, so the call is <b>${esc(c.grammar_call)}</b>. Check the selected species and the assembly, then resubmit if needed.</p>`;
+  return h;
+}
 function whyBlock(p) {
   const c = p.criteria; if (!c) return "";
+  if (c.checkpoints && c.checkpoints.residues.applied === false) return whyNotApplied(p, c);
   const k = c.checkpoints, r1 = k.residues, hy = c.hydrophobicity, rf = c.reference, dec = c.decided_by, res = c.positions.map(x => x.residue).join("");
   const intro = p.tier === "grammar" ? "Call from the three checkpoints, because this septatype is new." : `Call from the database majority rule${c.grammar_call !== p.call ? `. The three checkpoints alone would say ${esc(c.grammar_call)}` : ""}.`;
   const tag = on => on ? `<span class="tag">decides</span>` : "";
@@ -253,18 +269,20 @@ function renderResult(r, extra) {
   LAST = r;
   let h = `<div class="band result"><p class="print-only">Ciprotyper report, ${new Date().toLocaleDateString()}. ${esc(r.species_name)}, ${esc(SITE[r.habitat] || r.habitat)}. ${esc(r._name || "")}</p>`;
   if (r.bvbrc) h += `<p class="small muted" style="margin:0 0 8px">BV-BRC genome <a href="${esc(r.bvbrc.url)}" target="_blank" rel="noopener">${esc(r.bvbrc.genome_id)}</a>: ${esc(r.bvbrc.genome_name)}${r.bvbrc.country ? ", " + esc(r.bvbrc.country) : ""}${r.bvbrc.year ? ", " + esc(r.bvbrc.year) : ""}${r.bvbrc.isolation_source ? ". Source: " + esc(r.bvbrc.isolation_source) : ""}.</p>`;
+  if (r.species_check && r.species_check.message) h += `<div class="species-warn" role="alert"><b>Please verify the species selected and resubmit.</b> ${esc(r.species_check.message.replace(/^Please verify the species selected and resubmit\.\s*/, ""))}</div>`;
   if (!p) {
-    h += `<h3>No call could be made</h3><p>A complete septatype could not be built from this input.</p>`;
+    h += `<h3>No call could be made</h3><p>${a && a.checkpoint1 && !a.checkpoint1.applicable ? "Checkpoint 1 could not be applied and checkpoints 2 and 3 have nothing to go on. See the notes below." : "A complete septatype could not be built from this input."}</p>`;
   } else {
     const sitesTxt = (p.reference_sites || []).map(x => `${SITE_LC[x.habitat] || String(x.habitat).toLowerCase()} ${x.n}`).join(", ");
     const cs = p.reference_countries || [], top = cs.slice(0, 3).map(x => `${esc(x.country)} ${x.n}`).join(", ");
     const countryTxt = !cs.length ? "" : cs.length === 1 ? `, all from ${esc(cs[0].country)}` : `, from ${top}${cs.length > 3 ? ` and ${cs.length - 3} other ${cs.length - 3 === 1 ? "country" : "countries"}` : ""}`;
     const basis = p.tier === "database" ? `This septatype is in <b>${fmt(p.n_isolates)}</b> reference isolates (${esc(sitesTxt)})${countryTxt}. Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
       : p.tier === "database_other_site" ? `Not seen for this isolation source. It is in <b>${fmt(p.n_isolates)}</b> reference isolates from other sources (${esc(sitesTxt)})${countryTxt}. Based on the majority rule, it is <b>${esc(p.call.toLowerCase())}</b>.`
+      : p.tier === "checkpoints_2_3" ? `Checkpoint 1 could not be applied (see the notes below), so the call comes from checkpoints 2 and 3 only.`
       : `New septatype, so the call comes from the grammar.`;
     h += `<div class="verdict-row">${badge(p.call)}</div><p class="basis">${basis}</p>`;
     const codon = (a && a.recN_codon) || r.recn_codon;
-    h += `<div class="sep">${p.septatype.split("-").map((v, i) => {
+    if (p.septatype) h += `<div class="sep">${p.septatype.split("-").map((v, i) => {
       const ch = v !== WILD[i] && !(i >= 5 && v === "0");
       return `<div class="tile ${ch ? "changed" : ""}"><div class="cell">${esc(v)}</div><small>${POS[i][1]}</small>${i === 4 && codon ? `<span class="codon">${esc(codon.toLowerCase())}</span>` : ""}</div>`;
     }).join("")}</div>`;
@@ -287,14 +305,16 @@ function renderResult(r, extra) {
       h += `<p class="muted" style="margin-top:12px">Known septatypes with the same GyrA/ParC tetratype:</p><div class="scroll"><table><tr><th>Septatype</th><th>Isolates</th><th>Resistant</th><th>Susceptible</th></tr>${p.similar.map(x => `<tr><td class="mono">${esc(x.septatype)}</td><td>${x.n_isolates}</td><td>${x.n_resistant}</td><td>${x.n_susceptible}</td></tr>`).join("")}</table></div>`;
     }
     h += whyBlock(p);
-    h += `<details><summary>Structural reading (schematic)</summary><ul class="why">${p.mechanism.map(m => `<li><span class="dot ${esc(m.effect)}"></span><span><b>${esc(m.position)} ${esc(m.residue)}</b>. ${esc(m.text)}</span></li>`).join("")}</ul></details>`;
+    if (p.mechanism && p.mechanism.length) h += `<details><summary>Structural reading (schematic)</summary><ul class="why">${p.mechanism.map(m => `<li><span class="dot ${esc(m.effect)}"></span><span><b>${esc(m.position)} ${esc(m.residue)}</b>. ${esc(m.text)}</span></li>`).join("")}</ul></details>`;
   }
-  if (r.warnings && r.warnings.length) h += `<div class="note"><ul>${r.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
+  const notes = (r.warnings || []).filter(w => !w.startsWith("Please verify the species selected"));       // that one has its own banner
+  if (notes.length) h += `<div class="note"><ul>${notes.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>`;
   if (a && a.positions) {
     const ref = a.reference || { genes: {}, qnr: {} };
     h += `<details><summary>Sequence details</summary>
       <p class="muted small">Your sequence is compared with the ${esc(ref.species || "")} reference genes (${Object.entries(ref.genes || {}).map(([g, ac]) => `${esc(g)} ${esc(ac)}`).join(", ")}).</p>
-      <div class="scroll"><table><tr><th>Position</th><th>Sample codon</th><th>Sample residue</th><th>Reference codon</th><th>Reference residue</th></tr>` +
+      ${a.genes ? `<div class="scroll"><table><tr><th>Gene</th><th>Match to the reference</th><th>Coverage</th></tr>${Object.entries(a.genes).map(([g, x]) => { const id = x.found ? x.identity : x.best_identity, low = a.checkpoint1 && a.checkpoint1.low.some(l => l.gene === g); return `<tr><td>${PROT[g] || esc(g)}</td><td class="${low ? "bad" : ""}">${id != null ? id + "%" : "not found"}${x.found ? "" : " (not found)"}${low ? ` (below ${a.checkpoint1.threshold}%)` : ""}</td><td>${x.found ? x.coverage + "%" : "-"}</td></tr>`; }).join("")}</table></div>` : ""}
+      <div class="scroll" style="margin-top:10px"><table><tr><th>Position</th><th>Sample codon</th><th>Sample residue</th><th>Reference codon</th><th>Reference residue</th></tr>` +
       Object.values(a.positions).map(x => `<tr><td class="nw">${PROT[x.gene] || esc(x.gene)}-${x.pos}</td><td class="mono">${esc((x.codon || "-").toLowerCase())}</td><td class="mono">${esc(x.aa || "-")}</td><td class="mono">${esc((x.ref_codon || "-").toLowerCase())}</td><td class="mono">${esc(x.ref_aa || "-")}</td></tr>`).join("") +
       `</table></div><div class="scroll" style="margin-top:10px"><table><tr><th>qnr gene</th><th>Result</th><th>Match to reference</th></tr>` +
       Object.entries(a.qnr).map(([k, x]) => `<tr><td>${k === "qnrB2" ? "qnrB" : "qnrS"}</td><td>${x.present ? "Present" : "Absent"}${x.source === "set by user" ? " (set by you)" : ""}</td><td>${x.identity != null ? `${x.identity}% identity, ${x.coverage}% coverage to ${esc(x.reference)}` : "-"}</td></tr>`).join("") +
@@ -621,8 +641,8 @@ INIT.calc = async () => {
     <p class="muted" style="font-size:.9rem;margin-top:8px">The grammar is only a fallback. When a septatype was seen in the reference isolates, the majority rule is used instead. These tables describe the reference set. They are not a validation.</p></div>
   <div class="band"><h3>4. The three checkpoints</h3>
     <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. The isolate is <b>susceptible</b> if all four residues are in the Susceptible column, and <b>resistant</b> if all four are in the Resistant column.</p>
-    <div class="scroll"><table class="rtab"><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>${SYNTAX.map(([p, a, b]) => `<tr><td class="nw"><b>${p}</b></td><td>${a.split(" ").map(x => `<span class="rchip">${x}</span>`).join("")}</td><td>${b.split(" ").map(x => `<span class="rchip">${x}</span>`).join("")}</td></tr>`).join("")}</table></div>
-    <p class="muted small" style="margin-top:6px">A residue can be in both columns (D at GyrA-87, E at ParC-84), so the four positions are read together, which is the context sensitivity. One exception counts as Resistant: the ParC pair S-K (S at ParC-80 together with K at ParC-84, the F-N-S-K tetratype). S alone is the susceptible S-E state, and K alone is not listed. In a result the exception appears in the table only when your sample carries the whole pair. The residues follow the paper's Table S6 and Fig. 6.</p>
+    <div class="scroll"><table class="rtab"><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>${SYNTAX.map(([p, a, b, ta, tb]) => `<tr><td class="nw"><b>${p}</b></td><td>${a.split(" ").map(x => `<span class="rchip">${x}</span>`).join("")}<div class="clabel">(${ta})</div></td><td>${b.split(" ").map(x => `<span class="rchip">${x}</span>`).join("")}<div class="clabel">(${tb})</div></td></tr>`).join("")}</table></div>
+    <p class="muted small" style="margin-top:6px">A residue can be in both columns (D at GyrA-87, E at ParC-84), so the four positions are read together, which is the context sensitivity. One exception counts as Resistant: the ParC pair S-K (S at ParC-80 together with K at ParC-84, the F-N-S-K tetratype). S alone is the susceptible S-E state, and K alone is not listed. In a result the exception appears in the table only when your sample carries the whole pair. The residues follow the paper's Fig. 6 and the sentence under each column is its Table S6 wording.</p>
     <p><b>Checkpoint 2.</b> RecN-346. Susceptible if it is leucine (L) encoded by cta. Resistant if it is leucine encoded by ctg, or phenylalanine (F). Other codons, and an unknown codon, give no resistant signal.</p>
     <p><b>Checkpoint 3.</b> PMQR genes. Susceptible if both qnrB2 and qnrS1 are absent. Resistant if either or both are present.</p>
     <p><b>Combined.</b> Susceptible if all checkpoints say susceptible. Resistant if any checkpoint says resistant.</p>

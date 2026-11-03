@@ -209,6 +209,19 @@ def _rule(db, species, habitat, sep):
                       (species, habitat, sep)).fetchone()
 
 
+def predict_checkpoints_2_3(species: str, habitat: str, r346, recn_codon, qnrB: bool, qnrS: bool, why: str) -> dict:
+    """A call from checkpoints 2 and 3 only, used when checkpoint 1 cannot be applied. There is no septatype to look up, so
+    no reference isolates are shown."""
+    if species not in SPECIES:
+        raise ValueError("Unknown species")
+    g = grammar.predict_without_checkpoint1(r346, recn_codon, qnrB, qnrS, why)
+    return {"septatype": None, "species": species, "habitat": habitat, "mean_h": None, "mechanism": [], "novel": False,
+            "grammar": {"call": g["call"], "rule": g["rule"], "votes": []}, "criteria": grammar.explain_not_applied(g, why),
+            "call": g["call"], "tier": "checkpoints_2_3", "known": False, "n_isolates": 0, "n_resistant": 0, "n_susceptible": 0,
+            "confidence": None, "reference_sts": [], "reference_sites": [], "reference_countries": [], "similar": [],
+            "flags": [why + " Treat this call with care."]}
+
+
 def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None) -> dict:
     if species not in SPECIES:
         raise ValueError("Unknown species")
@@ -448,7 +461,7 @@ def create_submission(d: dict, result: dict) -> dict:
     novel = bool(pred.get("novel"))
     lab = d.get("lab_phenotype") or None
     matches = None if not (lab and call) else int(lab == call)
-    status = "needs_review" if (novel or matches == 0 or not call) else "pending"
+    status = "needs_review" if (novel or matches == 0 or not call or not result.get("septatype")) else "pending"
     job = uuid.uuid4().hex[:12]
     db = conn()
     try:

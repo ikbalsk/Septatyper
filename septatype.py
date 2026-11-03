@@ -17,7 +17,7 @@ from Bio.Align import PairwiseAligner
 from Bio.Seq import Seq
 
 from . import mlst
-from .config import BLAST_TIMEOUT_S, POSITIONS, REFS_DIR, WILD
+from .config import BLAST_TIMEOUT_S, CP1_MIN_ID, MLST_SPECIES_MIN_ID, POSITIONS, REFS_DIR, WILD
 
 # thresholds. QNR values are the ones stated in the manuscript Methods
 # (>=80% identity, >=90% gene-length coverage). The chromosomal ones are
@@ -104,6 +104,33 @@ def read_fasta(path: Path):
     if good / total < 0.9:
         raise InputError("This looks like protein sequence. Upload nucleotide FASTA (genome or gene sequences).")
     return seqs, names, total
+
+
+# ------------------------------------------------------- identity rules (checkpoint 1, species check)
+def checkpoint1_check(genes: dict) -> dict:
+    """Checkpoint 1 reads GyrA, ParC and RecN against the chosen species. If any of the three matches its reference at
+    less than CP1_MIN_ID % (or is not found at all), the residues cannot be trusted and checkpoint 1 is not applied."""
+    low = []
+    for g in ("gyrA", "parC", "recN"):
+        info = genes.get(g) or {}
+        ident = info.get("identity") if info.get("found") else info.get("best_identity")
+        if not info.get("found") or ident is None or ident < CP1_MIN_ID:
+            low.append({"gene": g, "identity": ident, "found": bool(info.get("found"))})
+    return {"applicable": not low, "threshold": CP1_MIN_ID, "low": low}
+
+
+def species_check(species: str, ms: dict, total_bp: int) -> dict:
+    """Does the genome match the MLST scheme of the chosen species? Every MLST gene should reach MLST_SPECIES_MIN_ID % identity.
+    Only judged for something the size of a genome: a gene-only upload does not carry the MLST genes."""
+    if total_bp < 1_000_000:
+        return {"checked": False, "ok": True, "threshold": MLST_SPECIES_MIN_ID, "low": [], "message": ""}
+    low = [{"locus": l, "identity": v} for l, v in (ms.get("identity") or {}).items() if v is None or v < MLST_SPECIES_MIN_ID]
+    msg = ""
+    if low:
+        txt = ", ".join(f"{x['locus']} {x['identity']}%" if x["identity"] is not None else f"{x['locus']} not found" for x in low[:7])
+        msg = (f"Please verify the species selected and resubmit. Each MLST gene of {REF_SPECIES[species]} should match this "
+               f"sequence at {MLST_SPECIES_MIN_ID:g}% identity or more, but: {txt}.")
+    return {"checked": True, "ok": not low, "threshold": MLST_SPECIES_MIN_ID, "low": low, "message": msg}
 
 
 # --------------------------------------------------------------------- BLAST
@@ -223,15 +250,15 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
             cand = [h for h in hits if h["qseqid"] == g]
             best = max(cand, key=lambda h: h["bitscore"]) if cand else None
             ref_acc = rec.description.split("|")[-1].strip()
-            info = {"found": False, "reference": ref_acc}
+            info = {"found": False, "reference": ref_acc, "best_identity": round(best["pident"], 1) if best else None}
             if best and best["pident"] >= MIN_ID_CHROM:
                 info = {"found": True, "reference": ref_acc, "identity": round(best["pident"], 1), "coverage": round(100 * best["qcov"], 1),
                         "contig": names[best["sseqid"]], "strand": "+" if best["sstart"] <= best["send"] else "-"}
                 if best["qcov"] < MIN_COV:
                     warnings.append(f"{g}: only {info['coverage']}% of the reference gene was covered (partial gene or contig break).")
                 if best["pident"] < WARN_ID_CHROM:
-                    warnings.append(f"{g}: identity to the {species} reference is {info['identity']}%. "
-                                    f"identity to the {REF_SPECIES[species]} reference is lower than expected. Check the selected species and the assembly.")
+                    warnings.append(f"{g}: identity to the {REF_SPECIES[species]} reference is {info['identity']}%, lower than expected. "
+                                    "Check the selected species and the assembly.")
                 region = _extract_region(seqs[best["sseqid"]], best)
                 gmap = _ref_to_region_map(region, ref)
             else:
@@ -286,10 +313,14 @@ def analyse(fasta: Path, species: str, qnr_override: dict | None = None) -> dict
         except Exception as e:  # noqa: BLE001
             ms = {"st": None, "status": "error", "note": f"MLST could not be run ({type(e).__name__})."}
 
+    if ms and ms.get("identity") is not None:
+        ms["species_check"] = species_check(species, ms, total)
+    cp1 = checkpoint1_check(genes)
+
     aas = [positions[f"{g}{p}"]["aa"] for g, p in POSITIONS]
     complete = all(a and a not in ("X", "*") for a in aas)
     sep = septatype_string(aas, qnr["qnrB2"]["present"], qnr["qnrS1"]["present"]) if complete else None
-    return {"genes": genes, "positions": positions, "qnr": qnr, "septatype": sep,
+    return {"genes": genes, "positions": positions, "qnr": qnr, "septatype": sep, "checkpoint1": cp1,
             "recN_codon": positions["recN346"]["codon"],
             "recN_syn": ({"CTA": "cta", "CTG": "ctg"}.get(positions["recN346"]["codon"] or "", "other")
                          if positions["recN346"]["aa"] == "L" else None),

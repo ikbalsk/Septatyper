@@ -98,13 +98,14 @@ def type_genome(species: str, seqs: dict, blast, workdir) -> dict:
     q = wd / "mlst_reps.fa"
     q.write_text("".join(f">{l}_{a}\n{s}\n" for l in loci for a, s in reps[l]))
     hits = blast(q, "mlstfast")
-    calls, state, slow = {}, {}, []
+    calls, state, slow, ident = {}, {}, [], {}
     for l in loci:
         hl = _by_locus(hits, l)
         if not hl:
-            calls[l], state[l] = "-", "missing"
+            calls[l], state[l], ident[l] = "-", "missing", None
             continue
         best = max(hl, key=lambda x: x["bitscore"])
+        ident[l] = best["pident"]
         allele = lookup[l].get(_window(seqs[best["sseqid"]], best))
         if allele:
             calls[l], state[l] = allele, "exact"
@@ -116,9 +117,13 @@ def type_genome(species: str, seqs: dict, blast, workdir) -> dict:
         hits2 = blast(q2, "mlstslow")
         for l in slow:
             calls[l], state[l] = _call_slow(_by_locus(hits2, l))
+            h2 = _by_locus(hits2, l)
+            if h2:                                                            # the full allele set gives the truer identity
+                ident[l] = max(h2, key=lambda x: x["bitscore"])["pident"]
     states = [state[l] for l in loci]
     out = {"scheme": scheme, "scheme_name": NAMES[scheme], "alleles": calls, "st": None,
-           "loci_total": len(loci), "loci_exact": states.count("exact")}
+           "loci_total": len(loci), "loci_exact": states.count("exact"),
+           "identity": {l: (round(ident[l], 1) if ident[l] is not None else None) for l in loci}}
     if all(s == "exact" for s in states):
         st = prof.get(tuple(calls[l] for l in loci))
         if st:

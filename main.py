@@ -144,15 +144,46 @@ def _read_upload(file: UploadFile) -> str | bytes:
         raise HTTPException(400, "The file is not plain-text FASTA.")
 
 
+def _cp1_reason(species, cp1):
+    """The sentence shown when checkpoint 1 cannot be applied."""
+    low = ", ".join(f"{x['gene']} {x['identity']}%" if x["identity"] is not None and x["found"] else
+                    (f"{x['gene']} not found" if x["identity"] is None else f"{x['gene']} not found (best match {x['identity']}%)") for x in cp1["low"])
+    recn = any(x["gene"] == "recN" and x["found"] for x in cp1["low"])
+    return (f"Checkpoint 1 can't be applied: identity to the {SPECIES[species]} reference is below {cp1['threshold']:g}% for {low}. "
+            f"The phenotype is based on checkpoints 2 and 3 only."
+            + (" RecN itself matches poorly, so checkpoint 2 is also less certain." if recn else ""))
+
+
 def _result(species, habitat, analysis, sep):
-    pred = rules.predict(species, habitat, sep, (analysis or {}).get("recN_codon")) if sep else None
+    cp1 = (analysis or {}).get("checkpoint1")
+    if analysis and cp1 and not cp1["applicable"]:
+        pos, qn = analysis.get("positions") or {}, analysis.get("qnr") or {}
+        r346 = (pos.get("recN346") or {}).get("aa")
+        qb, qs = bool((qn.get("qnrB2") or {}).get("present")), bool((qn.get("qnrS1") or {}).get("present"))
+        why = _cp1_reason(species, cp1)
+        if r346 in (None, "X", "*") and not (qb or qs):                       # nothing left to base a call on
+            pred = None
+            analysis.setdefault("warnings", []).append(why + " RecN-346 could not be read and no qnr gene was found, so no call can be made.")
+        else:
+            pred = rules.predict_checkpoints_2_3(species, habitat, r346 if r346 not in ("X", "*") else None,
+                                                 analysis.get("recN_codon"), qb, qs, why)
+        sep = None                                                                 # residues from a poorly matching gene are not reported as a septatype
+    else:
+        pred = rules.predict(species, habitat, sep, (analysis or {}).get("recN_codon")) if sep else None
     if pred and pred.get("criteria"):
         pos = (analysis or {}).get("positions") or {}
         ref4 = [(pos.get(k) or {}).get("ref_aa") for k in ("gyrA83", "gyrA87", "parC80", "parC84")]
         ref4 = ref4 if all(ref4) else list("SDSE")      # manual entry has no sample genome: compare with the wild type
         pred["criteria"]["reference"] = grammar.h_block(ref4)
     warnings = (analysis or {}).get("warnings", []) + ((pred or {}).get("flags", []))
-    return {"status": "ok" if sep else "incomplete", "species": species, "species_name": SPECIES[species],
+    if cp1 and not cp1["applicable"]:                    # one clear sentence instead of one warning per gene, and it comes first
+        import re
+        others = [w for w in (analysis or {}).get("warnings", []) if not re.match(r"^(gyrA|parC|recN)(:| was not found)", w)]
+        warnings = ([w for w in (pred or {}).get("flags", [])] + others) if pred else others
+    sc = ((analysis or {}).get("mlst") or {}).get("species_check") or {}
+    if sc.get("message"):
+        warnings.append(sc["message"])
+    return {"status": "ok" if (sep or pred) else "incomplete", "species_check": sc or None, "species": species, "species_name": SPECIES[species],
             "habitat": habitat, "septatype": sep, "analysis": analysis, "prediction": pred, "warnings": warnings}
 
 

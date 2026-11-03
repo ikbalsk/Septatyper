@@ -117,6 +117,11 @@ SUSCEPTIBLE_SET = {"GyrA-83": "SYT", "GyrA-87": "DNE", "ParC-80": "SYT", "ParC-8
 RESISTANT_SET = {"GyrA-83": "FLIW", "GyrA-87": "NDGYAE", "ParC-80": "IFW", "ParC-84": "EVD"}
 RESISTANT_EXCEPTION = {"ParC-80": "S", "ParC-84": "K"}      # one pair: both must be present
 ROWS = [(p, " ".join(SUSCEPTIBLE_SET[p]), " ".join(RESISTANT_SET[p])) for p in POS]
+# The paper's Table S6 wording for each column, shown beside the residues: (Csus sentence, Cres sentence)
+CLASS_TEXT = {"GyrA-83": ("Polar residue with -OH group", "Hydrophobic residue"),
+              "GyrA-87": ("Negatively charged or polar residue", "Uncharged or negatively charged residue"),
+              "ParC-80": ("Polar residue with -OH group", "Hydrophobic residue"),
+              "ParC-84": ("Negatively charged residue", "Hydrophobic or negatively charged residue")}
 
 
 def _cell(pos: str, res: str, pair: bool = False) -> dict:
@@ -170,6 +175,8 @@ def checkpoint1(species: str, aas4) -> dict:
 def checkpoint2(r346: str, codon: str | None = None) -> dict:
     """Checkpoint 2, RecN-346. Susceptible if leucine encoded by cta; Resistant if leucine encoded by ctg, or phenylalanine."""
     cd = (codon or "").upper() or None
+    if not r346:
+        return {"call": "Not determined", "residue": None, "codon": cd, "text": "RecN-346 could not be read from this sequence: no signal from checkpoint 2"}
     if r346 == "F":
         return {"call": "Resistant", "residue": r346, "codon": cd, "text": "RecN-346 is phenylalanine (F)"}
     if r346 == "L" and cd == "CTG":
@@ -187,6 +194,31 @@ def checkpoint3(qnrB: bool, qnrS: bool) -> dict:
     on = [n for n, v in (("qnrB2", qnrB), ("qnrS1", qnrS)) if v]
     return {"call": "Resistant" if on else "Susceptible", "qnrB2": bool(qnrB), "qnrS1": bool(qnrS),
             "text": (" and ".join(on) + " present") if on else "qnrB2 and qnrS1 both absent"}
+
+
+def predict_without_checkpoint1(r346, recn_codon, qnrB: bool, qnrS: bool, why: str) -> dict:
+    """The call when checkpoint 1 cannot be applied (a gene matches the species reference at too low an identity):
+    checkpoints 2 and 3 only. Resistant if either says Resistant, else Susceptible."""
+    c2, c3 = checkpoint2(r346, recn_codon), checkpoint3(qnrB, qnrS)
+    c1 = {"call": None, "applied": False, "pattern": None, "resolved_by": "not_applied", "rule": why, "cells": [], "votes": [],
+          "n_votes": 0, "mean_h": None, "override": None, "exceptions": []}
+    if c2["call"] == "Resistant":
+        call, decided, rule = "Resistant", "checkpoint2", f"checkpoint 2: {c2['text']} (checkpoint 1 not applied)"
+    elif c3["call"] == "Resistant":
+        call, decided, rule = "Resistant", "checkpoint3", f"checkpoint 3: {c3['text']} (checkpoint 1 not applied)"
+    else:
+        call, decided, rule = "Susceptible", "checkpoints_2_3", "checkpoints 2 and 3 are both without a resistant signal (checkpoint 1 not applied)"
+    return {"call": call, "rule": rule, "votes": [], "n_votes": 0, "mean_h": None, "override": None, "decided_by": decided,
+            "checkpoints": {"residues": c1, "recn": c2, "qnr": c3}}
+
+
+def explain_not_applied(g: dict, why: str) -> dict:
+    """The criteria block for a call made without checkpoint 1."""
+    c1, c2, c3 = g["checkpoints"]["residues"], g["checkpoints"]["recn"], g["checkpoints"]["qnr"]
+    return {"decided_by": g["decided_by"], "n_resistant_positions": 0, "positions": [],
+            "checkpoints": {"residues": {"call": None, "applied": False, "pattern": None, "resolved_by": "not_applied", "rule": why,
+                                         "n_votes": 0, "override": None, "exceptions": []}, "recn": c2, "qnr": c3},
+            "hydrophobicity": None, "reference": None, "grammar_call": g["call"], "rule": g["rule"]}
 
 
 _CUT = [None]      # lets the calculation page score other <H> cutoffs without changing the one the site uses
@@ -243,7 +275,8 @@ def explain(species: str, aas, g: dict, ref4=None, qnr=(False, False), codon=Non
             note = "exception residue"
         pos.append({"position": cell["position"], "residue": cell["residue"], "class": aa_class(cell["residue"]), "column": column,
                     "fits_susceptible": fs, "fits_resistant": fr, "exception": cell["exception"],
-                    "susceptible": cell["S"], "resistant": cell["R"], "note": note})
+                    "susceptible": cell["S"], "resistant": cell["R"], "note": note,
+                    "susceptible_label": CLASS_TEXT[cell["position"]][0], "resistant_label": CLASS_TEXT[cell["position"]][1]})
     sample = h_block([p["residue"] for p in pos])
     ref = h_block(list(ref4) if ref4 else list(WILD4))
     return {"decided_by": g["decided_by"], "n_resistant_positions": g["n_votes"], "positions": pos,
