@@ -206,9 +206,6 @@ The tests embed real reference genes in synthetic genomes. They do not use real 
 
 ## 7. Limitations
 
-1. **qnr coverage.** Detection uses one qnrB2 and one qnrS1 allele. Family members below 80 percent identity to these alleles are missed. Presence of a gene does not demonstrate expression, and some qnr-positive isolates in the data are susceptible.
-2. **Scope.** Four species and one antibiotic. The user selects the species, and E. coli and S. sonnei cannot be separated with these genes. The classes are unbalanced: S. enterica has 6 resistant isolates among 510.
-3. **Input.** Assembled nucleotide sequence only. Raw reads are not supported.
    
 
 ---
