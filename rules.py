@@ -46,7 +46,7 @@ def _migrate(path) -> None:
         for c in ("submitter", "submitted_date", "affiliation", "publication"):
             if c not in cols("isolates"):
                 db.execute(f"ALTER TABLE isolates ADD COLUMN {c} TEXT")
-        for c in ("submitter", "affiliation", "publication", "decided_by"):
+        for c in ("submitter", "affiliation", "publication", "decided_by", "consent_version", "consent_at"):
             if c not in cols("submissions"):
                 db.execute(f"ALTER TABLE submissions ADD COLUMN {c} TEXT")
         db.execute("CREATE TABLE IF NOT EXISTS audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, who TEXT, ip TEXT, "
@@ -467,12 +467,12 @@ def create_submission(d: dict, result: dict) -> dict:
     try:
         db.execute("INSERT INTO submissions (job_id, created, status, species, habitat, genome_id, genome_name, country, year, "
                    "source_text, lab_phenotype, email, submitter, affiliation, publication, septatype, tier, call, novel, matches, "
-                   "result_json, curator_note, decided) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                   "result_json, curator_note, decided, consent_version, consent_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                    (job, _now(), status, d["species"], d["habitat"], d.get("genome_id"), d.get("genome_name"),
                     d.get("country"), d.get("year"), d.get("source_text"), lab, d.get("email"),
                     d.get("submitter"), d.get("affiliation"), d.get("publication"),
                     result.get("septatype"), pred.get("tier"), call, int(novel), matches,
-                    json.dumps(result), None, None))
+                    json.dumps(result), None, None, d.get("consent_version"), _now()))
         db.commit()
     finally:
         db.close()
@@ -484,7 +484,7 @@ def list_queue(status: str = "") -> list[dict]:
     db = conn()
     try:
         sql = ("SELECT job_id,created,status,species,habitat,genome_id,genome_name,country,year,source_text,"
-               "email,submitter,affiliation,publication,lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided,decided_by,result_json FROM submissions")
+               "email,submitter,affiliation,publication,lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided,decided_by,consent_version,consent_at,result_json FROM submissions")
         rows = db.execute(sql + (" WHERE status=?" if status else "") + " ORDER BY created DESC",
                           (status,) if status else ()).fetchall()
     finally:

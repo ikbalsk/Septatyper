@@ -265,3 +265,17 @@ footer .credit-line{max-width:900px;margin:0 auto 8px;overflow-wrap:anywhere}
 .crit .tag.off{background:#e8edf3;color:var(--muted)}
 .species-warn{background:var(--amber-bg);border:2px solid var(--amber);border-radius:10px;padding:10px 12px;margin:0 0 12px;color:var(--ink)}
 td.bad{color:var(--res);font-weight:700}
+
+/* consent notice */
+dialog.consent{border:1px solid var(--line);border-radius:12px;padding:16px 16px 14px;width:min(640px,calc(100vw - 24px));max-width:none;color:var(--ink);background:var(--white);box-shadow:0 12px 40px rgba(11,60,114,.35)}
+dialog.consent::backdrop{background:rgba(11,28,48,.55)}
+dialog.consent h2{margin:0 0 4px;font-size:1.2rem;color:var(--th-ink)}
+.consent-body{max-height:min(52vh,430px);overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 12px 6px 6px;font-size:.93rem;line-height:1.45;background:var(--paper)}
+.consent-body ol{margin:6px 0;padding-left:1.4em}
+.consent-body li{margin:0 0 8px}
+.consent-check{display:flex;gap:10px;align-items:center;margin:12px 0 4px;font-weight:600;cursor:pointer}
+.consent-check input{width:22px;height:22px;flex:none}
+.consent-actions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px}
+.consent-actions .btn{flex:1 1 140px}
+.consent-actions .btn:disabled{opacity:.5;cursor:not-allowed}
+button.linklike{background:none;border:0;padding:0;font:inherit;color:var(--blue);text-decoration:underline;cursor:pointer}

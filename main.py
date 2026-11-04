@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import bvbrc, countries, grammar, persist, rules, septatype
-from .config import (ADMIN_LOCK_S, ADMIN_MAX_FAILS, ADMIN_TOKEN, HABITATS, MAX_PASTE_MB, MAX_UPLOAD_MB, RATE_PREDICT_PER_HOUR,
+from .config import (CONSENT_VERSION, ADMIN_LOCK_S, ADMIN_MAX_FAILS, ADMIN_TOKEN, HABITATS, MAX_PASTE_MB, MAX_UPLOAD_MB, RATE_PREDICT_PER_HOUR,
                      RATE_SUBMIT_PER_HOUR, SOURCES, SPECIES, VERSION)
 
 def _raise_form_field_limit(limit: int) -> None:
@@ -315,7 +315,7 @@ def meta():
     return {"species": SPECIES, "habitats": HABITATS, "stats": s["rows"], "build": s["meta"],
             "sources": [{"key": k, "label": l, "short": sh} for k, l, sh in SOURCES], "countries": sorted(countries.COUNTRIES),
             "counts": {"genomes": n, "species": nsp, "septatypes": nsep, "countries": ncountry, "community": ncomm},
-            "references": septatype.refs_status(), "max_upload_mb": MAX_UPLOAD_MB, "max_paste_mb": MAX_PASTE_MB,
+            "references": septatype.refs_status(), "max_upload_mb": MAX_UPLOAD_MB, "max_paste_mb": MAX_PASTE_MB, "consent_version": CONSENT_VERSION,
             "curation_enabled": bool(ADMIN_TOKEN), "facets": rules.facets()}
 
 
@@ -576,7 +576,7 @@ def bvbrc_lookup(genome_id: str):
 def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = Form(""), genome_name: str = Form(""),
            country: str = Form(""), year: str = Form(""), source_text: str = Form(""),
            lab_phenotype: str = Form(""), email: str = Form(""), submitter: str = Form(""), affiliation: str = Form(""),
-           publication: str = Form(""), file: UploadFile | None = File(None),
+           publication: str = Form(""), consent: str = Form(""), file: UploadFile | None = File(None),
            sequence: str = Form(""), qnrB2: str = Form("auto"), qnrS1: str = Form("auto")):
     _check(species, habitat)
     if habitat == "ALL":
@@ -592,6 +592,10 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
         raise HTTPException(400, "Phenotype must be Resistant or Susceptible.")
     if year and not re.fullmatch(r"\d{4}", year.strip()):
         raise HTTPException(400, "Year must be four digits.")
+    if not consent.strip():
+        raise HTTPException(400, "Please read and accept the consent notice before submitting.")
+    if consent.strip() != CONSENT_VERSION:
+        raise HTTPException(400, "The consent notice has changed since this page was loaded. Reload the page, read it and try again.")
     if not submitter.strip():
         raise HTTPException(400, "Enter the submitter's name.")
     if not email.strip():
@@ -616,7 +620,7 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
     d = dict(species=species, habitat=habitat, genome_id=genome_id.strip() or None, genome_name=genome_name.strip()[:200] or None,
              country=country_name, year=year.strip() or None, source_text=None,
              lab_phenotype=lab_phenotype or None, email=email.strip(), submitter=submitter.strip()[:120],
-             affiliation=affiliation.strip()[:200] or None, publication=pub or None)
+             affiliation=affiliation.strip()[:200] or None, publication=pub or None, consent_version=CONSENT_VERSION)
     sub = rules.create_submission(d, result)
     return sub | {"result": result}
 

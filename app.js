@@ -520,7 +520,30 @@ INIT.analytics = async () => {
 };
 
 /* ------------------------------------------------------------------ submit */
+/* consent notice: resolves true only when the person ticks the box and presses "Agree and submit" */
+function askConsent(readOnly = false) {
+  const dlg = $("#consent");
+  $("#consent-ver").textContent = META.consent_version || "";
+  if (typeof dlg.showModal !== "function") {                              // very old browsers: the same text in a plain confirm box
+    return Promise.resolve(readOnly ? (alert($(".consent-body", dlg).innerText), false) : window.confirm($(".consent-body", dlg).innerText + "\n\nDo you agree and want to submit?"));
+  }
+  const ok = $("#consent-ok"), agree = $("#consent-agree"), cancel = $("#consent-cancel");
+  ok.checked = false; agree.disabled = true;
+  $("#consent-check-row").style.display = agree.style.display = readOnly ? "none" : "";
+  cancel.textContent = readOnly ? "Close" : "Cancel";
+  $(".consent-body", dlg).scrollTop = 0;
+  return new Promise(resolve => {
+    const done = v => { ok.onchange = agree.onclick = cancel.onclick = dlg.oncancel = dlg.onclose = null; if (dlg.open) dlg.close(); resolve(v); };
+    ok.onchange = () => { agree.disabled = !ok.checked; };
+    agree.onclick = () => done(true);
+    cancel.onclick = () => done(false);
+    dlg.oncancel = e => { e.preventDefault(); done(false); };           // the Escape key
+    dlg.showModal();
+    (readOnly ? cancel : ok).focus();
+  });
+}
 INIT.submit = () => {
+  $("#s-consent-link").onclick = () => askConsent(true);
   const setDate = () => { $("#s-date").value = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }); };
   setDate();
   $("#s-sp").innerHTML = opts(Object.entries(SP));
@@ -534,12 +557,15 @@ INIT.submit = () => {
   };
   $("#sf").onsubmit = async e => {
     e.preventDefault();
-    const btn = $("#s-go"), err = $("#s-err"); err.innerHTML = ""; btn.disabled = true; const old = btn.textContent; btn.textContent = "Analysing";
+    const btn = $("#s-go"), err = $("#s-err"); err.innerHTML = "";
+    if (!$("#s-file").files[0]) { err.innerHTML = `<div class="err">Choose a genome FASTA file.</div>`; return; }
+    if (!(await askConsent())) { err.innerHTML = `<div class="info">Nothing was sent. You need to agree to the consent notice to submit.</div>`; return; }
+    btn.disabled = true; const old = btn.textContent; btn.textContent = "Analysing";
     try {
       const f = $("#s-file").files[0]; if (!f) throw new Error("Choose a genome FASTA file.");
       const fd = new FormData();
       [["species", "#s-sp"], ["habitat", "#s-hb"], ["genome_id", "#s-gid"], ["country", "#s-country"], ["year", "#s-year"], ["lab_phenotype", "#s-ph"], ["submitter", "#s-submitter"], ["affiliation", "#s-aff"], ["publication", "#s-pub"], ["email", "#s-email"]].forEach(([k, s]) => fd.append(k, $(s).value.trim()));
-      fd.append("genome_name", $("#s-name").dataset.name || ""); fd.append("file", await maybeGzip(f));
+      fd.append("genome_name", $("#s-name").dataset.name || ""); fd.append("consent", META.consent_version || ""); fd.append("file", await maybeGzip(f));
       const r = await api("/api/v1/submissions", { method: "POST", body: fd });
       const msg = { needs_review: "Needs review: the septatype is new or the prediction disagrees with your laboratory result.", pending: "Pending: the prediction matches your result or no result was given. A curator will check it." }[r.status] || r.status;
       $("#s-result").innerHTML = renderResult(r.result, `<div class="info"><b>Submission ${esc(r.job_id)}</b><br>${esc(msg)}${r.matches === null ? " Without a laboratory phenotype the isolate cannot be approved." : ""}</div>`);
@@ -702,7 +728,7 @@ INIT.curate = () => {
       $("#c-table").innerHTML = `<tr><th>Submission</th><th>Isolate</th><th>Septatype</th><th>ST</th><th>Prediction</th><th>Lab</th><th>Status</th><th>Decision</th></tr>` +
         (d.rows.length ? d.rows.map(r => `<tr><td class="nw">${esc(r.job_id)}<span class="alias">submitted ${esc(r.created)}</span></td>
           <td>${esc(r.genome_id || "no ID")}<span class="alias">${esc(SHORT[r.species])}, ${esc(SITE[r.habitat])}, ${esc(r.country || "-")} ${esc(r.year || "")}</span>
-            <span class="alias">${esc(r.submitter || "-")}${r.affiliation ? ", " + esc(r.affiliation) : ""}${r.email ? " (" + esc(r.email) + ")" : ""}</span>${r.publication ? `<span class="alias"><a href="${esc(r.publication)}" target="_blank" rel="noopener">${esc(r.publication.replace(/^https?:\/\//, ""))}</a></span>` : ""}</td>
+            <span class="alias">${esc(r.submitter || "-")}${r.affiliation ? ", " + esc(r.affiliation) : ""}${r.email ? " (" + esc(r.email) + ")" : ""}</span>${r.consent_version ? `<span class="alias">consent ${esc(r.consent_version)}, ${esc(r.consent_at || "")}</span>` : `<span class="alias">no consent recorded</span>`}${r.publication ? `<span class="alias"><a href="${esc(r.publication)}" target="_blank" rel="noopener">${esc(r.publication.replace(/^https?:\/\//, ""))}</a></span>` : ""}</td>
           <td class="mono nw">${mutSep(r.septatype)}${r.novel ? `<span class="alias">new septatype</span>` : ""}</td>
           <td class="nw">${esc(r.st || "-")}</td>
           <td>${r.call ? badge(r.call, 1) : "-"}<span class="alias">${esc(r.tier || "")}</span></td>

@@ -52,7 +52,7 @@ CREATE TABLE submissions (
   job_id TEXT PRIMARY KEY, created TEXT, status TEXT, species TEXT, habitat TEXT,
   genome_id TEXT, genome_name TEXT, country TEXT, year TEXT, source_text TEXT, lab_phenotype TEXT,
   email TEXT, submitter TEXT, affiliation TEXT, publication TEXT, septatype TEXT, tier TEXT, call TEXT, novel INTEGER, matches INTEGER, result_json TEXT,
-  curator_note TEXT, decided TEXT, decided_by TEXT);
+  curator_note TEXT, decided TEXT, decided_by TEXT, consent_version TEXT, consent_at TEXT);
 CREATE TABLE audit_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, who TEXT, ip TEXT, action TEXT, job_id TEXT, detail TEXT);
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 """
