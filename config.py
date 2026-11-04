@@ -59,7 +59,7 @@ FOUNDING_AFFILIATION = "JISIASR, Kolkata"
 FOUNDING_PUBLICATION = "https://doi.org/10.1038/s41598-026-75690-y"
 
 # ---- release, safety limits (all can be changed with environment variables on the server)
-VERSION = "3.7"
+VERSION = "3.7.1"
 RATE_SUBMIT_PER_HOUR = int(os.environ.get("RATE_SUBMIT_PER_HOUR", "20"))     # submissions per visitor per hour; 0 = no limit
 RATE_PREDICT_PER_HOUR = int(os.environ.get("RATE_PREDICT_PER_HOUR", "0"))    # genome predictions per visitor per hour; 0 = no limit (default)
 ADMIN_MAX_FAILS = int(os.environ.get("ADMIN_MAX_FAILS", "10"))               # wrong curator tokens before a pause
