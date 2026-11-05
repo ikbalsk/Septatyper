@@ -1,10 +1,4 @@
-# CiproTyper (SeptaTyper v3.7.1): Explainable Web Server, Curated Repository, and Context-Dependent Grammar for Ciprofloxacin Resistance Prediction in Enterobacterales
-
-**Authors and Maintainers:** Ikbal Sk, Protyusa Deb, Anamika Ghosh
-
-**Affiliation:** JIS Institute of Advanced Studies and Research (JISIASR), Kolkata, West Bengal, India
-
-**Contact:** [ikbalsk.personal@gmail.com](mailto:ikbalsk.personal@gmail.com)
+# CiproTyper: Database, Curated Repository for Ciprofloxacin Resistance Prediction in Enterobacterales
 
 **Live Web Server:** <https://septatyper-is.onrender.com/>
 
@@ -14,13 +8,13 @@
 
 **Founding Study:** Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Scientific Reports*. 2026. <https://doi.org/10.1038/s41598-026-75690-y>
 
-## 1. Abstract and Overview
+## 1. Abstract
 
 Ciprofloxacin is one of the most widely prescribed fluoroquinolone antibiotics for treating infections caused by Gram-negative bacteria in the order Enterobacterales. Resistance to ciprofloxacin mainly arises from amino-acid changes in the quinolone resistance-determining regions (QRDRs) of DNA gyrase (`GyrA`) and topoisomerase IV (`ParC`), variations in the DNA repair protein `RecN`, and the acquisition of plasmid-mediated quinolone resistance (`qnr`) genes that shield both enzymes from drug binding. Standard antimicrobial resistance (AMR) tools usually report individual mutations or resistance genes one by one. However, as shown in our published study of 2,734 bacterial genomes ([Ghosh et al., 2026](https://doi.org/10.1038/s41598-026-75690-y)), the phenotypic effect of a single mutation or plasmid gene depends heavily on the surrounding genetic background and the bacterial species.
 
-To make this combined genotype scheme practical for everyday research and surveillance, we built **CiproTyper** (the latest release of **SeptaTyper**, version `3.7.1`). CiproTyper is three things in a single open service:
+To make this combined genotype scheme practical for everyday research and surveillance, we built **CiproTyper**. CiproTyper is three things in a single open service:
 
-1. **An explainable web prediction server** that reads assembled nucleotide sequences (or BV-BRC genome IDs and manual residue entries), identifies five key codon positions (`GyrA-83`, `GyrA-87`, `ParC-80`, `ParC-84`, and `RecN-346`) plus two plasmid-borne resistance alleles (`qnrB2` and `qnrS1`), types the isolate's 7-locus Multilocus Sequence Type (MLST), and predicts whether the bacterium is **Resistant (Cres)** or **Susceptible (Csus)** to ciprofloxacin.
+1. **An explainable web prediction server** that reads assembled nucleotide sequences (or BV-BRC genome IDs and manual residue entries), identifies five key codon positions (`GyrA-83`, `GyrA-87`, `ParC-80`, `ParC-84`, and `RecN-346`) plus two plasmid-borne resistance genes (`qnrB2` and `qnrS1`), types the isolate's 7-locus Multilocus Sequence Type (MLST), and predicts whether the bacterium is **Resistant (Cres)** or **Susceptible (Csus)** to ciprofloxacin.
 
 2. **A curated reference repository** holding **2,734 founding bacterial genomes** across four species, 28 countries, 268 sequence types, and 64 distinct septatypes, equipped with interactive filtering, side-by-side comparison against [BV-BRC](https://www.bv-brc.org/) computational predictions, geographic mapping, and community submission with reversible curator review.
 
@@ -28,9 +22,9 @@ To make this combined genotype scheme practical for everyday research and survei
 
 **Intended Use Statement:** CiproTyper is strictly for research and epidemiological surveillance. It is not a clinical diagnostic tool and has not been validated for guiding patient treatment. All predictions should be confirmed with standard laboratory antimicrobial susceptibility testing (AST).
 
-| System Attribute | Specification in Latest Release (v3.7.1) | 
+| System Attribute | Specification | 
 | ----- | ----- | 
-| **Application Name and Version** | CiproTyper (SeptaTyper codebase, `VERSION = "3.7.1"`) | 
+| **Application Name and Version** | CiproTyper | 
 | **Supported Bacterial Species (4)** | *Escherichia coli* (`ecoli`), *Shigella sonnei* (`ssonnei`), *Salmonella enterica* subsp. I (`senterica`), *Klebsiella pneumoniae* (`kpneumoniae`) | 
 | **Founding Reference Isolates** | **2,734 genomes** (**1,669 Resistant**, **1,065 Susceptible**) from Table S1 ([Ghosh et al., 2026](https://doi.org/10.1038/s41598-026-75690-y)) | 
 | **Species Breakdown** | *K. pneumoniae*: 1,490 (1,319 R, 171 S); *S. enterica* subsp. I: 510 (6 R, 504 S); *E. coli*: 400 (193 R, 207 S); *S. sonnei*: 334 (151 R, 183 S) | 
@@ -107,7 +101,7 @@ flowchart TD
     I --> J
 ```
 
-* **Figure 1 Legend:** End-to-end sequence analysis and two-tier prediction workflow in CiproTyper (SeptaTyper v3.7.1).
+* **Figure 1 Legend:** End-to-end sequence analysis and two-tier prediction workflow in CiproTyper.
 
 ### 3.1 Input Modes and Validation Gate
 
@@ -198,7 +192,7 @@ Standard MLST tools BLAST all \~13,000 known alleles across 7 housekeeping genes
 
 ### 3.5 Complete Summary of Thresholds, Guards, and Checkpoint Gates
 
-To ensure nothing is missed during review or replication, the table below lists every numerical threshold, alignment parameter, and guard implemented in the latest codebase (`v3.7.1`):
+To ensure nothing is missed during review or replication, the table below lists every numerical threshold, alignment parameter, and guard implemented in the latest codebase:
 
 | Category | Parameter / Constant | Exact Value / Rule | Code Location | Behaviour When Triggered / Violated | 
 | ----- | ----- | ----- | ----- | ----- | 
@@ -344,7 +338,7 @@ Checkpoint 1 is resolved in the following exact order (`checkpoint1(species, aas
 
 #### Exact Calculation of QRDR Helix Mean Hydrophobicity `<H>` and the `0.334` Cutoff
 
-In the latest version (`v3.7.1`), `<H>` is calculated across the **entire QRDR alpha-helices** of both enzymes using the **Eisenberg normalized consensus hydrophobicity scale** ([Eisenberg et al., 1984](https://doi.org/10.1016/0022-2836\(84\)90309-7)):
+`<H>` is calculated across the **entire QRDR alpha-helices** of both enzymes using the **Eisenberg normalized consensus hydrophobicity scale** ([Eisenberg et al., 1984](https://doi.org/10.1016/0022-2836\(84\)90309-7)):
 
 | Amino Acid | 1-Letter | Eisenberg *H* | Physicochemical Class in CiproTyper | Amino Acid | 1-Letter | Eisenberg *H* | Physicochemical Class in CiproTyper | 
 | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | 
@@ -508,7 +502,6 @@ To make updating the project from a web browser or mobile phone effortless, the 
 | `/srv/data/` | `Table_S1.xlsx`, `seed.db` (and live `septatype.db` in `DATA_DIR`) | Founding Excel dataset (2,734 isolates), read-only baked `seed.db`, and live mutable SQLite database (`septatype.db`) plus automatic `.bak` backups. | 
 | `/srv/refs/` | `gyrA.fasta`, `parC.fasta`, `recN.fasta`, `qnrB2.fasta`, `qnrS1.fasta`, `mlst_ecoli_achtman_4.{fasta,txt}`, `mlst_senterica_achtman_2.{fasta,txt}`, `mlst_klebsiella.{fasta,txt}` | Species-specific chromosomal references, plasmid `qnr` alleles, and PubMLST allele sequences and profile tables. | 
 
-*(Note: Legacy files in the repository root such as `app.py`, `septatype.db`, `fetch_references.py`, and `README_CiproTyper.md` are ignored by the `Dockerfile` and do not affect the running `v3.7.1` server.)*
 
 ### 6.2 SQLite Database Schema (`seed.db` and Live `septatype.db`)
 
@@ -556,7 +549,7 @@ stateDiagram-v2
 
 ### 6.3 Smart Seed Refresh, Schema Migration, and GitHub Auto-Backup
 
-In version `3.7.1`, three mechanisms protect community data across deployments and server restarts:
+Three mechanisms protect community data across deployments and server restarts:
 
 * **Automatic Schema Migration (`_migrate` in `rules.py`):** On startup, the server inspects `PRAGMA table_info` on `isolates` and `submissions`, adds any new columns (`submitter`, `submitted_date`, `affiliation`, `publication`, `decided_by`, `consent_version`, `consent_at`), creates `audit_log` if missing, and backfills founding attribution.
 
@@ -665,7 +658,7 @@ All endpoints return JSON (except CSV downloads and static HTML). Base path: `ht
 | **`POST /api/v1/admin/bvbrc/load`** | Header `X-Admin-Token` | None | Starts background BV-BRC batch annotation thread if not already running. | 
 | **`GET /healthz`** | Public | None | Returns `{"ok": true, "blast": true}` for container health checks. | 
 
-## 9. Deployment, Configuration, and Upgrade History (Old v2 vs Latest v3.7.1)
+## 9. Deployment, Configuration, and Upgrade History
 
 ### 9.1 Environment Variables
 
@@ -685,26 +678,11 @@ All endpoints return JSON (except CSV downloads and static HTML). Base path: `ht
 | **`BACKUP_GITHUB_TOKEN`** | None | Fine-grained GitHub personal access token with `Contents: Read and write` permission on `BACKUP_GITHUB_REPO`. | 
 | **`BACKUP_GITHUB_BRANCH` / `_PATH`** | Default branch / `septatyper_backup.json` | Optional target branch and file path inside the backup repository. | 
 | **`PORT` / `DATA_DIR`** | `8000` / `/srv/data` | HTTP listening port and directory for the live SQLite database. | 
-
-### 9.2 Key Upgrades from Older Archive (`v2`) to Latest Archive (`v3.7.1`)
-
-To prevent any confusion between the two uploaded archives (`SeptaTyper_complete_old.zip` vs `Septatyper-latest.zip`), the table below documents every change introduced in the latest release (`v3.7.1`):
-
-| Feature Area | Older Version (`SeptaTyper_complete_old.zip`, v2) | Latest Version (`Septatyper-latest.zip`, CiproTyper v3.7.1) | 
-| ----- | ----- | ----- | 
-| **Application Name & Version** | SeptaTyper v2 (`main.py` 18.6 KB) | **CiproTyper / SeptaTyper `v3.7.1`** (`main.py` 33.3 KB, Lifespan context manager) | 
-| **Tier 2 Grammar Architecture** | 4-residue class voting + 4-residue mean `<H>` against `0.0` cutoff + post-hoc overrides (`grammar.py` 11.8 KB) | **Three-Checkpoint Grammar (`grammar.py` 19.7 KB):** Checkpoint 1 (Syntax Table + `S-K` exception pair + *S. sonnei* single-GyrA rule + class votes + whole-helix `<H>`), Checkpoint 2 (`RecN-346` `cta` vs `ctg` and `F`), Checkpoint 3 (`qnrB2`/`qnrS1`). | 
-| **Hydrophobicity `<H>` Formula & Cutoff** | Mean of only the 4 mutated residues; cutoff `0.0` (scale midpoint); mean R `0.197`, mean S `-0.478` | **Full QRDR Helix Mean `<H>`** across `GyrA 82-93` (12 aas) and `ParC 80-90` (11 aas); **Cutoff = `0.334`** (midpoint of wild-type `S-D-S-E = 0.270` and resistant `L-N-I-E = 0.397`); mean R `0.391`, mean S `0.274`. | 
-| **Species Verification & Identity Gates** | Basic `75%` acceptance and `92%` warning | Added **`CP1_MIN_ID = 90.0%` gate** (falls back to Checkpoints 2 & 3 if `gyrA`, `parC`, or `recN` `< 90%`) and **`MLST_SPECIES_MIN_ID = 95.0%` gate** (warns to verify species if any MLST locus `< 95%` on genomes `>= 1 Mb`). | 
-| **BV-BRC Genome ID Prediction Mode** | Only fetched BV-BRC names/calls for Browse | Added **`POST /api/v1/predict/bvbrc` and BV-BRC ID tab on Predict**: fetches assembly up to 10 IDs directly from BV-BRC, auto-detects species, analyses, and flags if genome is in the founding set. | 
-| **Paste Size Limit** | Restricted by Starlette's 1 MB default form parser | Added `_raise_form_field_limit` to allow **up to 10 MB of pasted FASTA sequence** (`MAX_PASTE_MB = 10`). | 
-| **Submission Metadata & Consent** | Basic submission form without formal consent version or submitter attribution columns | Added required **Submitter name**, optional **Affiliation** and **Publication (DOI/URL)**, mandatory **7-point Consent Modal (`CONSENT_VERSION = "2026-11-1"`)**, and founding attribution (`Ghosh et al`, `16 October 2026`, `JISIASR, Kolkata`). | 
-| **Security, Rate Limiting & Audit Log** | Basic token check; CSV export lacked formula sanitization; no rate limiter | Added **`RateLimiter`** (`20` submissions/hr/IP), **`FailGate`** (`10` wrong tokens -> 15-min lockout), **`audit_log` SQLite table**, **`_csv_safe` formula-injection guard**, and local `plotly.min.js` + SRI hash. | 
-| **Seed Database Refresh** | Live DB on persistent disk never received updates from new `seed.db` | Added **`_refresh_from_seed()`** with automatic `.bak` rotation (keeps last 3) that updates founding rows while replaying approved community isolates. | 
+ 
 
 ## 10. Limitations, Honest Validation Status, and Future Directions
 
-In accordance with bioinformatics journal standards, all current methodological, biological, and operational limitations of CiproTyper (`v3.7.1`) are stated transparently below:
+In accordance with bioinformatics journal standards, all current methodological, biological, and operational limitations of CiproTyper are stated transparently below:
 
 1. **Resubstitution Accuracy vs Independent External Validation:** Both the Tier 1 majority-rule accuracy (**98.1% pooled**, 96.8% to 99.8% by cohort) and the Tier 2 grammar accuracy (**97.2% pooled**, 94.4% to 99.2% by cohort) are **resubstitution accuracies** measured on the exact same 2,734 founding isolates from [Ghosh et al. (2026)](https://doi.org/10.1038/s41598-026-75690-y) that were used to build the reference lookup table and formulate the grammar rules. While the 54 automated software tests verify that the pipeline works as designed on synthetic genomes carrying real reference genes and MLST alleles, evaluating predictive performance on an independent external cohort of real whole-genome assemblies with paired clinical AST / MIC data remains the primary next step.
 
