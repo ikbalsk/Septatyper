@@ -6,7 +6,6 @@ CiproTyper is a web server, REST API and curated reference-isolate browser for e
 
 - **Web application:** https://septatyper-is.onrender.com/
 - **Source code:** https://github.com/ikbalsk/Septatyper
-- **REST API base path:** https://septatyper-is.onrender.com/api/v1
 - **Interactive API documentation:** https://septatyper-is.onrender.com/docs
 - **Support:** ikbalsk.personal@gmail.com
 
