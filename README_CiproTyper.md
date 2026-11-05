@@ -2,14 +2,12 @@
 
 **Septatype-based prediction of ciprofloxacin susceptibility in selected Enterobacterales**
 
-CiproTyper is a web server, REST API and curated reference-isolate browser for exploring ciprofloxacin susceptibility in four supported bacterial groups. It analyses assembled nucleotide sequences, identifies selected chromosomal quinolone-resistance-associated positions and plasmid-mediated quinolone-resistance markers, and combines these features into a seven-field genotype called a **septatype**.
+CiproTyper is a web database, REST API and repository for exploring ciprofloxacin resistance in four supported bacterial groups. It analyses assembled nucleotide sequences, identifies selected chromosomal quinolone-resistance-associated positions (gyrA83, gyrA87, parC80, parC84, and recN346) and plasmid-mediated quinolone-resistance markers (qnrB2 and qnrS1), combines these features into a seven-field genotype called a **septatype**.
 
 - **Web application:** https://septatyper-is.onrender.com/
 - **Source code:** https://github.com/ikbalsk/Septatyper
 - **Interactive API documentation:** https://septatyper-is.onrender.com/docs
-- **Support:** ikbalsk.personal@gmail.com
 
-> **Research use only.** CiproTyper is a research and surveillance resource. It is not a diagnostic test and must not be used to make treatment decisions. Predictions should be interpreted alongside laboratory antimicrobial susceptibility testing (AST).
 
 ## Overview
 
@@ -187,20 +185,19 @@ The Submit page accepts new isolate records for review. A submission includes th
 
 For routine prediction, uploaded sequence data are processed for analysis and then deleted; the service documentation states that genome files are not retained. For community submissions, derived genotype results and the metadata supplied with the submission are retained for curation and, if approved, repository display. Submitters should not upload patient-identifiable information or data they are not authorised to share. The service's backup configuration can include submitter contact information and must be protected accordingly.
 
+> **Research use only.** CiproTyper is a research and surveillance resource. It is not a diagnostic test and must not be used to make treatment decisions. Predictions should be interpreted alongside laboratory antimicrobial susceptibility testing (AST).
+
+
 ## Limitations
 
 - **Restricted organism scope:** the rules are implemented for the four supported bacterial groups only. They should not be extrapolated to other Enterobacterales without validation.
-- **Restricted resistance markers:** the septatype includes selected QRDR positions, the RecN-346 state and two qnr reference markers. It does not represent every known mechanism of fluoroquinolone resistance.
 - **Assembly input:** raw FASTQ reads are not accepted. Sequence quality, assembly completeness and contamination can affect locus detection.
 - **Reference dependence:** calls depend on the curated reference isolates, their laboratory phenotypes and the selected isolation source. Sparse or imbalanced cohorts can limit the reliability of phenotype estimates.
-- **Resubstitution performance:** the reported 98.1% reference-set accuracy is not an independent test-set result. Prospective or external validation is needed before making claims about performance on unseen isolates.
 - **No clinical validation:** the output is intended for research and surveillance, not patient-level diagnosis or antibiotic selection.
 
 ## Availability, licensing and maintenance
 
-The source code is publicly accessible at the GitHub repository and the web service is available at the URL above. However, **a `LICENSE` file was not present in the repository when this README was reviewed**. Until the rights holder selects and adds an explicit software licence, users should not assume that the code may be reused, modified or redistributed. The data and reference sequences may be subject to separate terms from the software; in particular, do not assign a CC BY 4.0 licence to the reference dataset without confirming that the source publication and data providers permit it.
-
-For a *Bioinformatics* Application Note submission, the authors should resolve the software and data licensing terms, archive the exact source release and test data in a persistent repository (for example, Zenodo) and provide the DOI. The journal's current software guidance also asks authors to ensure long-term availability and maintenance of the server, with support requirements extending beyond the date of publication.
+The source code is publicly accessible at the GitHub repository and the web service is available at the URL above. 
 
 ## How to cite
 
