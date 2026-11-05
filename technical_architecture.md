@@ -1,12 +1,12 @@
-# CiproTyper (SeptaTyper v3.7.1): Software Architecture, Database Schema, Algorithms, and REST API Reference
+# CiproTyper: Software Architecture, Database Schema, Algorithms, and REST API Reference
 
-**Main User & Biological Guide:** Return to [`README.md`](README.md) for the plain-language biological overview, septatype rules, checkpoint explanations, and user guidelines.  
+**Documentation:** Return to [`README.md`](README.md) for the biological overview, ciprotype rules, checkpoint explanations, and user guidelines.  
 **Live Server:** [https://septatyper-is.onrender.com/](https://septatyper-is.onrender.com/) | **Swagger / OpenAPI UI:** [https://septatyper-is.onrender.com/docs](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)  
 **GitHub Repository:** [https://github.com/ikbalsk/Septatyper](https://github.com/ikbalsk/Septatyper) | **Contact:** [ikbalsk.personal@gmail.com](mailto:ikbalsk.personal@gmail.com)
 
 ## 1. Software Stack and Repository Layout
 
-CiproTyper (`VERSION = "3.7.1"`) is built as a lightweight, self-contained Python web service and SQLite repository packaged inside a Docker container.
+CiproTyper is built as a lightweight, self-contained Python web service and SQLite repository packaged inside a Docker container.
 
 * **Backend Runtime:** Python `3.12` (`python:3.12-slim` Debian base image), FastAPI `0.162.0`, Starlette `1.10.0`, Uvicorn `0.54.0` (`uvicorn[standard]`), `python-multipart==0.0.32`.
 * **Bioinformatics Engine:** NCBI BLAST+ (`makeblastdb` and `blastn` installed via `apt-get install ncbi-blast+`), Biopython `1.88` (`Bio.SeqIO`, `Bio.Seq`, `Bio.Align.PairwiseAligner`), `openpyxl==3.1.5` (for parsing `Table_S1.xlsx`).
@@ -143,13 +143,3 @@ python -m pytest tests
 | `BACKUP_GITHUB_BRANCH` / `_PATH` | Default / `septatyper_backup.json` | Optional target branch and filename in the backup repository. |
 | `DATA_DIR` / `PORT` | `/srv/data` / `8000` | Directory for live `septatype.db` and HTTP listening port. |
 
-## 6. Version History: Upgrades from Older Archive (`v2`) to Latest (`v3.7.1`)
-
-| Component | Older Archive (`SeptaTyper_complete_old.zip`, v2) | Latest Archive (`Septatyper-latest.zip`, CiproTyper v3.7.1) |
-| :--- | :--- | :--- |
-| **Grammar Engine (`grammar.py`)** | 4-residue voting + 4-residue `<H>` against `0.0` cutoff (`11.8 KB`) | **Three-Checkpoint Grammar (`19.7 KB`)**: Checkpoint 1 (Syntax Table + `S-K` exception pair + *S. sonnei* single-GyrA rule + votes + whole-helix `<H>`), Checkpoint 2 (`RecN-346` `cta` vs `ctg` and `F`), Checkpoint 3 (`qnrB2`/`qnrS1`). |
-| **Hydrophobicity `<H>` & Cutoff** | Mean of 4 mutated residues only; cutoff `0.0` | **Full QRDR Helix Mean `<H>`** across `GyrA 82-93` (12 aas) and `ParC 80-90` (11 aas); **Cutoff = `0.334`** (midpoint of `S-D-S-E = 0.270` and `L-N-I-E = 0.397`). |
-| **Identity & Species Guards** | `75%` acceptance and `92%` warning only | Added **`CP1_MIN_ID = 90.0%` gate** (falls back to Checkpoints 2 & 3) and **`MLST_SPECIES_MIN_ID = 95.0%` gate** (species verification alert banner). |
-| **BV-BRC Direct Prediction** | Browse annotation only | Added **`POST /api/v1/predict/bvbrc`** and **BV-BRC ID tab** on Predict (up to 10 IDs). |
-| **Paste Size & Form Parser** | Capped at 1 MB by Starlette default | Patched Starlette form parser (`_raise_form_field_limit`) to support **up to 10 MB pasted sequences**. |
-| **Consent, Attribution & Security** | Basic submission form, no rate limiter or audit table | Added **`CONSENT_VERSION = "2026-11-1"` modal**, submitter/affiliation/DOI columns, **`RateLimiter`**, **`FailGate`**, **`audit_log`**, **`_csv_safe` formula sanitization**, and **`_refresh_from_seed`**. |
