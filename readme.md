@@ -15,8 +15,6 @@ To make this discovery easy for any biologist, student, or researcher to use wit
 2. **Shows the Sample's Strain Type and Similar Isolates:** It identifies your bacterium's **Multilocus Sequence Type (ST)** (its genetic family or clone, such as `ST131` in *E. coli* or `ST258` in *K. pneumoniae*) and shows you how many similar isolates in our collection came from the same body site and country.
 3. **Hosts a Growing Public Collection of 2,734 Genomes:** Anyone can browse, filter, map, and download our reference collection of 2,734 bacterial genomes, or submit new isolates with laboratory test results for curator review.
 
-**Important Research Notice:** CiproTyper is built strictly for scientific research and public health tracking. It is not a medical device and must never be used to choose treatment for a patient. Always confirm predictions with standard laboratory antibiotic susceptibility testing (AST).
-
 | Key Feature | Details in CiproTyper (SeptaTyper v3.7.1) |
 | :--- | :--- |
 | **Four Supported Bacterial Species** | *Escherichia coli*, *Shigella sonnei*, *Salmonella enterica* subsp. I, and *Klebsiella pneumoniae* |
