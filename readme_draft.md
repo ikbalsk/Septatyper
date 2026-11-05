@@ -8,7 +8,7 @@
 
 **Founding Study:** Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Scientific Reports*. 2026. <https://doi.org/10.1038/s41598-026-75690-y>
 
-## 1. Abstract
+## 1. Overview
 
 Ciprofloxacin is one of the most widely prescribed fluoroquinolone antibiotics for treating infections caused by Gram-negative bacteria in the order Enterobacterales. Resistance to ciprofloxacin mainly arises from amino-acid changes in the quinolone resistance-determining regions (QRDRs) of DNA gyrase (`GyrA`) and topoisomerase IV (`ParC`), variations in the DNA repair protein `RecN`, and the acquisition of plasmid-mediated quinolone resistance (`qnr`) genes that shield both enzymes from drug binding. Standard antimicrobial resistance (AMR) tools usually report individual mutations or resistance genes one by one. However, as shown in our published study of 2,734 bacterial genomes ([Ghosh et al., 2026](https://doi.org/10.1038/s41598-026-75690-y)), the phenotypic effect of a single mutation or plasmid gene depends heavily on the surrounding genetic background and the bacterial species.
 
@@ -24,18 +24,15 @@ To make this combined genotype scheme practical for everyday research and survei
 
 | System Attribute | Specification | 
 | ----- | ----- | 
-| **Application Name and Version** | CiproTyper | 
+| **Application Name** | CiproTyper | 
 | **Supported Bacterial Species (4)** | *Escherichia coli* (`ecoli`), *Shigella sonnei* (`ssonnei`), *Salmonella enterica* subsp. I (`senterica`), *Klebsiella pneumoniae* (`kpneumoniae`) | 
 | **Founding Reference Isolates** | **2,734 genomes** (**1,669 Resistant**, **1,065 Susceptible**) from Table S1 ([Ghosh et al., 2026](https://doi.org/10.1038/s41598-026-75690-y)) | 
 | **Species Breakdown** | *K. pneumoniae*: 1,490 (1,319 R, 171 S); *S. enterica* subsp. I: 510 (6 R, 504 S); *E. coli*: 400 (193 R, 207 S); *S. sonnei*: 334 (151 R, 183 S) | 
 | **Founding Isolation Sources (3)** | Stool / fecal (`FECAL`: 1,105), Urine (`URINE`: 1,231), Respiratory (`RESPIRATORY`: 398) | 
 | **Supported Submission Sources (12 + ALL)** | `FECAL`, `URINE`, `RESPIRATORY`, `BLOOD`, `WOUND`, `CSF`, `ABDOMINAL`, `GENITAL`, `ENVIRONMENT`, `FOOD`, `ANIMAL`, `OTHER`, plus `ALL` (unknown source) | 
 | **Diversity in Founding Repository** | **64 septatypes**, **24 tetratypes**, **268 MLST sequence types (STs)**, **28 countries** (249 ISO 3166 countries supported for new submissions) | 
-| **Tier 1 Majority-Rule Accuracy** | **98.1% pooled** (2,681 / 2,734 correct; 96.8% to 99.8% across species-source cohorts; resubstitution accuracy on founding set) | 
-| **Tier 2 Grammar-Only Accuracy** | **97.2% pooled** (94.4% to 99.2% across species-source cohorts on founding set) | 
 | **Per-Genome Analysis Speed** | **\~0.6 seconds** per 5 Mb bacterial assembly on 1 CPU core (reduced from 8.1 seconds via 4-representative MLST locus lookup) | 
 | **Software Stack** | Python 3.12, FastAPI 0.162.0, Starlette 1.10.0, Uvicorn 0.54.0, SQLite 3, NCBI BLAST+, Biopython 1.88, openpyxl 3.1.5, Vanilla JS + Plotly.js 2.35.2 | 
-| **Automated Test Suite** | **54 automated tests** in `pytest` (covering pipeline, grammar, MLST, gzip, BV-BRC simulation, curation state machine, and GitHub backup) | 
 
 ## 2. Biological Basis and the Septatype Definition
 
@@ -58,7 +55,7 @@ CiproTyper captures this combined genetic state in a hyphen-separated, seven-fie
 
 ```
 
-The first four positions (`[GyrA-83]-[GyrA-87]-[ParC-80]-[ParC-84]`) form the **tetratype**. All amino-acid coordinates follow standard *Escherichia coli* numbering.
+The first four positions (`[GyrA-83]-[GyrA-87]-[ParC-80]-[ParC-84]`) form the **tetratype**.
 
 | Field # | Locus / Marker | Wild-Type Susceptible State | Common Resistant States | Biological Role | 
 | ----- | ----- | ----- | ----- | ----- | 
@@ -72,7 +69,7 @@ The first four positions (`[GyrA-83]-[GyrA-87]-[ParC-80]-[ParC-84]`) form the **
 
 For example:
 
-* **`S-D-S-E-L-0-0`** is the canonical wild-type susceptible septatype (`S` at GyrA-83, `D` at GyrA-87, `S` at ParC-80, `E` at ParC-84, `L` at RecN-346, and both `qnrB2` and `qnrS1` absent).
+* **`S-D-S-E-L-0-0`** is the standard wild-type susceptible septatype (`S` at GyrA-83, `D` at GyrA-87, `S` at ParC-80, `E` at ParC-84, `L` at RecN-346, and both `qnrB2` and `qnrS1` absent).
 
 * **`L-N-I-E-L-0-0`** is the most common ciprofloxacin-resistant septatype in *E. coli* (`L` at GyrA-83, `N` at GyrA-87, `I` at ParC-80, `E` at ParC-84, `L` at RecN-346, no `qnr` genes).
 
@@ -109,7 +106,7 @@ Users can supply input in five ways on the **Predict** page or via the REST API:
 
 1. **Single FASTA Upload:** Plain-text or gzip-compressed nucleotide FASTA (`.fa`, `.fasta`, `.fna`, `.fas`, `.txt`, `.gz`) up to **60 MB** (`MAX_UPLOAD_MB = 60`). Decompressed `.gz` streams are capped at `4 x MAX_UPLOAD_MB` (**240 MB**) to prevent zip-bomb memory exhaustion. On modern browsers, files larger than **500 KB** (`500,000` bytes) are automatically gzip-compressed in the browser via `CompressionStream("gzip")` before upload so mobile and slow connections finish quickly.
 
-2. **Paste Sequence:** Raw nucleotide bases or FASTA-formatted text up to **10 MB** (`MAX_PASTE_MB = 10`). If the pasted string does not start with `>`, the server automatically prepends `>pasted\n`. Note that Starlette's default 1 MB multipart form field limit is patched at startup (`_raise_form_field_limit`) to `(MAX_PASTE_MB + 1) MB` (11 MB) so whole bacterial genomes can be pasted directly into the browser.
+2. **Paste Sequence:** FASTA-formatted text up to **10 MB** (`MAX_PASTE_MB = 10`). If the pasted string does not start with `>`, the server automatically prepends `>pasted\n`. Note that Starlette's default 1 MB multipart form field limit is patched at startup (`_raise_form_field_limit`) to `(MAX_PASTE_MB + 1) MB` (11 MB) so whole bacterial genomes can be pasted directly into the browser.
 
 3. **Batch Upload:** Up to **10 FASTA files** at once (one genome per file), processed sequentially with a live progress bar and combined into a downloadable batch summary table.
 
@@ -658,7 +655,7 @@ All endpoints return JSON (except CSV downloads and static HTML). Base path: `ht
 | **`POST /api/v1/admin/bvbrc/load`** | Header `X-Admin-Token` | None | Starts background BV-BRC batch annotation thread if not already running. | 
 | **`GET /healthz`** | Public | None | Returns `{"ok": true, "blast": true}` for container health checks. | 
 
-## 9. Deployment, Configuration, and Upgrade History
+## 9. Deployment, Configuration
 
 ### 9.1 Environment Variables
 
@@ -679,6 +676,43 @@ All endpoints return JSON (except CSV downloads and static HTML). Base path: `ht
 | **`BACKUP_GITHUB_BRANCH` / `_PATH`** | Default branch / `septatyper_backup.json` | Optional target branch and file path inside the backup repository. | 
 | **`PORT` / `DATA_DIR`** | `8000` / `/srv/data` | HTTP listening port and directory for the live SQLite database. | 
  
+## Architecture and Local Deployment
+The codebase is split into two repositories: **`septatyper-backend`** (Python 3.10+, FastAPI, Uvicorn, NCBI BLAST+, and SQLAlchemy connected to a Neon PostgreSQL instance) and **`septatyper-frontend`** (Next.js / React client).
+### System Requirements
+* Python $\ge 3.10$
+* NCBI BLAST+ (`blastn` and `makeblastdb` $\ge 2.12.0$ installed on system `PATH`)
+* PostgreSQL $\ge 14$ (local server or a managed [Neon](https://neon.tech) connection URI)
+* Node.js $\ge 18.17$ and `npm`
+### Running the Backend (`septatyper-backend`)
+```bash
+git clone https://github.com/<your-username>/septatyper-backend.git
+cd septatyper-backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+# Confirm blastn is reachable
+blastn -version
+# Set database URI and JWT secret for curator endpoints
+export DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"
+export SEPTATYPER_JWT_SECRET="your_random_secret_string"
+# Launch Uvicorn
+uvicorn septatyper.main:app --host 0.0.0.0 --port 8000
+```
+Interactive OpenAPI docs are served at `http://localhost:8000/docs`.
+### Running the Frontend (`septatyper-frontend`)
+```bash
+git clone https://github.com/<your-username>/septatyper-frontend.git
+cd septatyper-frontend
+npm install
+export NEXT_PUBLIC_API_URL="http://localhost:8000"
+npm run dev
+```
+### Docker Build
+To run the backend inside an isolated container with `ncbi-blast+` pre-installed:
+```bash
+docker build -t septatyper-backend:latest .
+docker run -d -p 8000:8000   -e DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"   -e SEPTATYPER_JWT_SECRET="your_random_secret_string"   septatyper-backend:latest
+```
 
 ## 10. Limitations, Honest Validation Status, and Future Directions
 
