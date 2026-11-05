@@ -85,7 +85,7 @@ Every uploaded sequence passes through a deterministic, seven-stage analysis pip
 
 ```mermaid
 flowchart TD
-    A["1. Sequence Input<br/>FASTA (.fa/.fna/.gz <=60 MB), Paste (<=10 MB)<br/>Batch (<=10), BV-BRC ID, or Manual 5 AAs"] --> B["2. Input & Species Gate<br/>Nucleotide check (>=90% ACGTN)<br/>Species MLST check (>=95% ID when input >=1 Mb)"]
+    A["1. Sequence Input, Paste, BV-BRC ID, or Manual 5 AAs"] --> B["2. Input & Species Gate<br/>Nucleotide check (>=90% ACGTN)<br/>Species MLST check"]
     B --> C["3. BLAST+ & Global Alignment<br/>gyrA, parC, recN (e <= 1e-20, accept >=75% ID, warn <92%)<br/>Biopython global align (match 2, mismatch -3, gap -8/-1)"]
     C --> D["4. Septatype & Fast MLST<br/>Read 5 codons + qnrB2/qnrS1 (>=80% ID, >=90% cov)<br/>4-representative locate-then-lookup MLST"]
     D --> E{"5. Checkpoint 1 Identity Gate<br/>Do gyrA, parC & recN all match<br/>species reference at >=90% ID?"}
