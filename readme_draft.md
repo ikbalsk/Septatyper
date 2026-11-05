@@ -676,44 +676,6 @@ All endpoints return JSON (except CSV downloads and static HTML). Base path: `ht
 | **`BACKUP_GITHUB_BRANCH` / `_PATH`** | Default branch / `septatyper_backup.json` | Optional target branch and file path inside the backup repository. | 
 | **`PORT` / `DATA_DIR`** | `8000` / `/srv/data` | HTTP listening port and directory for the live SQLite database. | 
  
-## Architecture and Local Deployment
-The codebase is split into two repositories: **`septatyper-backend`** (Python 3.10+, FastAPI, Uvicorn, NCBI BLAST+, and SQLAlchemy connected to a Neon PostgreSQL instance) and **`septatyper-frontend`** (Next.js / React client).
-### System Requirements
-* Python $\ge 3.10$
-* NCBI BLAST+ (`blastn` and `makeblastdb` $\ge 2.12.0$ installed on system `PATH`)
-* PostgreSQL $\ge 14$ (local server or a managed [Neon](https://neon.tech) connection URI)
-* Node.js $\ge 18.17$ and `npm`
-### Running the Backend (`septatyper-backend`)
-```bash
-git clone https://github.com/<your-username>/septatyper-backend.git
-cd septatyper-backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-# Confirm blastn is reachable
-blastn -version
-# Set database URI and JWT secret for curator endpoints
-export DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"
-export SEPTATYPER_JWT_SECRET="your_random_secret_string"
-# Launch Uvicorn
-uvicorn septatyper.main:app --host 0.0.0.0 --port 8000
-```
-Interactive OpenAPI docs are served at `http://localhost:8000/docs`.
-### Running the Frontend (`septatyper-frontend`)
-```bash
-git clone https://github.com/<your-username>/septatyper-frontend.git
-cd septatyper-frontend
-npm install
-export NEXT_PUBLIC_API_URL="http://localhost:8000"
-npm run dev
-```
-### Docker Build
-To run the backend inside an isolated container with `ncbi-blast+` pre-installed:
-```bash
-docker build -t septatyper-backend:latest .
-docker run -d -p 8000:8000   -e DATABASE_URL="postgresql://user:password@host/dbname?sslmode=require"   -e SEPTATYPER_JWT_SECRET="your_random_secret_string"   septatyper-backend:latest
-```
-
 ## 10. Limitations, Honest Validation Status, and Future Directions
 
 In accordance with bioinformatics journal standards, all current methodological, biological, and operational limitations of CiproTyper are stated transparently below:
