@@ -1,8 +1,4 @@
-# CiproTyper (SeptaTyper v3.7.1): A Simple Guide to Predicting Ciprofloxacin Resistance in Bacteria
-
-**Authors and Maintainers:** Ikbal Sk, Protyusa Deb, Anamika Ghosh  
-**Affiliation:** JIS Institute of Advanced Studies and Research (JISIASR), Kolkata, West Bengal, India  
-**Contact:** [ikbalsk.personal@gmail.com](mailto:ikbalsk.personal@gmail.com)  
+# CiproTyper: 
 **Live Website:** [https://septatyper-is.onrender.com/](https://septatyper-is.onrender.com/)  
 **Founding Research Paper:** Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Scientific Reports*. 2026. [https://doi.org/10.1038/s41598-026-75690-y](https://doi.org/10.1038/s41598-026-75690-y)  
 **Software Architecture and Technical Reference (Separate Guide):** See [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) (or the [GitHub Repository](https://github.com/ikbalsk/Septatyper) and [Interactive API Guide](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)) for all software design, database structure, and programming details.
@@ -373,9 +369,9 @@ In line with bioinformatics journal standards, we state all limitations of Cipro
 6. **Plasmid `qnr` Detection Uses Two Reference Alleles and Cannot Measure Gene Expression:** CiproTyper searches for `qnrB2` and `qnrS1` at `>= 80%` identity and `>= 90%` length coverage. Other `qnr` families (`qnrA`, `qnrC`, `qnrD`, `qnrE`, `qnrVC`), divergent alleles below 80% identity, or other resistance mechanisms such as `aac(6')-Ib-cr` or efflux pump changes (`acrAB-tolC`, `marA`, `soxS`, `ramA`) are not read. Conversely, finding a `qnr` gene in DNA does not prove the bacterium is actively expressing it (which is why a few `qnr`-positive isolates with wild-type `S-D-S-E` tested susceptible in the laboratory).
 7. **Hydrophobicity (`<H>`) is Only a Last Tie-Breaker for Borderline Novel Septatypes:** Across all 2,734 founding isolates, resistant isolates have a higher average `<H>` (`0.391`) than susceptible ones (`0.274`), and the full three-checkpoint grammar reaches **97.2% accuracy** at the `0.334` cutoff. However, in the small borderline group of **148 isolates** where the four QRDR amino acids fall in mixed columns and carry exactly 1 Resistant vote, `<H>` alone is right for only **41.2%** at `0.334` (and at most **59.5%** at `0.24`). That is why `<H>` is used strictly as a final tie-breaker inside Tier 2 when a septatype has never been seen before.
 
-## 8. Link to Separate Software Architecture, Database, and API Documentation
+## 8. Software Architecture, Database, and API Documentation
 
-For readers, reviewers, or software developers who want the complete technical details of how the server is built, how the SQLite database tables and automatic GitHub cloud backups work, how to deploy the Docker container, or how to call the 25 REST API endpoints from code, please open the separate technical reference document:
+The complete technical details of how the server is built, how the SQLite database tables work, how to deploy the Docker container, or how to call the 25 REST API endpoints from code, please open the separate technical reference document:
 
 * **Separate Technical & Software Reference:** [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md)
 * **Live Interactive API Documentation (Swagger UI):** [https://septatyper-is.onrender.com/docs](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)
@@ -383,7 +379,7 @@ For readers, reviewers, or software developers who want the complete technical d
 
 ## 9. How to Cite and References
 
-If you use CiproTyper (SeptaTyper) or its reference collection in your research, please cite our founding study:
+If you use CiproTyper or its reference collection in your research, please cite our founding study:
 
 > Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Scientific Reports*. 2026. [https://doi.org/10.1038/s41598-026-75690-y](https://doi.org/10.1038/s41598-026-75690-y)
 
