@@ -68,7 +68,7 @@ REFRESH_DB_ON_START = os.environ.get("REFRESH_DB_ON_START", "1") != "0"      # b
 
 # ---- identity rules for a genome of the chosen species
 CP1_MIN_ID = float(os.environ.get("CP1_MIN_ID", "90"))                  # gyrA, parC and recN must match the species reference at least this well for checkpoint 1
-MLST_SPECIES_MIN_ID = float(os.environ.get("MLST_SPECIES_MIN_ID", "95"))  # every MLST gene must match the species scheme at least this well, else "verify the species"
+MLST_SPECIES_MIN_ID = float(os.environ.get("MLST_SPECIES_MIN_ID", "90"))  # every MLST gene must match the species scheme at least this well, else "verify the species"
 
 # ---- consent notice shown before a submission. Change this label whenever the wording of the notice changes: a submission
 # is accepted only with the current label, and the label and time are stored with it.
