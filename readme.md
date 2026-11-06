@@ -1,8 +1,8 @@
 # CiproTyper: Web Server, Curated Repository, and Rest API for Ciprofloxacin Resistance Prediction in Enterobacterales
 **Live Website:** [https://septatyper-is.onrender.com/](https://septatyper-is.onrender.com/)    
-**Software Architecture and Technical Reference:** See [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) (or the [GitHub Repository](https://github.com/ikbalsk/septatyper) and [Interactive API Guide](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)) for all software design, database structure, and programming details.
+**Software Architecture and Technical Reference:** See [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) (or the [GitHub Repository](https://github.com/ikbalsk/septatyper) and [Interactive API Guide](https://septatyper-is.onrender.com/docs)) for all software design, database structure, and programming details.
 **Founding Study:** Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Scientific Reports*. 2026. <https://doi.org/10.1038/s41598-026-75690-y>
-**Interactive OpenAPI Documentation:** [https://septatyper-is.onrender.com/docs](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)
+**Interactive OpenAPI Documentation:** [https://septatyper-is.onrender.com/docs](https://septatyper-is.onrender.com/docs)
 
 ## 1. What is CiproTyper and Why Did We Build It?
 Ciprofloxacin is one of the most widely prescribed fluoroquinolone antibiotics for treating infections caused by Gram-negative bacteria in the order Enterobacterales. Resistance to ciprofloxacin mainly arises from amino-acid changes in the quinolone resistance-determining regions (QRDRs) of DNA gyrase (`GyrA`) and topoisomerase IV (`ParC`), variations in the DNA repair protein `RecN`, and the acquisition of plasmid-mediated quinolone resistance (`qnr`) genes that shield both enzymes from drug binding. Standard antimicrobial resistance (AMR) tools usually report individual mutations or resistance genes one by one. However, as shown in our published study of 2,734 bacterial genomes ([Ghosh et al., 2026](https://doi.org/10.1038/s41598-026-75690-y)), the phenotypic effect of a single mutation or plasmid gene depends heavily on the surrounding genetic background and the bacterial species.
@@ -370,8 +370,8 @@ In line with bioinformatics journal standards, we state all limitations of Cipro
 
 The complete technical details of how the server is built, how the SQLite database tables work, how to deploy the Docker container, or how to call the 25 REST API endpoints from code, please open the separate technical reference document:
 
-* **Separate Technical & Software Reference:** [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md)
-* **Live Interactive API Documentation (Swagger UI):** [https://ciprotyper-is.onrender.com/docs](https://www.google.com/search?q=https://ciprotyper-is.onrender.com/docs)
+* **Separate Technical & Software Reference:** [`TECHNICAL_ARCHITECTURE.md`](technical_architecture.md)
+* **Live Interactive API Documentation (Swagger UI):** [https://ciprotyper-is.onrender.com/docs](https://ciprotyper-is.onrender.com/docs)
 * **Source Code Repository:** [https://github.com/ikbalsk/ciprotyper](https://github.com/ikbalsk/ciprotyper)
 
 ## 9. How to Cite and References
