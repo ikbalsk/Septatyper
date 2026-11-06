@@ -1,33 +1,33 @@
-# CiproTyper: 
-**Live Website:** [https://septatyper-is.onrender.com/](https://septatyper-is.onrender.com/)  
-**Founding Research Paper:** Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Scientific Reports*. 2026. [https://doi.org/10.1038/s41598-026-75690-y](https://doi.org/10.1038/s41598-026-75690-y)  
-**Software Architecture and Technical Reference (Separate Guide):** See [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) (or the [GitHub Repository](https://github.com/ikbalsk/Septatyper) and [Interactive API Guide](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)) for all software design, database structure, and programming details.
+# CiproTyper: Web Server, Curated Repository, and Rest API for Ciprofloxacin Resistance Prediction in Enterobacterales
+**Live Website:** [https://ciprotyper-is.onrender.com/](https://ciprotyper-is.onrender.com/)    
+**Software Architecture and Technical Reference (Separate Guide):** See [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) (or the [GitHub Repository](https://github.com/ikbalsk/ciprotyper) and [Interactive API Guide](https://www.google.com/search?q=https://ciprotyper-is.onrender.com/docs)) for all software design, database structure, and programming details.
+**Founding Study:** Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Scientific Reports*. 2026. <https://doi.org/10.1038/s41598-026-75690-y>
+**Interactive OpenAPI Documentation:** [https://ciprotyper-is.onrender.com/docs](https://www.google.com/search?q=https://ciprotyper-is.onrender.com/docs)
 
 ## 1. What is CiproTyper and Why Did We Build It?
+Ciprofloxacin is one of the most widely prescribed fluoroquinolone antibiotics for treating infections caused by Gram-negative bacteria in the order Enterobacterales. Resistance to ciprofloxacin mainly arises from amino-acid changes in the quinolone resistance-determining regions (QRDRs) of DNA gyrase (`GyrA`) and topoisomerase IV (`ParC`), variations in the DNA repair protein `RecN`, and the acquisition of plasmid-mediated quinolone resistance (`qnr`) genes that shield both enzymes from drug binding. Standard antimicrobial resistance (AMR) tools usually report individual mutations or resistance genes one by one. However, as shown in our published study of 2,734 bacterial genomes ([Ghosh et al., 2026](https://doi.org/10.1038/s41598-026-75690-y)), the phenotypic effect of a single mutation or plasmid gene depends heavily on the surrounding genetic background and the bacterial species.
 
-**Ciprofloxacin** is one of the most common antibiotics doctors use to treat bacterial infections of the gut, urinary tract, lungs, and bloodstream. Over time, many bacteria have learned how to survive this medicine. When a bacterium can survive standard treatment with ciprofloxacin, we call it **Resistant**. When the medicine still kills or stops the bacterium as expected, we call it **Susceptible**.
+To make this combined genotype scheme practical for everyday research and surveillance, we built **CiproTyper** . CiproTyper is three things in a single open service:
 
-Usually, when scientists read a bacterium's DNA sequence to check for drug resistance, existing tools simply list individual mutations or resistance genes one by one. However, in our study of 2,734 bacterial samples ([Ghosh et al., 2026](https://doi.org/10.1038/s41598-026-75690-y)), we found that **context matters**. A single mutation or resistance gene that makes one bacterial species resistant may have no effect at all in another species, or may only cause resistance when paired with a specific neighboring amino acid.
+1. **A curated reference repository** holding **2,734 founding bacterial genomes** across four species, 28 countries, 268 sequence types, and 64 distinct ciprotypes, equipped with interactive filtering, side-by-side comparison against [BV-BRC](https://www.bv-brc.org/) computational predictions, geographic mapping, and community submission with reversible curator review. 
 
-To make this discovery easy for any biologist, student, or researcher to use without needing programming skills, we built **CiproTyper** (the latest version of **SeptaTyper**, release `3.7.1`). It does three main jobs in one free website:
+2. **An explainable web prediction server** that reads assembled nucleotide sequences (or BV-BRC genome IDs and manual residue entries), identifies five key codon positions (`GyrA-83`, `GyrA-87`, `ParC-80`, `ParC-84`, and `RecN-346`) plus two plasmid-borne resistance alleles (`qnrB2` and `qnrS1`), types the isolate's 7-locus Multilocus Sequence Type (MLST), and predicts whether the bacterium is **Resistant (Cres)** or **Susceptible (Csus)** to ciprofloxacin.
 
-1. **Predicts Ciprofloxacin Resistance:** You upload a bacterial DNA sequence (or type in a genome ID or five amino acids), and the site tells you whether the sample is likely **Resistant (Cres)** or **Susceptible (Csus)**, along with a clear step-by-step biological explanation.
-2. **Shows the Sample's Strain Type and Similar Isolates:** It identifies your bacterium's **Multilocus Sequence Type (ST)** (its genetic family or clone, such as `ST131` in *E. coli* or `ST258` in *K. pneumoniae*) and shows you how many similar isolates in our collection came from the same body site and country.
-3. **Hosts a Growing Public Collection of 2,734 Genomes:** Anyone can browse, filter, map, and download our reference collection of 2,734 bacterial genomes, or submit new isolates with laboratory test results for curator review.
+3. **A programmatic REST API (`/api/v1`)** that allows bioinformaticians to run predictions, query reference rules, evaluate physicochemical checkpoints, and download filtered datasets in CSV or JSON format directly from scripts.
 
-| Key Feature | Details in CiproTyper (SeptaTyper v3.7.1) |
+To make this discovery easy for any biologist, student, or researcher to use without needing programming skills, we built **CiproTyper** (the latest version of **ciprotyper**, release `3.7.1`). It does three main jobs in one free website:
+
+
+| Key Feature | Details in CiproTyper |
 | :--- | :--- |
 | **Four Supported Bacterial Species** | *Escherichia coli*, *Shigella sonnei*, *Salmonella enterica* subsp. I, and *Klebsiella pneumoniae* |
 | **Founding Reference Collection** | **2,734 bacterial genomes** (**1,669 Resistant**, **1,065 Susceptible**) from [Ghosh et al. (2026)](https://doi.org/10.1038/s41598-026-75690-y) |
-| **Isolates per Species** | *K. pneumoniae*: 1,490 (1,319 R, 171 S); *S. enterica* subsp. I: 510 (6 R, 504 S); *E. coli*: 400 (193 R, 207 S); *S. sonnei*: 334 (151 R, 183 S) |
+| **Isolates per Species (R-Resistant,S-Susceptible)** | *K. pneumoniae*: 1,490 (1,319 R, 171 S); *S. enterica* subsp. I: 510 (6 R, 504 S); *E. coli*: 400 (193 R, 207 S); *S. sonnei*: 334 (151 R, 183 S) |
 | **Founding Isolation Sources (3)** | Stool / fecal (`1,105` isolates), Urine (`1,231` isolates), and Respiratory (`398` isolates) |
-| **Supported Submission Sources (12 + Unknown)** | Stool, Urine, Respiratory, Blood, Wound or skin, Cerebrospinal fluid (CSF), Abdominal, Genital tract, Environment, Food, Animal, Other source, plus Unknown / not specified |
-| **Diversity in Founding Collection** | **64 unique septatypes**, **24 tetratypes**, **268 sequence types (STs)**, and **28 countries** (249 countries available for new submissions) |
-| **Accuracy of Past-Record Lookup (Majority Rule)** | **98.1% overall** (2,681 of 2,734 founding isolates matched; 96.8% to 99.8% across species and source groups) |
-| **Accuracy of Biological Rules Alone (Grammar Rule)** | **97.2% overall** (94.4% to 99.2% across species and source groups) |
-| **Analysis Speed** | About **0.6 seconds** for a complete 5-million-base bacterial genome |
+| **Supported Submission Sources (12 + Unknown)** | Stool, Urine, Respiratory, Blood, Wound or skin, Cerebrospinal fluid (CSF), Abdominal, Genital tract, Environment, Food, Animal, Other |
+| **Diversity in Founding Collection** | **64 unique ciprotypes**, **268 sequence types (STs)**, and **28 countries** (249 countries/territories available for new submissions) |
 
-## 2. The Biology Behind the Septatype: Five Codons and Two Genes
+## 2. The Biology Behind the Ciprotype:
 
 ### 2.1 How Ciprofloxacin Works and Why Context Matters
 
@@ -48,15 +48,14 @@ Beyond `gyrA` and `parC`, two other biological players shape ciprofloxacin survi
 * **DNA Repair Protein `RecN` (Position `RecN-346`):** When ciprofloxacin damages bacterial DNA, the cell uses the `RecN` protein to repair double-strand breaks. At position `346` of `RecN`, sensitive bacteria usually carry the amino acid Leucine (`L`) written with the DNA triplet **`cta`**. Resistant bacteria can either change the amino acid to **Phenylalanine (`F`)** or keep Leucine (`L`) but switch the DNA triplet from **`cta` to `ctg`**. Even though both `cta` and `ctg` code for Leucine (a **synonymous codon change**), bacteria read the `ctg` triplet much more efficiently during translation, producing more `RecN` repair protein to survive drug damage.
 * **Plasmid-Borne Protection Genes (`qnrB2` and `qnrS1`):** Bacteria can also carry mobile DNA rings (plasmids) bearing **Plasmid-Mediated Quinolone Resistance (PMQR)** genes from the `qnrB` and `qnrS` families. The Qnr proteins fold into a shape that mimics DNA and physically shields DNA gyrase and topoisomerase IV from ciprofloxacin.
 
-### 2.2 What the Seven-Part Septatype String Means
+### 2.2 What the Seven-Part of Ciprotype String Means
 
-CiproTyper combines these five chromosomal positions and two plasmid genes into a single seven-part code joined by dashes, called the **septatype**:
+CiproTyper combines these five chromosomal positions and two plasmid genes into a single seven-part code joined by dashes, called the **Ciproype**:
 
 ```text
 [GyrA-83]-[GyrA-87]-[ParC-80]-[ParC-84]-[RecN-346]-[qnrB2]-[qnrS1]
 ```
 
-The first four letters (`[GyrA-83]-[GyrA-87]-[ParC-80]-[ParC-84]`) are called the **tetratype**. All position numbers use standard *Escherichia coli* numbering.
 
 | Part # | Gene & Position | Normal Susceptible State | Common Resistant Changes | Biological Meaning |
 | :--- | :--- | :--- | :--- | :--- |
@@ -68,13 +67,13 @@ The first four letters (`[GyrA-83]-[GyrA-87]-[ParC-80]-[ParC-84]`) are called th
 | **6** | **qnrB2** | `0` (Absent) | `1` (Present) | Plasmid gene (`qnrB` family) that shields gyrase and topoisomerase IV. |
 | **7** | **qnrS1** | `0` (Absent) | `1` (Present) | Plasmid gene (`qnrS` family) that shields gyrase and topoisomerase IV. |
 
-Here are three everyday examples of how to read a septatype:
+Examples of how to read a Ciprotype:
 
-* **`S-D-S-E-L-0-0`** is the normal, wild-type **Susceptible** septatype (`S` at GyrA-83, `D` at GyrA-87, `S` at ParC-80, `E` at ParC-84, `L` at RecN-346, and `0` for both `qnrB2` and `qnrS1`).
-* **`L-N-I-E-L-0-0`** is the most common **Resistant** septatype in *E. coli* (Serine changed to Leucine at GyrA-83, Aspartate changed to Asparagine at GyrA-87, Serine changed to Isoleucine at ParC-80, Glutamate kept at ParC-84, Leucine at RecN-346, and no `qnr` genes).
-* **`I-N-I-E-L-0-0`** and **`I-D-I-E-L-0-0`** are the two most common **Resistant** septatypes in *K. pneumoniae*.
+* **`S-D-S-E-L-0-0`** is the normal, wild-type **Susceptible** ciprotype (`S` at GyrA-83, `D` at GyrA-87, `S` at ParC-80, `E` at ParC-84, `L` at RecN-346, and `0` for both `qnrB2` and `qnrS1`).
+* **`L-N-I-E-L-0-0`** is the most common **Resistant** ciprotype in *E. coli* (Serine changed to Leucine at GyrA-83, Aspartate changed to Asparagine at GyrA-87, Serine changed to Isoleucine at ParC-80, Glutamate kept at ParC-84, Leucine at RecN-346, and no `qnr` genes).
+* **`I-N-I-E-L-0-0`** and **`I-D-I-E-L-0-0`** are the two most common **Resistant** ciprotypes in *K. pneumoniae*.
 
-Because the 5th letter of the septatype shows the amino acid (`L` or `F`) rather than the 3-letter DNA codon, CiproTyper always reads and displays the exact DNA triplet (`cta` or `ctg`) right below the `RecN-346` tile whenever you upload a DNA sequence.
+Because the 5th letter of the ciprotype shows the amino acid (`L` or `F`) rather than the 3-letter DNA codon, CiproTyper always reads and displays the exact DNA triplet (`cta` or `ctg`) right below the `RecN-346` tile whenever you upload a DNA sequence.
 
 ## 3. How CiproTyper Reads Your Sequence and Checks Quality
 
@@ -83,14 +82,14 @@ Because the 5th letter of the septatype shows the amino acid (`L` or `F`) rather
 ```mermaid
 flowchart TD
     A["1. Your Input<br/>Upload FASTA file (up to 60 MB), Paste DNA (up to 10 MB),<br/>Upload Batch (up to 10 files), Enter BV-BRC ID, or Type 5 Amino Acids"] --> B["2. Sequence & Species Check<br/>Confirm valid DNA letters (>=90% A, C, G, T, N)<br/>Verify all 7 MLST housekeeping genes match species (>=95% identity)"]
-    B --> C["3. Locate Genes & Read Codons<br/>Match gyrA, parC, and recN against species reference (>=75% identity)<br/>Read exact 3-letter DNA codons at positions 83, 87, 80, 84, and 346"]
+    B --> C["3. Locate Genes & Read Codons<br/>Match gyrA, parC, and recN against species reference<br/>Read exact 3-letter DNA codons at positions 83, 87, 80, 84, and 346"]
     C --> D["4. Screen qnr Genes & Assign Strain ST<br/>Detect qnrB2 and qnrS1 (>=80% identity & >=90% length coverage)<br/>Assign 7-gene PubMLST Sequence Type (ST)"]
     D --> E{"5. Checkpoint 1 Quality Gate<br/>Do gyrA, parC, and recN all match<br/>the species reference at >=90% identity?"}
     E -- "No (Below 90% identity)" --> F["Partial Call: Checkpoints 2 & 3 Only<br/>Skip GyrA/ParC table; decide using RecN-346 (ctg/F)<br/>and qnrB2/qnrS1 only, with a warning"]
-    E -- "Yes (90% identity or higher)" --> G{"6. Is this Septatype Already in the<br/>Reference Database for this Species?"}
-    G -- "Yes (Known Septatype)" --> H["Tier 1: Majority Rule<br/>Use most common lab result in same species & source<br/>(or all sources if unseen in chosen source; ties go to Susceptible)"]
-    G -- "No (Brand-New Septatype)" --> I["Tier 2: Three-Checkpoint Grammar Rule<br/>Check QRDR table, votes, and helix hydrophobicity (<H> > 0.334)<br/>plus RecN-346 and qnr genes -> Flag for Curator"]
-    F --> J["7. Clear Visual Result Page<br/>Resistant (Cres) or Susceptible (Csus) Badge, 7-Tile Septatype,<br/>Sample ST vs Reference Clones, 3-Checkpoint Explanation, Print/CSV/JSON"]
+    E -- "Yes (90% identity or higher)" --> G{"6. Is this ciprotype Already in the<br/>Reference Database for this Species?"}
+    G -- "Yes (Known ciprotype)" --> H["Tier 1: Majority Rule<br/>Use most common lab result in same species & source<br/>(or all sources if unseen in chosen source; ties go to Susceptible)"]
+    G -- "No (Brand-New ciprotype)" --> I["Tier 2: Three-Checkpoint Grammar Rule<br/>Check QRDR table, votes, and helix hydrophobicity (<H> > 0.334)<br/>plus RecN-346 and qnr genes -> Flag for Curator"]
+    F --> J["7. Clear Visual Result Page<br/>Resistant (Cres) or Susceptible (Csus) Badge, 7-Tile ciprotype,<br/>Sample ST vs Reference Clones, 3-Checkpoint Explanation, Print/CSV/JSON"]
     H --> J
     I --> J
 ```
@@ -129,12 +128,12 @@ CiproTyper applies strict quality checks at every step so that poor-quality sequ
 | **2. File and Paste Size Limits** | Upload up to **60 MB** (or **240 MB** unzipped); Paste up to **10 MB**; Batch up to **10 files** | Stops oversized files with a clear message asking you to upload a single assembly file. |
 | **3. Finding `gyrA`, `parC`, and `recN`** | Minimum **75% DNA identity** (and BLAST e-value `<= 1e-20`) | Below 75% identity, the gene is marked as **not found**. |
 | **4. Gene Match & Length Warnings** | Warning below **92% DNA identity** or below **90% gene length coverage** | Displays a warning note advising you to check whether the gene is broken across contigs or if a different species was selected. |
-| **5. Checkpoint 1 Quality Gate (`CP1_MIN_ID`)** | All three genes (`gyrA`, `parC`, `recN`) must match the species reference at **90% identity or higher** | **Critical Safety Gate:** If any of the three chromosomal genes is missing or matches below **90% identity**, the amino-acid positions cannot be trusted. **Checkpoint 1 is turned off**, no septatype string is reported, and the call is made from **Checkpoints 2 and 3 only** with a clear warning. |
+| **5. Checkpoint 1 Quality Gate (`CP1_MIN_ID`)** | All three genes (`gyrA`, `parC`, `recN`) must match the species reference at **90% identity or higher** | **Critical Safety Gate:** If any of the three chromosomal genes is missing or matches below **90% identity**, the amino-acid positions cannot be trusted. **Checkpoint 1 is turned off**, no ciprotype string is reported, and the call is made from **Checkpoints 2 and 3 only** with a clear warning. |
 | **6. Species Verification Gate (`MLST_SPECIES_MIN_ID`)** | For whole genomes (`>= 1 million bases`), all **7 MLST genes** must match the chosen species scheme at **95% identity or higher** | Displays a prominent red banner: *"Please verify the species selected and resubmit."* |
-| **7. Clean Codon Reading** | Exact 3-base alignment with **no gaps, no stop codons (`*`), and no ambiguous bases (`N`)** | If any of the 5 codons has a gap, stop codon, or unknown base, that position is not guessed and no complete septatype is built. |
+| **7. Clean Codon Reading** | Exact 3-base alignment with **no gaps, no stop codons (`*`), and no ambiguous bases (`N`)** | If any of the 5 codons has a gap, stop codon, or unknown base, that position is not guessed and no complete ciprotype is built. |
 | **8. Plasmid `qnrB2` and `qnrS1` Detection** | At least **80% DNA identity** AND at least **90% gene length coverage** | Only hits meeting both limits count as **Present (`1`)**. For gene-only uploads (`< 1 million bases`), the site warns that `"absent"` only means no `qnr` sequence was in the partial file, and lets you set `qnrB`/`qnrS` manually. |
 | **9. Strain Sequence Type (ST) Naming** | **100% identity (`>= 99.999%`)** across the full length of all **7 MLST alleles** | An ST number (like `ST131`) is reported only when all 7 alleles match known alleles exactly. Nearest matches (`>= 90%` identity and `>= 90%` coverage) are marked with `~`. |
-| **10. Reference Support Warnings** | **Fewer than 5 reference isolates** (`LOW_SUPPORT = 5`) or **majority below 80%** (`MIXED = 0.80`) | Warns you when a known septatype rests on fewer than 5 database records or when the database isolates are a mix of Resistant and Susceptible. |
+| **10. Reference Support Warnings** | **Fewer than 5 reference isolates** (`LOW_SUPPORT = 5`) or **majority below 80%** (`MIXED = 0.80`) | Warns you when a known ciprotype rests on fewer than 5 database records or when the database isolates are a mix of Resistant and Susceptible. |
 | **11. Database Tie-Breaker Rule** | Equal number of Resistant and Susceptible reference isolates (`R == S`) | If reference isolates are split 50/50, the call defaults to **Susceptible** and flags the even split. |
 | **12. Hydrophobicity (`<H>`) Cutoff** | **Cutoff = `0.334`** (midpoint between wild-type `S-D-S-E = 0.270` and resistant `L-N-I-E = 0.397`) | Used in the Grammar Rule when the 4 QRDR positions are mixed and exactly 1 position votes Resistant: **`<H> > 0.334` = Resistant**, **`<H> <= 0.334` = Susceptible**. |
 
@@ -144,15 +143,15 @@ Once CiproTyper has read the five positions and two `qnr` genes, it predicts the
 
 ### 4.1 Tier 1: The Majority Rule (Checking Past Real-World Isolates)
 
-Whenever your sample passes the 90% gene-identity gate and its seven-part septatype has **already been seen** in our reference database for that bacterial species, CiproTyper uses the **Majority Rule**:
+Whenever your sample passes the 90% gene-identity gate and its seven-part ciprotype has **already been seen** in our reference database for that bacterial species, CiproTyper uses the **Majority Rule**:
 
-1. **Same Species and Same Isolation Source (`tier = "database"`):** If you selected a specific body site (for example, *E. coli* from **Urine**) and our database has *E. coli* urine isolates with that exact septatype, CiproTyper counts how many of those isolates tested **Resistant** vs. **Susceptible** in the laboratory. **Whichever group is larger wins.** (If both groups have the exact same count, it calls **Susceptible**.)
-2. **Same Species across All Sources (`tier = "database_other_site"`):** If that septatype has not yet been seen in the specific body site you chose (for example, **Blood**), but it *has* been seen in other body sites for the **same species**, CiproTyper pools all isolates of that species with that septatype, reports the majority phenotype, and adds a note explaining that isolates from other sources were used.
+1. **Same Species and Same Isolation Source (`tier = "database"`):** If you selected a specific body site (for example, *E. coli* from **Urine**) and our database has *E. coli* urine isolates with that exact ciprotype, CiproTyper counts how many of those isolates tested **Resistant** vs. **Susceptible** in the laboratory. **Whichever group is larger wins.** (If both groups have the exact same count, it calls **Susceptible**.)
+2. **Same Species across All Sources (`tier = "database_other_site"`):** If that ciprotype has not yet been seen in the specific body site you chose (for example, **Blood**), but it *has* been seen in other body sites for the **same species**, CiproTyper pools all isolates of that species with that ciprotype, reports the majority phenotype, and adds a note explaining that isolates from other sources were used.
 3. **Full Transparency on Reference Isolates:** Right below the prediction badge, the result page tells you the exact number of matching reference isolates, which body sites and countries they came from, and which **Sequence Types (STs)** they belong to, highlighting `"your genome"` if your sample shares the same ST as a known clone in the database.
 
-### 4.2 Tier 2: The Three-Checkpoint Grammar Rule (For Brand-New Septatypes)
+### 4.2 Tier 2: The Three-Checkpoint Grammar Rule (For Brand-New ciprotypes)
 
-If your bacterium carries a **brand-new septatype** that has never been recorded in the reference collection for that species, CiproTyper uses its **Three-Checkpoint Biological Grammar** (`tier = "grammar"`) and flags the sample as a new septatype for curator review. Importantly, CiproTyper also shows these three checkpoints on the screen for every Tier 1 call so you can always see the biological reasoning behind the phenotype.
+If your bacterium carries a **brand-new ciprotype** that has never been recorded in the reference collection for that species, CiproTyper uses its **Three-Checkpoint Biological Grammar** (`tier = "grammar"`) and flags the sample as a new ciprotype for curator review. Importantly, CiproTyper also shows these three checkpoints on the screen for every Tier 1 call so you can always see the biological reasoning behind the phenotype.
 
 ### Figure 2. How the Three-Checkpoint Grammar and Hydrophobicity (`<H>`) Cutoff Work
 
@@ -260,7 +259,7 @@ Instead of averaging only the 4 mutated positions, CiproTyper measures `<H>` acr
 
 Our founding reference database comes from Supplementary Table S1 of [Ghosh et al. (2026)](https://doi.org/10.1038/s41598-026-75690-y) and contains **2,734 bacterial genomes** across four species and three body sites. When tested across these 2,734 genomes, the Tier 1 Majority Rule matches the laboratory phenotype for **2,681 isolates (98.1% overall)**, and the Tier 2 Grammar Rule alone matches **97.2% overall**.
 
-| Bacterial Species | Body Site / Source | Total Isolates | Resistant Isolates | Susceptible Isolates | Unique Septatypes | Tier 1 Majority Rule Accuracy | Tier 2 Grammar Rule Accuracy |
+| Bacterial Species | Body Site / Source | Total Isolates | Resistant Isolates | Susceptible Isolates | Unique ciprotypes | Tier 1 Majority Rule Accuracy | Tier 2 Grammar Rule Accuracy |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | ***Escherichia coli*** | Stool (`FECAL`) | 184 | 19 (10.3%) | 165 (89.7%) | 6 | **98.9%** | 97.3% |
 | ***Escherichia coli*** | Urine (`URINE`) | 216 | 174 (80.6%) | 42 (19.4%) | 17 | **98.1%** | 94.4% |
@@ -317,21 +316,21 @@ Because the Tier 1 Majority Rule looks up each species separately, CiproTyper au
 
 ## 6. User Guide: How to Use Every Page on the Website
 
-When you open [https://septatyper-is.onrender.com/](https://septatyper-is.onrender.com/), you will see a clean blue-and-white navigation bar at the top with seven main sections (plus the calculation and curator pages):
+When you open [https://ciprotyper-is.onrender.com/](https://ciprotyper-is.onrender.com/), you will see a clean blue-and-white navigation bar at the top with seven main sections (plus the calculation and curator pages):
 
 1. **Home (`#/`):** Gives a quick overview of the 2,734 genomes, an interactive 7-tile animation showing how a susceptible *E. coli* (`S-D-S-E-L-0-0`) differs from a resistant one (`L-N-I-E-L-0-0`), and the summary accuracy table for all four species.
 2. **Predict (`#/predict`):**
    * **Step 1:** Choose your bacterium's **Species** and **Isolation source** (if you do not know the body site, leave it on `Unknown / not specified`).
    * **Step 2:** Pick your input tab (**Upload file**, **Paste sequence**, **Batch**, **BV-BRC ID**, or **Enter residues**). If you are uploading a single gene file rather than a whole genome, click *"Gene sequences only? Set the qnr status yourself"* to tell the tool whether `qnrB` or `qnrS` is present.
-   * **Step 3:** Click **Predict phenotype**. You will get the **Resistant (Cres)** or **Susceptible (Csus)** call, the 7-tile septatype with any changed positions highlighted and the `RecN-346` codon shown underneath, your sample's **Sequence Type (ST)**, a table of matching reference isolates broken down by ST, country, and body site, and the full **Why Resistant / Why Susceptible** three-checkpoint explanation. You can save your report using **Print or save as PDF**, **Download CSV**, or **Download JSON**.
-3. **Browse (`#/browse`):** Lets you search and filter all 2,734 founding genomes (plus approved community genomes) by **Species**, **Isolation source**, **Sequence type (ST)**, **Country**, **Septatype**, **Lab phenotype**, **Collection year range**, **Genome ID or name**, and **Source** (`Founding set` vs. `Community`). Every BV-BRC genome ID is a clickable link to its official [BV-BRC genome page](https://www.bv-brc.org/), and you can compare the **Laboratory phenotype**, the **BV-BRC computational prediction**, and the **CiproTyper prediction** side by side (a star `★` marks isolates where CiproTyper matches the laboratory result and BV-BRC does not). You can download any filtered view as CSV or JSON.
+   * **Step 3:** Click **Predict phenotype**. You will get the **Resistant (Cres)** or **Susceptible (Csus)** call, the 7-tile ciprotype with any changed positions highlighted and the `RecN-346` codon shown underneath, your sample's **Sequence Type (ST)**, a table of matching reference isolates broken down by ST, country, and body site, and the full **Why Resistant / Why Susceptible** three-checkpoint explanation. You can save your report using **Print or save as PDF**, **Download CSV**, or **Download JSON**.
+3. **Browse (`#/browse`):** Lets you search and filter all 2,734 founding genomes (plus approved community genomes) by **Species**, **Isolation source**, **Sequence type (ST)**, **Country**, **ciprotype**, **Lab phenotype**, **Collection year range**, **Genome ID or name**, and **Source** (`Founding set` vs. `Community`). Every BV-BRC genome ID is a clickable link to its official [BV-BRC genome page](https://www.bv-brc.org/), and you can compare the **Laboratory phenotype**, the **BV-BRC computational prediction**, and the **CiproTyper prediction** side by side (a star `★` marks isolates where CiproTyper matches the laboratory result and BV-BRC does not). You can download any filtered view as CSV or JSON.
 4. **Analytics (`#/analytics`):**
-   * **Top 12 Septatypes by Source:** Shows a color-coded bar chart of the 12 most common septatypes in each species broken down by body site.
-   * **Where is it Found? (World Map and Table):** Shows an interactive world map and country table that you can filter by species, ST (such as `ST131` or `ST258`), septatype, and phenotype to see global spread.
+   * **Top 12 ciprotypes by Source:** Shows a color-coded bar chart of the 12 most common ciprotypes in each species broken down by body site.
+   * **Where is it Found? (World Map and Table):** Shows an interactive world map and country table that you can filter by species, ST (such as `ST131` or `ST258`), ciprotype, and phenotype to see global spread.
 5. **Submit (`#/submit`) and Curate (`#/curate`):**
    * **How to Submit an Isolate:** Any researcher can contribute a new bacterial genome by choosing the species and body site, entering their **Submitter name** and **Contact email** (required), optionally adding a **BV-BRC genome ID** (with a `"Look up"` button that fills in the official name), **Country** (searchable list of 249 countries), **Year**, **Laboratory phenotype** (`Resistant` or `Susceptible`), **Affiliation**, and **Publication (DOI or web link)**, and uploading the genome FASTA file.
-   * **7-Point Informed Consent (`Notice version 2026-11-1`):** Before sending, a short consent window explains that **your sequence file is deleted immediately after analysis**, your email stays private for curator questions only, and if a curator approves your isolate, its derived septatype, ST, metadata, and your submitter attribution become part of the public repository and rules.
-   * **How Curation Works:** Submissions with a brand-new septatype or where the lab result disagrees with CiproTyper's prediction are placed in the **Needs review** list; others go to **Pending**. A curator signs in with a secret token on the **Curate** page to **Approve** or **Reject** each submission. Approving an isolate adds it to Browse and Analytics and adds its vote to the Tier 1 Majority Rule. If a mistake is discovered later, a curator can **Reject and remove** an approved isolate at any time, which cleanly removes both the isolate and its vote.
+   * **7-Point Informed Consent (`Notice version 2026-11-1`):** Before sending, a short consent window explains that **your sequence file is deleted immediately after analysis**, your email stays private for curator questions only, and if a curator approves your isolate, its derived ciprotype, ST, metadata, and your submitter attribution become part of the public repository and rules.
+   * **How Curation Works:** Submissions with a brand-new ciprotype or where the lab result disagrees with CiproTyper's prediction are placed in the **Needs review** list; others go to **Pending**. A curator signs in with a secret token on the **Curate** page to **Approve** or **Reject** each submission. Approving an isolate adds it to Browse and Analytics and adds its vote to the Tier 1 Majority Rule. If a mistake is discovered later, a curator can **Reject and remove** an approved isolate at any time, which cleanly removes both the isolate and its vote.
 6. **Theory (`#/theory`) and Calculation (`#/calc`):**
    * **Theory:** Lets you click any common tetratype (or type any 4 amino acids) to watch an interactive diagram of the **ciprofloxacin + water + `Mg2+` binding pocket** update in real time, showing which hydrogen bonds and negative charges are intact, weakened, or lost. It also displays the three checkpoints, the validation tables, and the `qnr` edge-case table.
    * **Calculation (`#/calc`):** Shows the complete step-by-step arithmetic for the 12-residue `GyrA` helix (`82-93`) and 11-residue `ParC` helix (`80-90`) on the Eisenberg scale, lets you type any 4 sample and reference residues to see the worked math live, and shows the accuracy across 18 different hydrophobicity cutoffs (`0.20` to `0.50`).
@@ -342,11 +341,11 @@ When you open [https://septatyper-is.onrender.com/](https://septatyper-is.onrend
 ```mermaid
 stateDiagram-v2
     [*] --> PrivacyParse : Researcher Uploads FASTA + Metadata + Agrees to Consent (v2026-11-1)
-    PrivacyParse : Sequence Read in Temp Folder -> Genome File Deleted -> Only Derived Septatype & Metadata Kept
-    PrivacyParse --> NeedsReview : Brand-new septatype OR lab result disagrees with call OR incomplete
-    PrivacyParse --> Pending : Known septatype AND lab result matches prediction (or lab not tested)
-    NeedsReview --> Approved : Curator Approves (Requires Lab R/S + Complete Septatype)
-    Pending --> Approved : Curator Approves (Requires Lab R/S + Complete Septatype)
+    PrivacyParse : Sequence Read in Temp Folder -> Genome File Deleted -> Only Derived ciprotype & Metadata Kept
+    PrivacyParse --> NeedsReview : Brand-new ciprotype OR lab result disagrees with call OR incomplete
+    PrivacyParse --> Pending : Known ciprotype AND lab result matches prediction (or lab not tested)
+    NeedsReview --> Approved : Curator Approves (Requires Lab R/S + Complete ciprotype)
+    Pending --> Approved : Curator Approves (Requires Lab R/S + Complete ciprotype)
     NeedsReview --> Rejected : Curator Rejects
     Pending --> Rejected : Curator Rejects
     Approved --> Rejected : Curator Revokes Later (Removes isolate from Browse & removes its vote from rules)
@@ -361,19 +360,19 @@ In line with bioinformatics journal standards, we state all limitations of Cipro
 
 1. **Accuracy is Measured on the Founding Reference Set (Not Yet an Independent Test Set):** Both the **98.1%** Tier 1 Majority Rule accuracy and the **97.2%** Tier 2 Grammar Rule accuracy are **resubstitution accuracies**, meaning they were measured on the same 2,734 founding isolates from [Ghosh et al. (2026)](https://doi.org/10.1038/s41598-026-75690-y) that were used to build the reference table and write the grammar rules. Testing CiproTyper on a completely independent external collection of clinical genomes with laboratory susceptibility results is the next priority.
 2. **Covers Four Bacterial Species and One Drug Only:** The rules are built specifically for **ciprofloxacin** in *E. coli*, *S. sonnei*, *S. enterica* subsp. I, and *K. pneumoniae*. They must not be used for other bacteria or other fluoroquinolone drugs without separate validation. Also, because *E. coli* and *S. sonnei* are genetically very close and share the same housekeeping genes, the tool cannot tell them apart automatically from sequence alone; you must select the species yourself.
-3. **Requires Assembled DNA Sequences (Not Raw Sequencing Reads):** You must upload assembled contigs or gene sequences in FASTA format. Raw sequencing read files (`FASTQ` from Illumina, Nanopore, or PacBio) are not accepted and must be assembled first. If an assembly is broken right across one of the five target codons or has unknown bases (`N`) there, CiproTyper will not guess the codon and will not produce a septatype.
+3. **Requires Assembled DNA Sequences (Not Raw Sequencing Reads):** You must upload assembled contigs or gene sequences in FASTA format. Raw sequencing read files (`FASTQ` from Illumina, Nanopore, or PacBio) are not accepted and must be assembled first. If an assembly is broken right across one of the five target codons or has unknown bases (`N`) there, CiproTyper will not guess the codon and will not produce a ciprotype.
 4. **Uneven Numbers Across Countries, Sources, and Species in the Founding Set:** More than half of the 2,734 founding genomes come from the United States (`1,495`), followed by Australia (`411`) and the United Kingdom (`409`). Also, while *K. pneumoniae* is mostly resistant (`88.5%`), *S. enterica* subsp. I has only **6 resistant isolates out of 510 (`1.2%`)**. Finally, the founding set covers Stool, Urine, and Respiratory isolates; the other 9 body sites and sources (`Blood`, `CSF`, `Wound`, `Food`, etc.) currently use pooled species-wide predictions until community submissions build up site-specific records for them.
 5. **No Stored `RecN-346` DNA Codons in the Founding Spreadsheet:** When you upload a DNA sequence, CiproTyper reads the exact 3-letter codon at `RecN-346` to tell susceptible `cta` apart from resistant `ctg` (Checkpoint 2). However, the original `Table_S1.xlsx` spreadsheet only listed the amino-acid letter (`L` or `F`), not the DNA codon, so Checkpoint 2 for `ctg` could not be scored on those 2,734 stored table rows.
 6. **Plasmid `qnr` Detection Uses Two Reference Alleles and Cannot Measure Gene Expression:** CiproTyper searches for `qnrB2` and `qnrS1` at `>= 80%` identity and `>= 90%` length coverage. Other `qnr` families (`qnrA`, `qnrC`, `qnrD`, `qnrE`, `qnrVC`), divergent alleles below 80% identity, or other resistance mechanisms such as `aac(6')-Ib-cr` or efflux pump changes (`acrAB-tolC`, `marA`, `soxS`, `ramA`) are not read. Conversely, finding a `qnr` gene in DNA does not prove the bacterium is actively expressing it (which is why a few `qnr`-positive isolates with wild-type `S-D-S-E` tested susceptible in the laboratory).
-7. **Hydrophobicity (`<H>`) is Only a Last Tie-Breaker for Borderline Novel Septatypes:** Across all 2,734 founding isolates, resistant isolates have a higher average `<H>` (`0.391`) than susceptible ones (`0.274`), and the full three-checkpoint grammar reaches **97.2% accuracy** at the `0.334` cutoff. However, in the small borderline group of **148 isolates** where the four QRDR amino acids fall in mixed columns and carry exactly 1 Resistant vote, `<H>` alone is right for only **41.2%** at `0.334` (and at most **59.5%** at `0.24`). That is why `<H>` is used strictly as a final tie-breaker inside Tier 2 when a septatype has never been seen before.
+7. **Hydrophobicity (`<H>`) is Only a Last Tie-Breaker for Borderline Novel ciprotypes:** Across all 2,734 founding isolates, resistant isolates have a higher average `<H>` (`0.391`) than susceptible ones (`0.274`), and the full three-checkpoint grammar reaches **97.2% accuracy** at the `0.334` cutoff. However, in the small borderline group of **148 isolates** where the four QRDR amino acids fall in mixed columns and carry exactly 1 Resistant vote, `<H>` alone is right for only **41.2%** at `0.334` (and at most **59.5%** at `0.24`). That is why `<H>` is used strictly as a final tie-breaker inside Tier 2 when a ciprotype has never been seen before.
 
 ## 8. Software Architecture, Database, and API Documentation
 
 The complete technical details of how the server is built, how the SQLite database tables work, how to deploy the Docker container, or how to call the 25 REST API endpoints from code, please open the separate technical reference document:
 
 * **Separate Technical & Software Reference:** [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md)
-* **Live Interactive API Documentation (Swagger UI):** [https://septatyper-is.onrender.com/docs](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)
-* **Source Code Repository:** [https://github.com/ikbalsk/Septatyper](https://github.com/ikbalsk/Septatyper)
+* **Live Interactive API Documentation (Swagger UI):** [https://ciprotyper-is.onrender.com/docs](https://www.google.com/search?q=https://ciprotyper-is.onrender.com/docs)
+* **Source Code Repository:** [https://github.com/ikbalsk/ciprotyper](https://github.com/ikbalsk/ciprotyper)
 
 ## 9. How to Cite and References
 
