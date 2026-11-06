@@ -1,6 +1,6 @@
 # CiproTyper: Web Server, Curated Repository, and Rest API for Ciprofloxacin Resistance Prediction in Enterobacterales
 **Live Website:** [https://septatyper-is.onrender.com/](https://septatyper-is.onrender.com/)    
-**Software Architecture and Technical Reference:** See [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) (or the [GitHub Repository](https://github.com/ikbalsk/septatyper) and [Interactive API Guide](https://www.google.com/search?q=https://sepatyper-is.onrender.com/docs)) for all software design, database structure, and programming details.
+**Software Architecture and Technical Reference:** See [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) (or the [GitHub Repository](https://github.com/ikbalsk/septatyper) and [Interactive API Guide](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)) for all software design, database structure, and programming details.
 **Founding Study:** Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. *Scientific Reports*. 2026. <https://doi.org/10.1038/s41598-026-75690-y>
 **Interactive OpenAPI Documentation:** [https://septatyper-is.onrender.com/docs](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)
 
