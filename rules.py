@@ -623,8 +623,8 @@ def cutoff_stats() -> dict:
     for t in rows:
         a = t["tetratype"].split("-")
         nv = sum(1 for v in grammar.votes(*a) if v["vote"])
-        # <H> decides only where the two columns of the table have the same number of marks and exactly one position votes Resistant
-        groups.append((grammar.mean_h(a), nv, t["r"], t["s"], grammar.checkpoint1("ecoli", a)["resolved_by"] == "hydrophobicity"))
+        # <H> decides only where the four residues are not all in one column of the table and exactly one position votes Resistant
+        groups.append((grammar.mean_h(a), nv, t["r"], t["s"], grammar.checkpoint1("ecoli", a)["pattern"] is None and nv == 1))
     n_r, n_s = sum(g[2] for g in groups), sum(g[3] for g in groups)
     cut = grammar.H_CUTOFF
     grid = sorted({round(0.20 + 0.02 * i, 2) for i in range(16)} | {cut, grammar.H_WILD})

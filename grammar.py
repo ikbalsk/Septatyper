@@ -109,85 +109,47 @@ def votes(g83, g87, p80, p84) -> list[dict]:
 
 
 POS = ("GyrA-83", "GyrA-87", "ParC-80", "ParC-84")
-# Checkpoint 1, the syntax rules table. Each position has a Susceptible and a Resistant column. A residue can sit in both
-# columns (D and E at GyrA-87, E and D at ParC-84), so the four positions are read together.
-# The residue lists below are the DATA behind the table (they decide which column a residue is marked in). The table on the
-# site no longer prints them: it shows the amino-acid PROPERTIES of each column (PROP_TAGS) and lights up the sample's residue
-# and the properties that residue has. Edit a list here to move a residue between columns.
-#   GyrA-83 Resistant : hydrophobic residues without an -OH group (F L I W, and A V M)
-#   GyrA-87 Susceptible: negatively charged residue or its amide derivative (D E, and the amides N Q)
-#   GyrA-87 Resistant  : hydrophobic, or negatively charged residue or its amide derivative
-#   ParC-80 Resistant  : hydrophobic residues without an -OH group (I F W, and L A V M), plus the exception S
-#   ParC-84 Resistant  : hydrophobic or negatively charged residue, plus the exception K
-# The one exception counts as Resistant and is marked only when the sample carries it: the ParC pair S-K (Fig. 6b of the paper),
+# Checkpoint 1, the syntax rules table: the residues that make each position Susceptible or Resistant.
+# A residue can sit in both columns (D at GyrA-87, E at ParC-84), so the four positions are read together.
+# The one exception counts as Resistant and is shown only when the sample carries it: the ParC pair S-K (Fig. 6b of the paper),
 # that is S at ParC-80 together with K at ParC-84. S alone (the susceptible S-E state) or K alone is not an exception.
-SUSCEPTIBLE_SET = {"GyrA-83": "SYT", "GyrA-87": "DNEQ", "ParC-80": "SYT", "ParC-84": "DE"}
-RESISTANT_SET = {"GyrA-83": "FLIWAVM", "GyrA-87": "NDGYAEQ", "ParC-80": "IFWLAVM", "ParC-84": "EVD"}
+SUSCEPTIBLE_SET = {"GyrA-83": "SYT", "GyrA-87": "DNE", "ParC-80": "SYT", "ParC-84": "DE"}
+RESISTANT_SET = {"GyrA-83": "FLIW", "GyrA-87": "NDGYAE", "ParC-80": "IFW", "ParC-84": "EVD"}
 RESISTANT_EXCEPTION = {"ParC-80": "S", "ParC-84": "K"}      # one pair: both must be present
 ROWS = [(p, " ".join(SUSCEPTIBLE_SET[p]), " ".join(RESISTANT_SET[p])) for p in POS]
-# The wording of each column, shown beside the residues in the API: (Susceptible sentence, Resistant sentence)
-CLASS_TEXT = {"GyrA-83": ("Polar residue with -OH group", "Hydrophobic residue without -OH group"),
-              "GyrA-87": ("Negatively charged residue or its amide derivative", "Hydrophobic residue, or negatively charged residue or its amide derivative"),
-              "ParC-80": ("Polar residue with -OH group", "Hydrophobic residue without -OH group"),
+# The paper's Table S6 wording for each column, shown beside the residues: (Csus sentence, Cres sentence)
+CLASS_TEXT = {"GyrA-83": ("Polar residue with -OH group", "Hydrophobic residue"),
+              "GyrA-87": ("Negatively charged or polar residue", "Uncharged or negatively charged residue"),
+              "ParC-80": ("Polar residue with -OH group", "Hydrophobic residue"),
               "ParC-84": ("Negatively charged residue", "Hydrophobic or negatively charged residue")}
-
-# Amino-acid properties used by the table. A property lights up for the sample only in a column the residue is marked in.
-#   hydrophobic : positive on the Eisenberg scale (A V I L M F W P G C and Y; ASSUMPTION for display, Y is +0.26)
-#   oh          : has an -OH group (S T Y)          no_oh : has none
-#   polar       : polar side chain (S T Y N Q)
-#   neg         : negatively charged (D E)          neg_deriv : amide derivative of a negatively charged residue (N from D, Q from E)
-RES_PROPS = {a: {k for k, on in (("hydrophobic", EISENBERG[a] > 0), ("oh", a in POLAR_OH), ("no_oh", a not in POLAR_OH),
-                                 ("polar", a in POLAR_UNCHARGED), ("neg", a in ACIDIC), ("neg_deriv", a in "NQ")) if on}
-             for a in EISENBERG}
-_P = {"polar": "Polar", "oh": "-OH group", "no_oh": "No -OH group", "hydrophobic": "Hydrophobic",
-      "neg": "Negatively charged", "neg_deriv": "Amide derivative of a negatively charged residue"}
-# the property tags printed in each column of the table, in order: (key, label)
-PROP_TAGS = {"GyrA-83": {"S": ["polar", "oh"], "R": ["hydrophobic", "no_oh"]},
-             "GyrA-87": {"S": ["neg", "neg_deriv"], "R": ["hydrophobic", "neg", "neg_deriv"]},
-             "ParC-80": {"S": ["polar", "oh"], "R": ["hydrophobic", "no_oh"]},
-             "ParC-84": {"S": ["neg"], "R": ["hydrophobic", "neg"]}}
-EXCEPTION_TAG = {"ParC-80": "Exception: S together with K at ParC-84", "ParC-84": "Exception: K together with S at ParC-80"}
-
-
-def _tags(pos: str, side: str, res: str, member: bool, exc: bool) -> list[dict]:
-    """The property tags of one column. A tag is lit (hit) when the sample residue is marked in this column and has the property."""
-    out = [{"key": k, "label": _P[k], "hit": bool(member and k in RES_PROPS.get(res, ())), "exception": False} for k in PROP_TAGS[pos][side]]
-    if side == "R" and pos in EXCEPTION_TAG:
-        out.append({"key": "exception", "label": EXCEPTION_TAG[pos], "hit": exc, "exception": True})
-    return out
 
 
 def _cell(pos: str, res: str, pair: bool = False) -> dict:
-    """The two columns of one row of the table. A residue is marked in a column when it belongs to it; an exception residue
-    is marked in the Resistant column only when the sample carries the whole S-K pair (pair=True)."""
+    """The two columns of one row of the table, each residue flagged when it is the sample's. An exception residue
+    is added to the Resistant column only when the sample carries the whole S-K pair (pair=True)."""
     exc = RESISTANT_EXCEPTION.get(pos, "") if pair and res == RESISTANT_EXCEPTION.get(pos) else ""
-    in_s, in_r = res in SUSCEPTIBLE_SET[pos], res in RESISTANT_SET[pos] or bool(exc)
     return {"S": [{"residue": a, "hit": a == res, "exception": False} for a in SUSCEPTIBLE_SET[pos]],
             "R": [{"residue": a, "hit": a == res, "exception": False} for a in RESISTANT_SET[pos]]
                  + ([{"residue": exc, "hit": True, "exception": True}] if exc else []),
-            "S_props": _tags(pos, "S", res, in_s, False), "R_props": _tags(pos, "R", res, in_r, bool(exc)),
-            "fits_s": in_s, "fits_r": in_r, "exception": bool(exc)}
+            "fits_s": res in SUSCEPTIBLE_SET[pos], "fits_r": res in RESISTANT_SET[pos] or bool(exc), "exception": bool(exc)}
 
 
 def checkpoint1(species: str, aas4) -> dict:
     """Checkpoint 1, the context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84, from the syntax rules table.
-    Each of the four sample residues is marked in the Susceptible column, the Resistant column, or both (D at GyrA-87 and
-    E or D at ParC-84 sit in both). The column with MORE marks decides: Susceptible when more positions are marked in the
-    Susceptible column, Resistant when more are marked in the Resistant column (all four in one column is the clearest case).
-    Only when the two columns have the same number of marks does the table give no answer; then the residue votes and <H>
-    settle it (ASSUMPTION). S. sonnei keeps its extra single-change rule."""
+    Susceptible when all four residues are in the Susceptible column, Resistant when all four are in the Resistant column
+    (the exception pair S-K included). Where the four fit neither, the written rules are silent: the residue votes and <H>
+    settle it (ASSUMPTION), and S. sonnei keeps its extra single-change rule."""
     pair = aas4[2] == RESISTANT_EXCEPTION["ParC-80"] and aas4[3] == RESISTANT_EXCEPTION["ParC-84"]
     cells = []
     for pos, res in zip(POS, aas4):
         c = _cell(pos, res, pair)
         cells.append({"position": pos, "residue": res, **c})
-    n_s, n_r = sum(1 for c in cells if c["fits_s"]), sum(1 for c in cells if c["fits_r"])
-    pattern = "susceptible" if n_s == 4 else "resistant" if n_r == 4 else None
+    pattern = "susceptible" if all(c["fits_s"] for c in cells) else "resistant" if all(c["fits_r"] for c in cells) else None
     vs = votes(*aas4)
     n = sum(1 for x in vs if x["vote"])
     h = mean_h(list(aas4))
     voter = next((x["position"] for x in vs if x["vote"]), None)
-    used_exc = [c["position"] for c in cells if c["exception"]] if n_r > n_s else []
+    used_exc = [c["position"] for c in cells if c["exception"]] if pattern == "resistant" else []
     override = None
     if pattern == "resistant":
         call, by = "Resistant", "pattern"
@@ -197,24 +159,17 @@ def checkpoint1(species: str, aas4) -> dict:
         rule = "S. sonnei single GyrA-83 or GyrA-87 change"
     elif pattern == "susceptible":
         call, by, rule = "Susceptible", "pattern", "all four residues are in the Susceptible column"
-    elif n_s > n_r:
-        call, by = "Susceptible", "marks"
-        rule = f"{n_s} positions are marked in the Susceptible column and {n_r} in the Resistant column: the column with more marks decides"
-    elif n_r > n_s:
-        call, by = "Resistant", "marks"
-        rule = (f"{n_r} positions are marked in the Resistant column and {n_s} in the Susceptible column: the column with more marks decides"
-                + (" (exception: the ParC pair S-K)" if used_exc else ""))
     elif n >= 2:
-        call, by, rule = "Resistant", "votes", f"both columns have {n_s} marks; {n} of 4 positions vote Resistant"
+        call, by, rule = "Resistant", "votes", f"not all four in one column; {n} of 4 positions vote Resistant"
     elif n == 0:
-        call, by, rule = "Susceptible", "votes", f"both columns have {n_s} marks; no position votes Resistant"
+        call, by, rule = "Susceptible", "votes", "not all four in one column; no position votes Resistant"
     else:
         cut = H_CUTOFF if _CUT[0] is None else _CUT[0]
         call = "Resistant" if h > cut else "Susceptible"
         by = "hydrophobicity"
-        rule = f"both columns have {n_s} marks; 1 vote, so the QRDR helix mean hydrophobicity {h} is {'above' if h > cut else 'at or below'} {cut}"
+        rule = f"not all four in one column; 1 vote, so the QRDR helix mean hydrophobicity {h} is {'above' if h > cut else 'at or below'} {cut}"
     return {"call": call, "pattern": pattern, "resolved_by": by, "rule": rule, "cells": cells, "votes": vs, "n_votes": n,
-            "mean_h": h, "override": override, "exceptions": used_exc, "marks": {"susceptible": n_s, "resistant": n_r}}
+            "mean_h": h, "override": override, "exceptions": used_exc}
 
 
 def checkpoint2(r346: str, codon: str | None = None) -> dict:
@@ -320,15 +275,13 @@ def explain(species: str, aas, g: dict, ref4=None, qnr=(False, False), codon=Non
             note = "exception residue"
         pos.append({"position": cell["position"], "residue": cell["residue"], "class": aa_class(cell["residue"]), "column": column,
                     "fits_susceptible": fs, "fits_resistant": fr, "exception": cell["exception"],
-                    "susceptible": cell["S"], "resistant": cell["R"], "susceptible_props": cell["S_props"],
-                    "resistant_props": cell["R_props"], "note": note,
+                    "susceptible": cell["S"], "resistant": cell["R"], "note": note,
                     "susceptible_label": CLASS_TEXT[cell["position"]][0], "resistant_label": CLASS_TEXT[cell["position"]][1]})
     sample = h_block([p["residue"] for p in pos])
     ref = h_block(list(ref4) if ref4 else list(WILD4))
     return {"decided_by": g["decided_by"], "n_resistant_positions": g["n_votes"], "positions": pos,
             "checkpoints": {"residues": {"call": c1["call"], "pattern": c1["pattern"], "resolved_by": c1["resolved_by"], "rule": c1["rule"],
-                                         "n_votes": c1["n_votes"], "override": c1["override"], "exceptions": c1["exceptions"],
-                                         "marks": c1["marks"]},
+                                         "n_votes": c1["n_votes"], "override": c1["override"], "exceptions": c1["exceptions"]},
                             "recn": c2, "qnr": c3},
             "hydrophobicity": {"gyr": sample["gyr"], "parc": sample["parc"], "mean": sample["mean"], "cutoff": H_CUTOFF,
                                "side": "above" if sample["mean"] > H_CUTOFF else "at_or_below"},

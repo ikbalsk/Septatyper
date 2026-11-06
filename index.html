@@ -18,18 +18,11 @@
   <nav id="nav" aria-label="Main">
     <a href="#/predict" data-p="predict">Predict</a>
     <a href="#/browse" data-p="browse">Browse</a>
-    <a href="#/analyze" data-p="analyze">Analyze</a>
+    <a href="#/analytics" data-p="analytics">Analytics</a>
     <a href="#/submit" data-p="submit">Submit</a>
-    <div class="dd" id="help-dd">
-      <button type="button" class="dd-btn" id="help-btn" aria-haspopup="true" aria-expanded="false" aria-controls="help-menu">Help <span aria-hidden="true">&#9662;</span></button>
-      <div class="dd-menu" id="help-menu" role="menu" aria-label="Help">
-        <a href="#/about" data-p="about" role="menuitem">About</a>
-        <a href="#/theory" data-p="theory" role="menuitem">Theory</a>
-        <a href="#/documentation" data-p="documentation" role="menuitem">Documentation</a>
-        <a href="#/data" data-p="data" role="menuitem">API and data</a>
-        <a href="#/references" data-p="references" role="menuitem">References</a>
-      </div>
-    </div>
+    <a href="#/theory" data-p="theory">Theory</a>
+    <a href="#/data" data-p="data">API and data</a>
+    <a href="#/about" data-p="about">About</a>
   </nav>
 </div></header>
 
@@ -45,6 +38,7 @@
       <a class="btn ghost" href="#/browse">Browse the isolates</a>
     </div>
     <p class="counter">Currently hosting <b id="c-genomes">2,734</b> genomes across <b id="c-species">4</b> species, <b id="c-countries">28</b> countries and <b id="c-septa">64</b> septatypes.</p>
+    <p class="counter hero-credit">The database and the septatype scheme come from our study: Ghosh, A., Deb, P., Bose, P. <i>et al.</i> <i>Sci Rep</i> (2026), <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">doi:10.1038/s41598-026-75690-y</a>.</p>
     <p class="demo-label" id="demo-label">E. coli, same species, two septatypes</p>
     <div class="tiles" id="demo-tiles" aria-live="polite"></div>
     <div class="verdict"><span class="badge Susceptible" id="demo-badge">Susceptible</span><span id="demo-note" class="counter" style="margin:0"></span>
@@ -162,9 +156,9 @@
   </div>
 </section>
 
-<!-- ANALYZE -->
-<section id="p-analyze" class="page">
-  <div class="page-head"><h2>Analyze</h2><p>Septatype frequency by isolation source and the geography of a clone or septatype. Approved submissions are included.</p></div>
+<!-- ANALYTICS -->
+<section id="p-analytics" class="page">
+  <div class="page-head"><h2>Analytics</h2><p>Septatype frequency by isolation source and the geography of a clone or septatype. Approved submissions are included.</p></div>
   <div class="band">
     <h3>Septatype frequency by isolation source</h3>
     <div class="row2"><div><label for="a-sp">Species</label><select id="a-sp"></select></div></div>
@@ -240,20 +234,20 @@
     </div>
   </div>
   <div class="band"><h3>Grammar rules: three checkpoints</h3>
-    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. Each column of the table lists amino-acid properties. A sample residue is marked in a column when it belongs to it, and the column with <b>more marked positions</b> decides: the isolate is <b>susceptible</b> if more positions are marked in the Susceptible column and <b>resistant</b> if more are marked in the Resistant column.</p>
+    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. The isolate is <b>susceptible</b> if all four residues are in the Susceptible column and <b>resistant</b> if all four are in the Resistant column.</p>
     <div class="scroll"><table class="rtab">
       <tr><th>Phenotype</th><th>GyrA-83</th><th>GyrA-87</th><th>ParC-80</th><th>ParC-84</th></tr>
-      <tr><td><b>Susceptible</b></td><td><div class="ptags"><span class="ptag">Polar</span><span class="ptag">-OH group</span></div></td><td><div class="ptags"><span class="ptag">Negatively charged</span><span class="ptag">Amide derivative of a negatively charged residue</span></div></td><td><div class="ptags"><span class="ptag">Polar</span><span class="ptag">-OH group</span></div></td><td><div class="ptags"><span class="ptag">Negatively charged</span></div></td></tr>
-      <tr><td><b>Resistant</b></td><td><div class="ptags"><span class="ptag">Hydrophobic</span><span class="ptag">No -OH group</span></div></td><td><div class="ptags"><span class="ptag">Hydrophobic</span><span class="ptag">Negatively charged</span><span class="ptag">Amide derivative of a negatively charged residue</span></div></td><td><div class="ptags"><span class="ptag">Hydrophobic</span><span class="ptag">No -OH group</span><span class="ptag exc">Exception: S together with K at ParC-84</span></div></td><td><div class="ptags"><span class="ptag">Hydrophobic</span><span class="ptag">Negatively charged</span><span class="ptag exc">Exception: K together with S at ParC-80</span></div></td></tr>
+      <tr><td><b>Susceptible</b></td><td>S, Y, T<div class="clabel">(Polar residue with -OH group)</div></td><td>D, N, E<div class="clabel">(Negatively charged or polar residue)</div></td><td>S, Y, T<div class="clabel">(Polar residue with -OH group)</div></td><td>D, E<div class="clabel">(Negatively charged residue)</div></td></tr>
+      <tr><td><b>Resistant</b></td><td>F, L, I, W<div class="clabel">(Hydrophobic residue)</div></td><td>N, D, G, Y, A, E<div class="clabel">(Uncharged or negatively charged residue)</div></td><td>I, F, W<div class="clabel">(Hydrophobic residue)</div><span class="muted">Exception: S</span></td><td>E, V, D<div class="clabel">(Hydrophobic or negatively charged residue)</div><span class="muted">Exception: K</span></td></tr>
     </table></div>
-    <p class="muted" style="font-size:.9rem;margin-top:8px">A residue can be marked in both columns (for example D at GyrA-87 or E at ParC-84), so the four positions are read together. That is the context sensitivity. The two exceptions are one pair, S at ParC-80 together with K at ParC-84 (the F-N-S-K tetratype, Fig. 6b of the paper): S alone is the susceptible S-E state, and K alone is not listed. In a result, the table shows the sample&#39;s residue in the column where it is marked and lights it together with the properties that residue has; the exception is lit only when the sample carries the whole pair. The number of marked positions in each column is counted under the table. Source: Ghosh et al., <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">Scientific Reports, doi:10.1038/s41598-026-75690-y</a>.</p>
+    <p class="muted" style="font-size:.9rem;margin-top:8px">A residue can be in both columns (D at GyrA-87, E at ParC-84), so the four positions are read together. That is the context sensitivity. The two exceptions are one pair, S at ParC-80 together with K at ParC-84 (the F-N-S-K tetratype, Fig. 6b of the paper): S alone is the susceptible S-E state, and K alone is not listed. In a result, the exception appears only when the sample carries the whole pair, and the sample&#39;s residue blinks in the column where it is found. The sentence under each set of residues is the paper&#39;s Table S6 wording for that column; the residues are those observed or possible in Enterobacteriaceae (Fig. 6). Source: Ghosh et al., <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">Scientific Reports, doi:10.1038/s41598-026-75690-y</a>.</p>
     <p><b>Checkpoint 2.</b> RecN-346. Susceptible if leucine (L) encoded by cta. Resistant if leucine encoded by ctg, or phenylalanine (F).</p>
     <p><b>Checkpoint 3.</b> PMQR genes. Susceptible if both qnrB2 and qnrS1 are absent. Resistant if either or both are present.</p>
     <p><b>Combined.</b> The isolate is predicted susceptible if all checkpoints consider it susceptible, and resistant if any checkpoint considers it resistant.</p>
     <p><a href="#/calc">See the worked calculation of the hydrophobicity value and the cutoff</a></p>
     <h3 style="margin-top:16px">Where the written rules are silent</h3>
-    <p>When both columns of the checkpoint 1 table have the same number of marked positions (for example L-D-S-E, three marks each), the rules above give no answer. The site then counts the positions outside the Susceptible class: two or more mean Resistant and none means Susceptible. One position is settled by the QRDR helix mean hydrophobicity &lt;H&gt; (Eisenberg scale) against a cutoff of 0.334, the midpoint between the wild-type helices (S-D-S-E, 0.270) and the resistant reference helices (L-N-I-E, 0.397). &lt;H&gt; covers the whole GyrA helix (82-93, 12 residues) and ParC helix (80-90, 11 residues) with the sample&#39;s residues at positions 83, 87, 80 and 84: the GyrA mean is the sum over 12, the ParC mean is the sum over 11, and &lt;H&gt; is the average of the two. These steps are assumptions of the site, not part of the three written checkpoints. <i>S. sonnei</i> also keeps one extra rule taken from the reference isolates: a single change at GyrA-83 or GyrA-87 gives Resistant.</p>
-    <p class="muted">The checkpoints are only used for septatypes not seen in the reference isolates, and are shown next to every majority-rule call. The residues that belong to each column are set in <code>app/grammar.py</code> (<code>SUSCEPTIBLE_SET</code>, <code>RESISTANT_SET</code> and <code>RESISTANT_EXCEPTION</code>), and the properties printed in the table in <code>PROP_TAGS</code>. The RecN-346 codon is read from an uploaded genome or typed in by hand, and the reference isolates carry no codon, so checkpoint 2 for ctg could not be scored on them.</p>
+    <p>When the four residues are not all in one column in checkpoint 1 (for example L-D-S-E), the rules above give no answer. The site then counts the positions outside the Susceptible column: two or more mean Resistant and none means Susceptible. One position is settled by the QRDR helix mean hydrophobicity &lt;H&gt; (Eisenberg scale) against a cutoff of 0.334, the midpoint between the wild-type helices (S-D-S-E, 0.270) and the resistant reference helices (L-N-I-E, 0.397). &lt;H&gt; covers the whole GyrA helix (82-93, 12 residues) and ParC helix (80-90, 11 residues) with the sample&#39;s residues at positions 83, 87, 80 and 84: the GyrA mean is the sum over 12, the ParC mean is the sum over 11, and &lt;H&gt; is the average of the two. These steps are assumptions of the site, not part of the three written checkpoints. <i>S. sonnei</i> also keeps one extra rule taken from the reference isolates: a single change at GyrA-83 or GyrA-87 gives Resistant.</p>
+    <p class="muted">The checkpoints are only used for septatypes not seen in the reference isolates, and are shown next to every majority-rule call. The residue table is set in <code>app/grammar.py</code> (<code>SUSCEPTIBLE_SET</code>, <code>RESISTANT_SET</code> and <code>RESISTANT_EXCEPTION</code>). The RecN-346 codon is read from an uploaded genome or typed in by hand, and the reference isolates carry no codon, so checkpoint 2 for ctg could not be scored on them.</p>
   </div>
   <div class="band"><h3>Performance validation</h3><div id="t-valid"></div></div>
   <div class="band"><h3>Amino acid hydrophobicity (Eisenberg normalised consensus)</h3><div class="scroll"><table id="t-aa"></table></div></div>
@@ -263,33 +257,6 @@
 <section id="p-calc" class="page">
   <div class="page-head"><h2>How the call is calculated</h2><p>The residue table, the QRDR helix hydrophobicity value and the cutoff, with worked numbers.</p></div>
   <div id="calc-body"><div class="band muted">Loading</div></div>
-</section>
-
-<!-- DOCUMENTATION -->
-<section id="p-documentation" class="page">
-  <div class="page-head"><h2>Documentation</h2></div>
-  <div class="band">
-    <p>All source files and detailed documentation can be found at <a href="https://github.com/ikbalsk/Septatyper" target="_blank" rel="noopener">github.com/ikbalsk/septatyper</a>.</p>
-  </div>
-</section>
-
-<!-- REFERENCES -->
-<section id="p-references" class="page">
-  <div class="page-head"><h2>References</h2></div>
-  <div class="band">
-    <ol class="refs">
-      <li>Ghosh A, Deb P, Bose P, Sk I, Biswas S, Mukhopadhyay AK, Ganguly D, Chattopadhyay S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. <i>Scientific Reports</i>. 2026. <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">https://doi.org/10.1038/s41598-026-75690-y</a></li>
-      <li>Camacho C, Coulouris G, Avagyan V, Ma N, Papadopoulos J, Bealer K, Madden TL. BLAST+: architecture and applications. <i>BMC Bioinformatics</i>. 2009;10:421. <a href="https://doi.org/10.1186/1471-2105-10-421" target="_blank" rel="noopener">https://doi.org/10.1186/1471-2105-10-421</a></li>
-      <li>Cock PJA, Antao T, Chang JT, Chapman BA, Cox CJ, Dalke A, Friedberg I, Hamelryck T, Kauff F, Wilczynski B, de Hoon MJL. Biopython: freely available Python tools for computational molecular biology and bioinformatics. <i>Bioinformatics</i>. 2009;25(11):1422-1423. <a href="https://doi.org/10.1093/bioinformatics/btp163" target="_blank" rel="noopener">https://doi.org/10.1093/bioinformatics/btp163</a></li>
-      <li>Jolley KA, Bray JE, Maiden MCJ. Open-access bacterial population genomics: BIGSdb software, the PubMLST.org website and their applications. <i>Wellcome Open Research</i>. 2018;3:124. <a href="https://doi.org/10.12688/wellcomeopenres.14826.1" target="_blank" rel="noopener">https://doi.org/10.12688/wellcomeopenres.14826.1</a></li>
-      <li>Wirth T, Falush D, Lan R, Colles F, Mensa P, Wieler LH, Karch H, Reeves PR, Maiden MCJ, Ochman H, Achtman M. Sex and virulence in <i>Escherichia coli</i>: an evolutionary perspective. <i>Molecular Microbiology</i>. 2006;60(5):1136-1151. <a href="https://doi.org/10.1111/j.1365-2958.2006.05172.x" target="_blank" rel="noopener">https://doi.org/10.1111/j.1365-2958.2006.05172.x</a></li>
-      <li>Achtman M, Wain J, Weill FX, Nair S, Zhou Z, Sangal V, Krauland MG, Hale JL, Harbottle H, Uesbeck A, Dougan G, Harrison LH, Brisse S. Multilocus sequence typing as a replacement for serotyping in <i>Salmonella enterica</i>. <i>PLoS Pathogens</i>. 2012;8(6):e1002776. <a href="https://doi.org/10.1371/journal.ppat.1002776" target="_blank" rel="noopener">https://doi.org/10.1371/journal.ppat.1002776</a></li>
-      <li>Diancourt L, Passet V, Verhoef J, Grimont PAD, Brisse S. Multilocus sequence typing of <i>Klebsiella pneumoniae</i> nosocomial isolates. <i>Journal of Clinical Microbiology</i>. 2005;43(8):4178-4182. <a href="https://doi.org/10.1128/JCM.43.8.4178-4182.2005" target="_blank" rel="noopener">https://doi.org/10.1128/JCM.43.8.4178-4182.2005</a></li>
-      <li>Eisenberg D, Schwarz E, Komaromy M, Wall R. Analysis of membrane and surface protein sequences with the hydrophobic moment plot. <i>Journal of Molecular Biology</i>. 1984;179(1):125-142. <a href="https://doi.org/10.1016/0022-2836(84)90309-7" target="_blank" rel="noopener">https://doi.org/10.1016/0022-2836(84)90309-7</a></li>
-      <li>Olson RD, Assaf R, Brettin T, et al. Introducing the Bacterial and Viral Bioinformatics Resource Center (BV-BRC): a resource combining PATRIC, IRD and ViPR. <i>Nucleic Acids Research</i>. 2023;51(D1):D678-D689. <a href="https://doi.org/10.1093/nar/gkac1003" target="_blank" rel="noopener">https://doi.org/10.1093/nar/gkac1003</a></li>
-      <li>Aldred KJ, Kerns RJ, Osheroff N. Mechanism of quinolone action and resistance. <i>Biochemistry</i>. 2014;53(10):1565-1574. <a href="https://doi.org/10.1021/bi5000564" target="_blank" rel="noopener">https://doi.org/10.1021/bi5000564</a></li>
-    </ol>
-  </div>
 </section>
 
 <!-- DATA -->
@@ -332,7 +299,7 @@
     <h3>Sequence types</h3>
     <p>The sequence type (ST) of an uploaded genome is read with PubMLST schemes: Achtman for <i>E. coli</i>, <i>S. sonnei</i> and <i>S. enterica</i>, Diancourt for <i>K. pneumoniae</i>. An ST is given only when all seven alleles match exactly and the profile exists. Otherwise the nearest alleles are shown. The STs of the reference isolates come from Table S1. Scheme data were taken from the tseemann/mlst database (downloaded 2026-03-11) and the PubMLST website; cite PubMLST (Jolley et al. 2018).</p>
     <h3>When the genome does not match the chosen species</h3>
-    <p>Checkpoint 1 reads GyrA, ParC and RecN against the reference of the species you chose. If any of the three matches that reference at less than 90% identity, or is not found, checkpoint 1 cannot be applied and the phenotype is based on checkpoints 2 and 3 only. Separately, for a genome-sized input every gene of that species&#39; MLST scheme should match at 90% identity or more; if one does not, the result carries the note &quot;Please verify the species selected and resubmit&quot;.</p>
+    <p>Checkpoint 1 reads GyrA, ParC and RecN against the reference of the species you chose. If any of the three matches that reference at less than 90% identity, or is not found, checkpoint 1 cannot be applied and the phenotype is based on checkpoints 2 and 3 only. Separately, for a genome-sized input every gene of that species&#39; MLST scheme should match at 95% identity or more; if one does not, the result carries the note &quot;Please verify the species selected and resubmit&quot;.</p>
     <h3>Hydrophobicity (QRDR helix)</h3>
     <p>The mean hydrophobicity &lt;H&gt; is read over the whole quinolone resistance-determining region helix of each enzyme: GyrA 82-93 (D<b>S</b>AVY<b>D</b>TIVRMA, 12 residues) and ParC 80-90 (<b>S</b>ACY<b>E</b>AMVLMA, 11 residues). The four tetratype positions (in bold) take the sample&#39;s residues and the others stay fixed. The GyrA helix mean is the sum of H over 12, the ParC helix mean is the sum over 11, and &lt;H&gt; = (GyrA mean + ParC mean) / 2. The three values are also in the JSON download and the API for every isolate.</p>
     <h3>What the numbers mean</h3>
@@ -369,7 +336,7 @@
 </section>
 
 </main>
-<footer><a href="#/curate">Curator sign in</a></footer>
+<footer><p class="credit-line">Ciprotyper and its database are based on: Ghosh, A., Deb, P., Bose, P. <i>et al.</i> Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. <i>Sci Rep</i> (2026). <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">https://doi.org/10.1038/s41598-026-75690-y</a></p>Ciprotyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
 <script src="/static/app.js"></script>
 
 <dialog id="consent" class="consent" aria-labelledby="consent-title">

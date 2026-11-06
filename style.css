@@ -279,25 +279,3 @@ dialog.consent h2{margin:0 0 4px;font-size:1.2rem;color:var(--th-ink)}
 .consent-actions .btn{flex:1 1 140px}
 .consent-actions .btn:disabled{opacity:.5;cursor:not-allowed}
 button.linklike{background:none;border:0;padding:0;font:inherit;color:var(--blue);text-decoration:underline;cursor:pointer}
-
-/* Help menu (drop-down in the main navigation) */
-.dd{position:relative;display:flex}
-.dd-btn{background:none;border:0;border-bottom:3px solid transparent;color:#dbe8f7;font:inherit;font-size:.95rem;padding:14px 12px;cursor:pointer;white-space:nowrap}
-.dd-btn:hover,.dd.open .dd-btn{color:#fff}
-.dd-btn.on{color:#fff;border-color:#fff}
-.dd-menu{display:none;position:fixed;z-index:40;min-width:190px;background:var(--top);border:1px solid #ffffff33;border-radius:0 0 8px 8px;box-shadow:0 10px 28px rgba(11,60,114,.4);padding:4px 0}
-.dd.open .dd-menu{display:block}
-.dd-menu a{display:block;padding:10px 16px;border-bottom:0;font-size:.93rem}
-.dd-menu a:hover{background:#ffffff1f}
-.dd-menu a.on{background:#ffffff2e;border-color:transparent}
-
-/* checkpoint 1 table: amino-acid properties; the sample's residue and the properties it has are lit */
-.ptags{display:flex;flex-wrap:wrap;gap:4px;max-width:16em;margin-top:3px}
-.ptag{display:inline-block;white-space:normal;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font:500 .76rem var(--sans)}
-.ptag.exc{border-style:dashed}
-.ptag.hit{font-weight:700}
-.ptag.hit.s{background:var(--sus-bg);border-color:var(--sus);color:var(--sus);box-shadow:0 0 0 2px var(--sus-bg)}
-.ptag.hit.r{background:var(--res-bg);border-color:var(--res);color:var(--res);box-shadow:0 0 0 2px var(--res-bg)}
-table.rtab tr.marks td{border-top:2px solid var(--line);font-size:.88rem}
-ol.refs{margin:0;padding-left:1.4em}
-ol.refs li{margin:0 0 10px;overflow-wrap:anywhere}
