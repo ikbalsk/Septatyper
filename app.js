@@ -41,34 +41,14 @@ const PAL = ["#1d4e89", "#4d9de0", "#9cc4f5", "#00897b", "#8e6bbf", "#c98a00", "
 const hcol = h => PAL[Math.max(0, META.sources.findIndex(s => s.key === h)) % PAL.length];
 
 /* ------------------------------------------------------------------ router */
-const PAGES = ["home", "predict", "browse", "analytics", "submit", "theory", "data", "about", "documentation", "references", "curate", "calc"];
-const HELP_PAGES = ["about", "theory", "documentation", "data", "references", "calc"];
-function closeHelp() {
-  const dd = $("#help-dd"), btn = $("#help-btn");
-  if (dd) dd.classList.remove("open");
-  if (btn) btn.setAttribute("aria-expanded", "false");
-}
-document.addEventListener("click", e => {
-  const btn = e.target.closest("#help-btn");
-  if (btn) {
-    e.stopPropagation();
-    const dd = $("#help-dd"), open = dd.classList.toggle("open");
-    btn.setAttribute("aria-expanded", open ? "true" : "false");
-    return;
-  }
-  if (!e.target.closest("#help-dd") || e.target.closest("#help-menu a")) closeHelp();
-});
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeHelp(); });
+const PAGES = ["home", "predict", "browse", "analytics", "submit", "theory", "data", "about", "curate", "calc"];
 function route() {
-  const raw = (location.hash.replace(/^#\/?/, "") || "home").split("?")[0];
-  const p = raw === "analyze" ? "analytics" : raw === "docs" ? "documentation" : raw;
+  const p = (location.hash.replace(/^#\/?/, "") || "home").split("?")[0];
   const page = PAGES.includes(p) ? p : "home";
-  closeHelp();
   $$(".page").forEach(e => e.classList.toggle("on", e.id === "p-" + page));
-  const activeNav = page === "calc" ? "theory" : page;
-  $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === activeNav));
-  if ($("#help-btn")) $("#help-btn").classList.toggle("on", HELP_PAGES.includes(page));
+  $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === page));
   if (page === "calc") {
+    $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === "theory"));
     if (META) INIT.calc();
     return;
   }

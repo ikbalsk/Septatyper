@@ -18,18 +18,11 @@
   <nav id="nav" aria-label="Main">
     <a href="#/predict" data-p="predict">Predict</a>
     <a href="#/browse" data-p="browse">Browse</a>
-    <a href="#/analyze" data-p="analytics">Analyze</a>
+    <a href="#/analytics" data-p="analytics">Analytics</a>
     <a href="#/submit" data-p="submit">Submit</a>
-    <div class="nav-dd" id="help-dd">
-      <button type="button" class="nav-btn" id="help-btn" aria-haspopup="true" aria-expanded="false">Help <span class="caret" aria-hidden="true">&#9662;</span></button>
-      <div class="dd-menu" id="help-menu" role="menu" aria-label="Help">
-        <a href="#/about" data-p="about" role="menuitem">About</a>
-        <a href="#/theory" data-p="theory" role="menuitem">Theory</a>
-        <a href="#/documentation" data-p="documentation" role="menuitem">Documentation</a>
-        <a href="#/data" data-p="data" role="menuitem">API and Data</a>
-        <a href="#/references" data-p="references" role="menuitem">References</a>
-      </div>
-    </div>
+    <a href="#/theory" data-p="theory">Theory</a>
+    <a href="#/data" data-p="data">API and data</a>
+    <a href="#/about" data-p="about">About</a>
   </nav>
 </div></header>
 
@@ -45,6 +38,7 @@
       <a class="btn ghost" href="#/browse">Browse the isolates</a>
     </div>
     <p class="counter">Currently hosting <b id="c-genomes">2,734</b> genomes across <b id="c-species">4</b> species, <b id="c-countries">28</b> countries and <b id="c-septa">64</b> septatypes.</p>
+    <p class="counter hero-credit">The database and the septatype scheme come from our study: Ghosh, A., Deb, P., Bose, P. <i>et al.</i> <i>Sci Rep</i> (2026), <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">doi:10.1038/s41598-026-75690-y</a>.</p>
     <p class="demo-label" id="demo-label">E. coli, same species, two septatypes</p>
     <div class="tiles" id="demo-tiles" aria-live="polite"></div>
     <div class="verdict"><span class="badge Susceptible" id="demo-badge">Susceptible</span><span id="demo-note" class="counter" style="margin:0"></span>
@@ -162,9 +156,9 @@
   </div>
 </section>
 
-<!-- ANALYZE -->
+<!-- ANALYTICS -->
 <section id="p-analytics" class="page">
-  <div class="page-head"><h2>Analyze</h2><p>Septatype frequency by isolation source and the geography of a clone or septatype. Approved submissions are included.</p></div>
+  <div class="page-head"><h2>Analytics</h2><p>Septatype frequency by isolation source and the geography of a clone or septatype. Approved submissions are included.</p></div>
   <div class="band">
     <h3>Septatype frequency by isolation source</h3>
     <div class="row2"><div><label for="a-sp">Species</label><select id="a-sp"></select></div></div>
@@ -325,32 +319,6 @@
   </div>
 </section>
 
-<!-- DOCUMENTATION -->
-<section id="p-documentation" class="page">
-  <div class="page-head"><h2>Documentation</h2></div>
-  <div class="band">
-    <p>All source files and detailed documentation can be found in <a href="https://github.com/ikbalsk/Septatyper" target="_blank" rel="noopener">github.com/ikbalsk/septatyper</a>.</p>
-  </div>
-</section>
-
-<!-- REFERENCES -->
-<section id="p-references" class="page">
-  <div class="page-head"><h2>References</h2><p>Publications, databases and software resources used in Ciprotyper.</p></div>
-  <div class="band">
-    <ol class="ref-list">
-      <li>Ghosh, A., Deb, P., Bose, P., Sk, I., Biswas, S., Mukhopadhyay, A. K., Ganguly, D. &amp; Chattopadhyay, S. Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. <i>Scientific Reports</i> (2026). <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">https://doi.org/10.1038/s41598-026-75690-y</a></li>
-      <li>Camacho, C., Coulouris, G., Avagyan, V., Ma, N., Papadopoulos, J., Bealer, K. &amp; Madden, T. L. BLAST+: architecture and applications. <i>BMC Bioinformatics</i> <b>10</b>, 421 (2009). <a href="https://doi.org/10.1186/1471-2105-10-421" target="_blank" rel="noopener">https://doi.org/10.1186/1471-2105-10-421</a></li>
-      <li>Cock, P. J. A. <i>et al.</i> Biopython: freely available Python tools for computational molecular biology and bioinformatics. <i>Bioinformatics</i> <b>25</b>, 1422-1423 (2009). <a href="https://doi.org/10.1093/bioinformatics/btp163" target="_blank" rel="noopener">https://doi.org/10.1093/bioinformatics/btp163</a></li>
-      <li>Jolley, K. A., Bray, J. E. &amp; Maiden, M. C. J. Open-access bacterial population genomics: BIGSdb software, the PubMLST.org website and their applications. <i>Wellcome Open Research</i> <b>3</b>, 124 (2018). <a href="https://doi.org/10.12688/wellcomeopenres.14826.1" target="_blank" rel="noopener">https://doi.org/10.12688/wellcomeopenres.14826.1</a></li>
-      <li>Wirth, T. <i>et al.</i> Sex and virulence in <i>Escherichia coli</i>: an evolutionary perspective. <i>Molecular Microbiology</i> <b>60</b>, 1136-1151 (2006). <a href="https://doi.org/10.1111/j.1365-2958.2006.05172.x" target="_blank" rel="noopener">https://doi.org/10.1111/j.1365-2958.2006.05172.x</a></li>
-      <li>Achtman, M. <i>et al.</i> Multilocus sequence typing as a replacement for serotyping in <i>Salmonella enterica</i>. <i>PLoS Pathogens</i> <b>8</b>, e1002776 (2012). <a href="https://doi.org/10.1371/journal.ppat.1002776" target="_blank" rel="noopener">https://doi.org/10.1371/journal.ppat.1002776</a></li>
-      <li>Diancourt, L., Passet, V., Verhoef, J., Grimont, P. A. D. &amp; Brisse, S. Multilocus sequence typing of <i>Klebsiella pneumoniae</i> nosocomial isolates. <i>Journal of Clinical Microbiology</i> <b>43</b>, 4178-4182 (2005). <a href="https://doi.org/10.1128/JCM.43.8.4178-4182.2005" target="_blank" rel="noopener">https://doi.org/10.1128/JCM.43.8.4178-4182.2005</a></li>
-      <li>Eisenberg, D., Schwarz, E., Komaromy, M. &amp; Wall, R. Analysis of membrane and surface protein sequences with the hydrophobic moment plot. <i>Journal of Molecular Biology</i> <b>179</b>, 125-142 (1984). <a href="https://doi.org/10.1016/0022-2836(84)90309-7" target="_blank" rel="noopener">https://doi.org/10.1016/0022-2836(84)90309-7</a></li>
-      <li>Olson, R. D. <i>et al.</i> Introducing the Bacterial and Viral Bioinformatics Resource Center (BV-BRC): a resource combining PATRIC, IRD and ViPR. <i>Nucleic Acids Research</i> <b>51</b>, D678-D689 (2023). <a href="https://doi.org/10.1093/nar/gkac1003" target="_blank" rel="noopener">https://doi.org/10.1093/nar/gkac1003</a></li>
-    </ol>
-  </div>
-</section>
-
 <!-- CURATE -->
 <section id="p-curate" class="page">
   <div class="page-head"><h2>Curation</h2><p>Approving adds the isolate to the repository and updates the rules for its septatype. An approved submission can be rejected later, which removes it again.</p></div>
@@ -368,7 +336,7 @@
 </section>
 
 </main>
-<footer><a href="#/curate">Curator sign in</a></footer>
+<footer><p class="credit-line">Ciprotyper and its database are based on: Ghosh, A., Deb, P., Bose, P. <i>et al.</i> Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. <i>Sci Rep</i> (2026). <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">https://doi.org/10.1038/s41598-026-75690-y</a></p>Ciprotyper. Research use only. Suggestions or problems: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>. <a href="#/curate">Curator sign in</a></footer>
 <script src="/static/app.js"></script>
 
 <dialog id="consent" class="consent" aria-labelledby="consent-title">
