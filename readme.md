@@ -81,7 +81,7 @@ Because the 5th letter of the ciprotype shows the amino acid (`L` or `F`) rather
 
 ```mermaid
 flowchart TD
-    A["1. Your Input<br/>Upload FASTA file (up to 60 MB), Paste DNA (up to 10 MB),<br/>Upload Batch (up to 10 files), Enter BV-BRC ID, or Type 5 Amino Acids"] --> B["2. Sequence & Species Check<br/>Confirm valid DNA letters (>=90% A, C, G, T, N)<br/>Verify all 7 MLST housekeeping genes match species (>=95% identity)"]
+    A["1. Upload FASTA file (up to 60 MB), Paste DNA (up to 10 MB),<br/>Upload Batch (up to 10 files), Enter BV-BRC ID, or Type 5 Amino Acids"] --> B["2. Sequence & Species Check<br/>Confirm valid DNA letters (>=90% A, C, G, T, N)<br/>Verify all 7 MLST housekeeping genes match species (>=95% identity)"]
     B --> C["3. Locate Genes & Read Codons<br/>Match gyrA, parC, and recN against species reference<br/>Read exact 3-letter DNA codons at positions 83, 87, 80, 84, and 346"]
     C --> D["4. Screen qnr Genes & Assign Strain ST<br/>Detect qnrB2 and qnrS1 (>=80% identity & >=90% length coverage)<br/>Assign 7-gene PubMLST Sequence Type (ST)"]
     D --> E{"5. Checkpoint 1 Quality Gate<br/>Do gyrA, parC, and recN all match<br/>the species reference at >=90% identity?"}
@@ -89,7 +89,7 @@ flowchart TD
     E -- "Yes (90% identity or higher)" --> G{"6. Is this ciprotype Already in the<br/>Reference Database for this Species?"}
     G -- "Yes (Known ciprotype)" --> H["Tier 1: Majority Rule<br/>Use most common lab result in same species & source<br/>(or all sources if unseen in chosen source; ties go to Susceptible)"]
     G -- "No (Brand-New ciprotype)" --> I["Tier 2: Three-Checkpoint Grammar Rule<br/>Check QRDR table, votes, and helix hydrophobicity (<H> > 0.334)<br/>plus RecN-346 and qnr genes -> Flag for Curator"]
-    F --> J["7. Clear Visual Result Page<br/>Resistant (Cres) or Susceptible (Csus) Badge, 7-Tile ciprotype,<br/>Sample ST vs Reference Clones, 3-Checkpoint Explanation, Print/CSV/JSON"]
+    F --> J["7. Visual Result Page<br/>Resistant (Cres) or Susceptible (Csus) Badge, 7-Tile ciprotype,<br/>Sample ST vs Reference Clones, 3-Checkpoint Explanation, Print/CSV/JSON"]
     H --> J
     I --> J
 ```
@@ -157,12 +157,11 @@ If your bacterium carries a **brand-new ciprotype** that has never been recorded
 
 ```mermaid
 flowchart TD
-    A["Checkpoint 1: The Four QRDR Positions (GyrA-83, GyrA-87, ParC-80, ParC-84)"] --> B{"Do all 4 amino acids sit inside a single column<br/>of the Syntax Rules Table?"}
-    B -- "All 4 in Resistant Column<br/>(or ParC S-K exception pair)" --> R1["Checkpoint 1 = Resistant (Table Pattern)"]
-    B -- "All 4 in Susceptible Column<br/>(S,Y,T / D,N,E / S,Y,T / D,E)" --> S1["Checkpoint 1 = Susceptible (Table Pattern)<br/>(Except in S. sonnei, where a single GyrA-83/87 change -> Resistant)"]
-    B -- "Mixed Columns (some in Susceptible, some in Resistant)" --> C{"Count how many of the 4 positions lost their<br/>normal water/Mg2+ binding chemistry (Votes)"}
+    A["Checkpoint 1: The Four QRDR Positions (GyrA-83, GyrA-87, ParC-80, ParC-84)"] --> B{"Do all 4 amino acids sit inside a single column?"}
+    B -- "All 4 in Resistant Column<br/>(or ParC S-K exception pair)" --> R1["Checkpoint 1 = Resistant"]
+    B -- "All 4 in Susceptible Column" --> S1["Checkpoint 1 = Susceptible<br/>(Except in S. sonnei, where a single GyrA-83/87 change -> Resistant)"]
+    B -- "Mixed Columns (some in Susceptible, some in Resistant)" --> C{"Count how many of the 4 positions are in Resistant column and Susceptible coloumn"}
     C -- "2 or more positions vote Resistant<br/>(or S. sonnei single GyrA change)" --> R2["Checkpoint 1 = Resistant (Votes / Override)"]
-    C -- "0 positions vote Resistant" --> S2["Checkpoint 1 = Susceptible (Votes)"]
     C -- "Exactly 1 position votes Resistant" --> D{"Check QRDR Helix Mean Hydrophobicity <H><br/>across GyrA (82-93) & ParC (80-90) against Cutoff 0.334"}
     D -- "<H> above 0.334" --> R3["Checkpoint 1 = Resistant (Hydrophobicity)"]
     D -- "<H> 0.334 or below" --> S3["Checkpoint 1 = Susceptible (Hydrophobicity)"]
@@ -270,28 +269,6 @@ Our founding reference database comes from Supplementary Table S1 of [Ghosh et a
 | ***Shigella sonnei*** | Stool (`FECAL`) | 334 | 151 (45.2%) | 183 (54.8%) | 13 | **99.4%** | 98.5% |
 | **All Founding Isolates** | **All 7 Groups Combined** | **2,734** | **1,669 (61.0%)** | **1,065 (39.0%)** | **64 unique** | **98.1% (2,681/2,734)** | **97.2%** |
 
-### Figure 3. Visual Summary of Reference Accuracy and Resistance Balance (`n = 2,734`)
-
-```text
-A. Accuracy by Species and Body Site (Tier 1 Majority Rule vs. Tier 2 Grammar Rule)
-------------------------------------------------------------------------------------
-E. coli (Fecal, n=184)         | Tier 1: #################### 98.9% | Tier 2: ################### 97.3%
-E. coli (Urine, n=216)         | Tier 1: #################### 98.1% | Tier 2: ################### 94.4%
-K. pneumoniae (Fecal, n=77)    | Tier 1: #################### 98.7% | Tier 2: ################### 97.4%
-K. pneumoniae (Resp., n=398)   | Tier 1: ###################  97.2% | Tier 2: ################### 96.5%
-K. pneumoniae (Urine, n=1,015) | Tier 1: ###################  96.8% | Tier 2: ################### 96.7%
-S. enterica (Fecal, n=510)     | Tier 1: #################### 99.8% | Tier 2: #################### 99.2%
-S. sonnei (Fecal, n=334)       | Tier 1: #################### 99.4% | Tier 2: #################### 98.5%
-------------------------------------------------------------------------------------
-Pooled Founding Set (n=2,734)  | Tier 1: 98.1% (2,681/2,734)        | Tier 2: 97.2%
-
-B. Proportion of Resistant [R] vs. Susceptible [S] Isolates per Species
-------------------------------------------------------------------------------------
-K. pneumoniae (n=1,490) : [RRRRRRRRRRRRRRRRRR.. ] 1,319 R (88.5%) | 171 S (11.5%)
-E. coli       (n=400)   : [RRRRRRRRRR.......... ]   193 R (48.2%) | 207 S (51.8%)
-S. sonnei     (n=334)   : [RRRRRRRRR........... ]   151 R (45.2%) | 183 S (54.8%)
-S. enterica   (n=510)   : [.................... ]     6 R ( 1.2%) | 504 S (98.8%)
-```
 
 ### 5.2 Why the Same `qnr` Gene Means Different Things in Different Species
 
@@ -314,9 +291,8 @@ A great example of why CiproTyper keeps its rules separated by bacterial species
 
 Because the Tier 1 Majority Rule looks up each species separately, CiproTyper automatically calls `S-D-S-E-L-0-1` **Susceptible** in *E. coli* and *S. enterica*, and **Resistant** in *K. pneumoniae* and *S. sonnei*.
 
-## 6. User Guide: How to Use Every Page on the Website
-
-When you open [https://ciprotyper-is.onrender.com/](https://ciprotyper-is.onrender.com/), you will see a clean blue-and-white navigation bar at the top with seven main sections (plus the calculation and curator pages):
+## 6. User Guide: 
+When you open [https://septatyper-is.onrender.com/](https://septatyper-is.onrender.com/), you will see a clean blue-and-white navigation bar at the top with seven main sections :
 
 1. **Home (`#/`):** Gives a quick overview of the 2,734 genomes, an interactive 7-tile animation showing how a susceptible *E. coli* (`S-D-S-E-L-0-0`) differs from a resistant one (`L-N-I-E-L-0-0`), and the summary accuracy table for all four species.
 2. **Predict (`#/predict`):**
@@ -340,7 +316,7 @@ When you open [https://ciprotyper-is.onrender.com/](https://ciprotyper-is.onrend
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PrivacyParse : Researcher Uploads FASTA + Metadata + Agrees to Consent (v2026-11-1)
+    [*] --> PrivacyParse : Researcher Uploads FASTA + Metadata + Agrees to Consent
     PrivacyParse : Sequence Read in Temp Folder -> Genome File Deleted -> Only Derived ciprotype & Metadata Kept
     PrivacyParse --> NeedsReview : Brand-new ciprotype OR lab result disagrees with call OR incomplete
     PrivacyParse --> Pending : Known ciprotype AND lab result matches prediction (or lab not tested)
@@ -354,25 +330,21 @@ stateDiagram-v2
 
 * **Figure 4 Legend:** How community submissions are processed without storing raw genome sequences, reviewed by curators, and added to (or reversibly removed from) the live reference repository.
 
-## 7. Honest Limitations and What Users Should Keep in Mind
+## 7. Limitations
 
-In line with bioinformatics journal standards, we state all limitations of CiproTyper (`v3.7.1`) openly so researchers can interpret results responsibly:
-
-1. **Accuracy is Measured on the Founding Reference Set (Not Yet an Independent Test Set):** Both the **98.1%** Tier 1 Majority Rule accuracy and the **97.2%** Tier 2 Grammar Rule accuracy are **resubstitution accuracies**, meaning they were measured on the same 2,734 founding isolates from [Ghosh et al. (2026)](https://doi.org/10.1038/s41598-026-75690-y) that were used to build the reference table and write the grammar rules. Testing CiproTyper on a completely independent external collection of clinical genomes with laboratory susceptibility results is the next priority.
-2. **Covers Four Bacterial Species and One Drug Only:** The rules are built specifically for **ciprofloxacin** in *E. coli*, *S. sonnei*, *S. enterica* subsp. I, and *K. pneumoniae*. They must not be used for other bacteria or other fluoroquinolone drugs without separate validation. Also, because *E. coli* and *S. sonnei* are genetically very close and share the same housekeeping genes, the tool cannot tell them apart automatically from sequence alone; you must select the species yourself.
-3. **Requires Assembled DNA Sequences (Not Raw Sequencing Reads):** You must upload assembled contigs or gene sequences in FASTA format. Raw sequencing read files (`FASTQ` from Illumina, Nanopore, or PacBio) are not accepted and must be assembled first. If an assembly is broken right across one of the five target codons or has unknown bases (`N`) there, CiproTyper will not guess the codon and will not produce a ciprotype.
-4. **Uneven Numbers Across Countries, Sources, and Species in the Founding Set:** More than half of the 2,734 founding genomes come from the United States (`1,495`), followed by Australia (`411`) and the United Kingdom (`409`). Also, while *K. pneumoniae* is mostly resistant (`88.5%`), *S. enterica* subsp. I has only **6 resistant isolates out of 510 (`1.2%`)**. Finally, the founding set covers Stool, Urine, and Respiratory isolates; the other 9 body sites and sources (`Blood`, `CSF`, `Wound`, `Food`, etc.) currently use pooled species-wide predictions until community submissions build up site-specific records for them.
-5. **No Stored `RecN-346` DNA Codons in the Founding Spreadsheet:** When you upload a DNA sequence, CiproTyper reads the exact 3-letter codon at `RecN-346` to tell susceptible `cta` apart from resistant `ctg` (Checkpoint 2). However, the original `Table_S1.xlsx` spreadsheet only listed the amino-acid letter (`L` or `F`), not the DNA codon, so Checkpoint 2 for `ctg` could not be scored on those 2,734 stored table rows.
-6. **Plasmid `qnr` Detection Uses Two Reference Alleles and Cannot Measure Gene Expression:** CiproTyper searches for `qnrB2` and `qnrS1` at `>= 80%` identity and `>= 90%` length coverage. Other `qnr` families (`qnrA`, `qnrC`, `qnrD`, `qnrE`, `qnrVC`), divergent alleles below 80% identity, or other resistance mechanisms such as `aac(6')-Ib-cr` or efflux pump changes (`acrAB-tolC`, `marA`, `soxS`, `ramA`) are not read. Conversely, finding a `qnr` gene in DNA does not prove the bacterium is actively expressing it (which is why a few `qnr`-positive isolates with wild-type `S-D-S-E` tested susceptible in the laboratory).
-7. **Hydrophobicity (`<H>`) is Only a Last Tie-Breaker for Borderline Novel ciprotypes:** Across all 2,734 founding isolates, resistant isolates have a higher average `<H>` (`0.391`) than susceptible ones (`0.274`), and the full three-checkpoint grammar reaches **97.2% accuracy** at the `0.334` cutoff. However, in the small borderline group of **148 isolates** where the four QRDR amino acids fall in mixed columns and carry exactly 1 Resistant vote, `<H>` alone is right for only **41.2%** at `0.334` (and at most **59.5%** at `0.24`). That is why `<H>` is used strictly as a final tie-breaker inside Tier 2 when a ciprotype has never been seen before.
+1. **Covers Four Bacterial Species Only:** The rules are built specifically for **ciprofloxacin** in *E. coli*, *S. sonnei*, *S. enterica* subsp. I, and *K. pneumoniae*. They must not be used for other bacteria or other fluoroquinolone drugs without separate validation.
+2. **Requires Assembled DNA Sequences:** You must upload assembled contigs or gene sequences in FASTA format. Raw sequencing read files (`FASTQ` from Illumina, Nanopore, or PacBio) are not accepted and must be assembled first. If an assembly is broken right across one of the five target codons or has unknown bases (`N`) there, CiproTyper will not guess the codon and will not produce a ciprotype.
+3. **Uneven Numbers Across Countries, Sources, and Species in the Founding Set:** More than half of the 2,734 founding genomes come from the United States (`1,495`), followed by Australia (`411`) and the United Kingdom (`409`). Also, while *K. pneumoniae* is mostly resistant (`88.5%`), *S. enterica* subsp. I has only **6 resistant isolates out of 510 (`1.2%`)**. The founding set covers Stool, Urine, and Respiratory isolates; the other 9 body sites and sources (`Blood`, `CSF`, `Wound`, `Food`, etc.) currently use pooled species-wide predictions until community submissions build up site-specific records for them.
+4. **Plasmid `qnr` Detection Uses Two Reference Alleles and Cannot Measure Gene Expression:** CiproTyper searches for `qnrB2` and `qnrS1` at `>= 80%` identity and `>= 90%` length coverage. Other `qnr` families (`qnrA`, `qnrC`, `qnrD`, `qnrE`, `qnrVC`), divergent alleles below 80% identity, or other resistance mechanisms such as `aac(6')-Ib-cr` or efflux pump changes (`acrAB-tolC`, `marA`, `soxS`, `ramA`) are not read. Conversely, finding a `qnr` gene in DNA does not prove the bacterium is actively expressing it (which is why a few `qnr`-positive isolates with wild-type `S-D-S-E` tested susceptible in the laboratory).
+5. **Hydrophobicity (`<H>`) is Only a Last Tie-Breaker for Borderline Novel ciprotypes:** Across all 2,734 founding isolates, resistant isolates have a higher average `<H>` (`0.391`) than susceptible ones (`0.274`), and the full three-checkpoint grammar reaches **97.2% accuracy** at the `0.334` cutoff. However, in the small borderline group of **148 isolates** where the four QRDR amino acids fall in mixed columns, `<H>` is used strictly as a final tie-breaker inside Tier 2.
 
 ## 8. Software Architecture, Database, and API Documentation
 
 The complete technical details of how the server is built, how the SQLite database tables work, how to deploy the Docker container, or how to call the 25 REST API endpoints from code, please open the separate technical reference document:
 
 * **Separate Technical & Software Reference:** [`TECHNICAL_ARCHITECTURE.md`](technical_architecture.md)
-* **Live Interactive API Documentation (Swagger UI):** [https://ciprotyper-is.onrender.com/docs](https://ciprotyper-is.onrender.com/docs)
-* **Source Code Repository:** [https://github.com/ikbalsk/ciprotyper](https://github.com/ikbalsk/ciprotyper)
+* **Live Interactive API Documentation (Swagger UI):** [https://septatyper-is.onrender.com/docs](https://septatyper-is.onrender.com/docs)
+* **Source Code Repository:** [https://github.com/ikbalsk/septatyper](https://github.com/ikbalsk/septatyper)
 
 ## 9. How to Cite and References
 
