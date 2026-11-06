@@ -1,7 +1,7 @@
 # CiproTyper: Software Architecture, Database Schema, Algorithms, and REST API Reference
 
 **Documentation:** Return to [`README.md`](README.md) for the biological overview, ciprotype rules, checkpoint explanations, and user guidelines.  
-**Live Server:** [https://septatyper-is.onrender.com/](https://septatyper-is.onrender.com/) | **Swagger / OpenAPI UI:** [https://septatyper-is.onrender.com/docs](https://www.google.com/search?q=https://septatyper-is.onrender.com/docs)  
+**Live Server:** [https://ciprotyper-is.onrender.com/](https://ciprotyper-is.onrender.com/) | **Swagger / OpenAPI UI:** [https://ciprotyper-is.onrender.com/docs](https://www.google.com/search?q=https://ciprotyper-is.onrender.com/docs)  
 **GitHub Repository:** [https://github.com/ikbalsk/Septatyper](https://github.com/ikbalsk/Septatyper) | **Contact:** [ikbalsk.personal@gmail.com](mailto:ikbalsk.personal@gmail.com)
 
 ## 1. Software Stack and Repository Layout
@@ -65,7 +65,7 @@ BLASTing all ~13,000 PubMLST alleles against a 5 Mb assembly takes ~7.6 seconds.
 
 ## 4. Complete REST API Specification (`/api/v1`)
 
-Base URL: `https://septatyper-is.onrender.com/api/v1` (Interactive OpenAPI documentation at `/docs`).
+Base URL: `https://ciprotyper-is.onrender.com/api/v1` (Interactive OpenAPI documentation at `/docs`).
 
 | Method & Endpoint | Auth / Rate Limit | Parameters / Request Payload | Response Summary |
 | :--- | :--- | :--- | :--- |
