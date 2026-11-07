@@ -41,14 +41,19 @@ const PAL = ["#1d4e89", "#4d9de0", "#9cc4f5", "#00897b", "#8e6bbf", "#c98a00", "
 const hcol = h => PAL[Math.max(0, META.sources.findIndex(s => s.key === h)) % PAL.length];
 
 /* ------------------------------------------------------------------ router */
-const PAGES = ["home", "predict", "browse", "analytics", "submit", "theory", "data", "about", "curate", "calc"];
+const PAGES = ["home", "predict", "browse", "analyze", "submit", "theory", "documentation", "data", "references", "about", "curate", "calc"];
+const ALIAS = { analytics: "analyze" };                       // the old #/analytics address still opens the page
+const HELP = ["about", "theory", "documentation", "data", "references", "calc"];     // pages that live under the Help menu
+function closeHelp() { const m = $("#help-menu"), b = $("#help-btn"); if (m) m.hidden = true; if (b) b.setAttribute("aria-expanded", "false"); }
 function route() {
-  const p = (location.hash.replace(/^#\/?/, "") || "home").split("?")[0];
+  const p0 = (location.hash.replace(/^#\/?/, "") || "home").split("?")[0], p = ALIAS[p0] || p0;
   const page = PAGES.includes(p) ? p : "home";
+  closeHelp();
   $$(".page").forEach(e => e.classList.toggle("on", e.id === "p-" + page));
-  $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === page));
+  $$("#nav a, #help-menu a").forEach(a => a.classList.toggle("on", a.dataset.p === page));
+  const hb = $("#help-btn"); if (hb) hb.classList.toggle("on", HELP.includes(page));
   if (page === "calc") {
-    $$("#nav a").forEach(a => a.classList.toggle("on", a.dataset.p === "theory"));
+    $$("#nav a, #help-menu a").forEach(a => a.classList.toggle("on", a.dataset.p === "theory"));
     if (META) INIT.calc();
     return;
   }
@@ -56,6 +61,26 @@ function route() {
   if (META && !LOADED[page]) { LOADED[page] = true; (INIT[page] || (() => {}))(); }
 }
 window.addEventListener("hashchange", route);
+/* Help menu: tap Help to show its pages (About, Theory, Documentation, API and data, References); tap a page to open it.
+   It closes on a second tap of Help, Escape, a tap elsewhere, or when a page opens. It never closes on scroll or resize. */
+(function () {
+  const btn = $("#help-btn"), menu = $("#help-menu"), top = $(".top");
+  if (!btn || !menu || !top) return;
+  const place = () => { const r = btn.getBoundingClientRect(), t = top.getBoundingClientRect(); menu.style.left = Math.max(8, Math.min(r.left - t.left, window.innerWidth - menu.offsetWidth - 8)) + "px"; };
+  btn.addEventListener("click", e => { e.stopPropagation(); const on = menu.hidden; menu.hidden = !on; btn.setAttribute("aria-expanded", String(on)); if (on) place(); });
+  menu.addEventListener("click", e => {
+    e.stopPropagation();
+    const a = e.target.closest("a"); if (!a) return;
+    e.preventDefault();
+    const h = a.getAttribute("href");
+    if (location.hash === h) route(); else location.hash = h;
+    closeHelp();
+  });
+  document.addEventListener("click", () => closeHelp());
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !menu.hidden) { closeHelp(); btn.focus(); } });
+  window.addEventListener("resize", () => { if (!menu.hidden) place(); });
+  const nv = $("#nav"); if (nv) nv.addEventListener("scroll", () => { if (!menu.hidden) place(); }, { passive: true });
+})();
 
 /* -------------------------------------------------------------------- home */
 let demoState = 0, demoData = null;
@@ -183,10 +208,11 @@ document.addEventListener("click", e => {
 const SITE_LC = {};
 const PROT = { gyrA: "GyrA", parC: "ParC", recN: "RecN" };
 const f2 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(2);
-const SYNTAX = [["GyrA-83", "S Y T", "F L I W", "Polar residue with -OH group", "Hydrophobic residue"],
-  ["GyrA-87", "D N E", "N D G Y A E", "Negatively charged or polar residue", "Uncharged or negatively charged residue"],
-  ["ParC-80", "S Y T", "I F W", "Polar residue with -OH group", "Hydrophobic residue"],
-  ["ParC-84", "D E", "E V D", "Negatively charged residue", "Hydrophobic or negatively charged residue"]];
+const SYNTAX = [["GyrA-83", ["Polar", "-OH group"], ["Hydrophobic", "No -OH group"]],
+  ["GyrA-87", ["Negatively charged", "Amide derivative of a negatively charged residue"], ["Hydrophobic", "Negatively charged", "Amide derivative of a negatively charged residue"]],
+  ["ParC-80", ["Polar", "-OH group"], ["Hydrophobic", "No -OH group", "Exception: S together with K at ParC-84"]],
+  ["ParC-84", ["Negatively charged"], ["Hydrophobic", "Negatively charged", "Exception: K together with S at ParC-80"]]];
+const ptags = list => list.map(t => `<span class="ptag${t.startsWith("Exception") ? " exc" : ""}">${t}</span>`).join("");
 const f3 = v => (v < 0 ? "-" : "") + Math.abs(v).toFixed(3);
 /* QRDR helix as a strip of letters; the four tetratype positions are marked */
 const helixStrip = b => `<span class="helix">${b.values.map(v => `<span class="${v.sub ? "sub" : ""}">${esc(v.residue)}</span>`).join("")}</span>`;
@@ -194,10 +220,19 @@ const helixStrip = b => `<span class="helix">${b.values.map(v => `<span class="$
 const helixLines = (label, v) => `<p class="formula wrap">${label} GyrA helix ${v.gyr.start}-${v.gyr.end} ${helixStrip(v.gyr)} sum ${f2(v.gyr.sum)} / ${v.gyr.n} = <b>${f3(v.gyr.mean)}</b></p>
     <p class="formula wrap">${label} ParC helix ${v.parc.start}-${v.parc.end} ${helixStrip(v.parc)} sum ${f2(v.parc.sum)} / ${v.parc.n} = <b>${f3(v.parc.mean)}</b></p>
     <p class="formula wrap">${label} &lt;H&gt; = (${f3(v.gyr.mean)} + ${f3(v.parc.mean)}) / 2 = <b>${f3(v.mean)}</b></p>`;
+/* Checkpoint 1 table: each column lists the amino-acid PROPERTIES only. The sample's residue is shown (lit) in the column(s) it
+   is marked in, together with the properties it has (lit). Positions marked in each column are counted under the table. */
 function critTable(positions) {
-  const chips = (list, side) => list.map(c => `<span class="rchip${c.hit ? " hit " + side : ""}${c.exception ? " exc" : ""}">${esc(c.residue)}${c.exception ? "<small>exception</small>" : ""}</span>`).join("");
+  const chips = (list, side) => (list || []).filter(c => c.hit).map(c => `<span class="rchip hit ${side}${c.exception ? " exc" : ""}">${esc(c.residue)}${c.exception ? "<small>exception</small>" : ""}</span>`).join("");
+  const tags = (list, side) => list.map(t => `<span class="ptag${t.hit ? " hit " + side : ""}${t.exception ? " exc" : ""}">${esc(t.label)}</span>`).join("");
+  const cell = (x, side) => {
+    const props = side === "s" ? x.susceptible_props : x.resistant_props, label = side === "s" ? x.susceptible_label : x.resistant_label;
+    return `<td>${chips(side === "s" ? x.susceptible : x.resistant, side)}<div class="ptags">${props ? tags(props, side) : `<span class="clabel">(${esc(label || "")})</span>`}</div></td>`;
+  };
+  const ns = positions.filter(x => x.fits_susceptible).length, nr = positions.filter(x => x.fits_resistant).length;
   return `<div class="scroll"><table class="rtab"><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>${positions.map(x =>
-    `<tr><td class="nw"><b>${esc(x.position)}</b><span class="alias">sample: ${esc(x.residue)}</span></td><td>${chips(x.susceptible, "s")}<div class="clabel">(${esc(x.susceptible_label || "")})</div></td><td>${chips(x.resistant, "r")}<div class="clabel">(${esc(x.resistant_label || "")})</div></td></tr>`).join("")}</table></div>`;
+    `<tr><td class="nw"><b>${esc(x.position)}</b><span class="alias">sample: ${esc(x.residue)}${x.column === "neither" ? " (in neither column)" : ""}</span></td>${cell(x, "s")}${cell(x, "r")}</tr>`).join("")}
+    <tr class="marks"><td class="nw"><b>Positions marked</b></td><td><b>${ns}</b> of 4</td><td><b>${nr}</b> of 4</td></tr></table></div>`;
 }
 /* number line: sample and reference <H> against the cutoff; extra = typical resistant and susceptible isolates */
 function hChart(sample, ref, cutoff, extra) {
@@ -240,12 +275,14 @@ function whyBlock(p) {
   const exc = (r1.exceptions || []).length ? ` (exception: the ParC pair S-K)` : "";
   const why1 = r1.override ? `${r1.pattern ? "All four residues are in the Susceptible column, but " : "The four residues are not all in one column. "}${esc(r1.rule)}: counted Resistant. This is an extra rule from the reference isolates, not one of the three checkpoints.`
     : r1.pattern ? `All four residues are in the ${r1.pattern === "resistant" ? "Resistant" : "Susceptible"} column${exc}.`
-    : r1.resolved_by === "hydrophobicity" ? `The four residues are not all in one column, so the written rules do not decide. One position votes Resistant, so the QRDR helix mean &lt;H&gt; settles it.`
-    : `The four residues are not all in one column, so the written rules do not decide. The residue votes settle it: ${r1.n_votes} of 4 positions vote Resistant.`;
+    : r1.resolved_by === "marks" ? `The four residues are not all in one column. ${(r1.marks || {}).susceptible} position(s) are marked in the Susceptible column and ${(r1.marks || {}).resistant} in the Resistant column, so the column with more marks decides.`
+    : r1.resolved_by === "hydrophobicity" ? `Both columns have the same number of marks (${(r1.marks || {}).susceptible}), so the table does not decide. One position votes Resistant, so the QRDR helix mean &lt;H&gt; settles it.`
+    : `Both columns have the same number of marks (${(r1.marks || {}).susceptible}), so the table does not decide. The residue votes settle it: ${r1.n_votes} of 4 positions vote Resistant.`;
   const usedH = r1.resolved_by === "hydrophobicity";
-  const hNote = usedH ? `The four residues are not all in one column and one position votes Resistant, so &lt;H&gt; against the cutoff settles checkpoint 1: ${hy.side === "above" ? "above the cutoff, Resistant" : "at or below the cutoff, Susceptible"}.`
+  const hNote = usedH ? `Both columns of the table have the same number of marks and one position votes Resistant, so &lt;H&gt; against the cutoff settles checkpoint 1: ${hy.side === "above" ? "above the cutoff, Resistant" : "at or below the cutoff, Susceptible"}.`
     : r1.override ? "Shown for information. The extra <i>S. sonnei</i> rule decides checkpoint 1 here, so &lt;H&gt; does not change the call."
     : r1.pattern ? "Shown for information. The residue table decides checkpoint 1 here, so &lt;H&gt; does not change the call."
+    : r1.resolved_by === "marks" ? "Shown for information. The marks in the residue table decide checkpoint 1 here, so &lt;H&gt; does not change the call."
     : "Shown for information. The residue votes decide checkpoint 1 here, so &lt;H&gt; does not change the call.";
   const hBlock = `<div class="crit ${usedH ? (hy.side === "above" ? "hit" : "dim") : "dim"}"><h4>QRDR helix mean hydrophobicity &lt;H&gt; ${tagOn(usedH)}</h4>
     <p class="muted small" style="margin:0 0 4px">${hNote}</p>${hChart(hy.mean, rf.mean, hy.cutoff)}
@@ -254,7 +291,7 @@ function whyBlock(p) {
     <p class="small"><a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}">How is this calculated?</a> &nbsp; <a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}&s=cutoff">Why a cutoff of ${f3(hy.cutoff)}?</a></p></div>`;
   const dim = x => x === "Resistant" ? "hit" : "dim";
   let h = `<h3>Why ${esc(p.call)}</h3><p class="muted small">${intro} Highlighted is what applies to this sample.</p>`;
-  h += `<div class="crit ${dim(r1.call)}"><h4>Checkpoint 1: residues at GyrA-83, GyrA-87, ParC-80 and ParC-84 ${badge(r1.call, 1)} ${tag(["pattern", "votes", "hydrophobicity", "override"].includes(dec))}</h4>${critTable(c.positions)}
+  h += `<div class="crit ${dim(r1.call)}"><h4>Checkpoint 1: residues at GyrA-83, GyrA-87, ParC-80 and ParC-84 ${badge(r1.call, 1)} ${tag(["pattern", "marks", "votes", "hydrophobicity", "override"].includes(dec))}</h4>${critTable(c.positions)}
     <p style="margin:8px 0 0">${why1} <b>Checkpoint 1 says ${esc(r1.call)}.</b></p></div>`;
   h += hBlock;
   h += `<div class="crit ${dim(k.recn.call)}"><h4>Checkpoint 2: RecN-346 ${badge(k.recn.call, 1)} ${tag(dec === "checkpoint2")}</h4>
@@ -510,13 +547,13 @@ async function loadMap() {
       { displayModeBar: false, responsive: true });
   } catch (e) { $("#map").innerHTML = `<p class="muted">The map library could not be loaded. The table below has the same counts.</p>`; }
 }
-INIT.analytics = async () => {
+INIT.analyze = async () => {
   await refreshMeta();
   $("#a-sp").innerHTML = opts(Object.entries(SP)); $("#a-sp").onchange = loadBars; loadBars();
   $("#g-sp").innerHTML = opts(Object.entries(SP), "All");
   $("#dl-st2").innerHTML = dl(META.facets.st);
   $("#dl-sep").innerHTML = dl(META.facets.septatype);
-  $$("#p-analytics .filters select, #g-st, #g-sep").forEach(e => e.onchange = loadMap); loadMap();
+  $$("#p-analyze .filters select, #g-st, #g-sep").forEach(e => e.onchange = loadMap); loadMap();
 };
 
 /* ------------------------------------------------------------------ submit */
@@ -658,21 +695,21 @@ INIT.calc = async () => {
     <div><label for="calc-ref">Reference residues</label><input type="text" id="calc-ref" maxlength="4" value="${esc(startRef)}" class="mono-in"></div></div>
     <div id="calc-steps"></div></div>
   <div class="band" id="calc-cutoff"><h3>3. Where the cutoff comes from</h3>
-    <p><b>The cutoff is the midpoint between two reference helices.</b> The susceptible wild-type residues ${esc(wt.residues.split("").join("-"))} give a GyrA helix mean of ${f3(wt.gyr.mean)} and a ParC helix mean of ${f3(wt.parc.mean)}, so &lt;H&gt; = <b>${f3(wt.mean)}</b>. The resistant reference residues ${esc(rs.residues.split("").join("-"))} (the commonest fully changed tetratype) give ${f3(rs.gyr.mean)} and ${f3(rs.parc.mean)}, so &lt;H&gt; = <b>${f3(rs.mean)}</b>. The midpoint is (${f3(wt.mean)} + ${f3(rs.mean)}) / 2 = <b>${f3(cut)}</b>. When the four residues are not all in one column of the table and exactly one position votes Resistant, the sample counts as Resistant only if its &lt;H&gt; is above this value. The helices are mostly oily residues, so both values are above zero. The cutoff is set from these two reference helices, not by searching the isolates for the best score.</p>
-    <p><b>How much it matters.</b> &lt;H&gt; settles a call only where the four residues are not all in one column of the table and exactly one position votes Resistant. That is ${fmt(cs.n_single_vote)} of the ${fmt(cs.n_isolates)} reference isolates (${fmt(cs.single_vote_resistant)} resistant). The whole grammar scores ${cs.grammar_all.find(x => x.cutoff === wt.mean).accuracy}% with the wild-type value ${f3(wt.mean)} as cutoff and ${cs.grammar_all.find(x => x.cutoff === cut).accuracy}% with ${f3(cut)}.</p>
+    <p><b>The cutoff is the midpoint between two reference helices.</b> The susceptible wild-type residues ${esc(wt.residues.split("").join("-"))} give a GyrA helix mean of ${f3(wt.gyr.mean)} and a ParC helix mean of ${f3(wt.parc.mean)}, so &lt;H&gt; = <b>${f3(wt.mean)}</b>. The resistant reference residues ${esc(rs.residues.split("").join("-"))} (the commonest fully changed tetratype) give ${f3(rs.gyr.mean)} and ${f3(rs.parc.mean)}, so &lt;H&gt; = <b>${f3(rs.mean)}</b>. The midpoint is (${f3(wt.mean)} + ${f3(rs.mean)}) / 2 = <b>${f3(cut)}</b>. When the two columns of the table have the same number of marks and exactly one position votes Resistant, the sample counts as Resistant only if its &lt;H&gt; is above this value. The helices are mostly oily residues, so both values are above zero. The cutoff is set from these two reference helices, not by searching the isolates for the best score.</p>
+    <p><b>How much it matters.</b> &lt;H&gt; settles a call only where the two columns of the table have the same number of marks and exactly one position votes Resistant. That is ${fmt(cs.n_single_vote)} of the ${fmt(cs.n_isolates)} reference isolates (${fmt(cs.single_vote_resistant)} resistant). The whole grammar scores ${cs.grammar_all.find(x => x.cutoff === wt.mean).accuracy}% with the wild-type value ${f3(wt.mean)} as cutoff and ${cs.grammar_all.find(x => x.cutoff === cut).accuracy}% with ${f3(cut)}.</p>
     <p><b>Agreement with the paper.</b> The paper reports &lt;H&gt; of 0.27 to 0.32 for the susceptible tetratypes (S-D-S-E, S-N-S-E, Y-D-S-E, S-Y-S-E, L-D-S-E) and 0.40 to 0.48 for the resistant ones (L-N-I-E, F-N-I-E, I-D-I-E, I-N-I-E, L-G-I-E, I-Y-I-E, F-A-I-E, L-N-I-V), with F-N-S-K an exception at 0.297. This calculation gives the same values (for example S-D-S-E ${f3(wt.mean)}, L-N-I-E ${f3(rs.mean)}). The cutoff ${f3(cut)} lies in the gap between the two groups, above L-D-S-E (0.322) and F-D-S-E (0.327).</p>
     <p><b>Check against the data.</b> Across the ${fmt(cs.n_isolates)} reference isolates the mean &lt;H&gt; is <b>${f3(cs.mean_resistant)}</b> for resistant and <b>${f3(cs.mean_susceptible)}</b> for susceptible isolates. The values run from ${f3(cs.range[0])} to ${f3(cs.range[1])}. The two groups differ on average, but only by a small step.</p>
     <p>Accuracy at each cutoff, scored on the reference isolates the rules were built from. The first column is the whole grammar (the three checkpoints, with &lt;H&gt; settling single votes). The other two use &lt;H&gt; alone. The ${fmt(cs.n_single_vote)} isolates where &lt;H&gt; decides (${fmt(cs.single_vote_resistant)} resistant) are the last column.</p>${ctab()}
     <p style="margin-top:12px">Where &lt;H&gt; decides it is a weak separator (best ${cs.best_single_vote.accuracy}% on this grid).${cs.h_decided_max !== null && cs.h_decided_max <= cut ? " At the site's cutoff every isolate it decides is called Susceptible, so on these data it works as a last tie-breaker toward Susceptible." : ""}</p>
     <p class="muted" style="font-size:.9rem;margin-top:8px">The grammar is only a fallback. When a septatype was seen in the reference isolates, the majority rule is used instead. These tables describe the reference set. They are not a validation.</p></div>
   <div class="band"><h3>4. The three checkpoints</h3>
-    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. The isolate is <b>susceptible</b> if all four residues are in the Susceptible column, and <b>resistant</b> if all four are in the Resistant column.</p>
-    <div class="scroll"><table class="rtab"><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>${SYNTAX.map(([p, a, b, ta, tb]) => `<tr><td class="nw"><b>${p}</b></td><td>${a.split(" ").map(x => `<span class="rchip">${x}</span>`).join("")}<div class="clabel">(${ta})</div></td><td>${b.split(" ").map(x => `<span class="rchip">${x}</span>`).join("")}<div class="clabel">(${tb})</div></td></tr>`).join("")}</table></div>
-    <p class="muted small" style="margin-top:6px">A residue can be in both columns (D at GyrA-87, E at ParC-84), so the four positions are read together, which is the context sensitivity. One exception counts as Resistant: the ParC pair S-K (S at ParC-80 together with K at ParC-84, the F-N-S-K tetratype). S alone is the susceptible S-E state, and K alone is not listed. In a result the exception appears in the table only when your sample carries the whole pair. The residues follow the paper's Fig. 6 and the sentence under each column is its Table S6 wording.</p>
+    <p><b>Checkpoint 1.</b> Context-sensitive grammar of GyrA-83, GyrA-87, ParC-80 and ParC-84. Each column of the table lists amino-acid properties. A sample residue is marked in a column when it belongs to it, and the column with <b>more marked positions</b> decides: <b>susceptible</b> if more positions are marked in the Susceptible column, <b>resistant</b> if more are marked in the Resistant column.</p>
+    <div class="scroll"><table class="rtab"><tr><th>Position</th><th>Susceptible</th><th>Resistant</th></tr>${SYNTAX.map(([p, a, b]) => `<tr><td class="nw"><b>${p}</b></td><td><div class="ptags">${ptags(a)}</div></td><td><div class="ptags">${ptags(b)}</div></td></tr>`).join("")}</table></div>
+    <p class="muted small" style="margin-top:6px">A residue can be marked in both columns (for example D at GyrA-87, E at ParC-84), so the four positions are read together, which is the context sensitivity. One exception counts as Resistant: the ParC pair S-K (S at ParC-80 together with K at ParC-84, the F-N-S-K tetratype). S alone is the susceptible S-E state, and K alone is not listed. In a result the table shows your sample's residue in the column where it is marked, lights the properties that residue has, and lights the exception only when your sample carries the whole pair.</p>
     <p><b>Checkpoint 2.</b> RecN-346. Susceptible if it is leucine (L) encoded by cta. Resistant if it is leucine encoded by ctg, or phenylalanine (F). Other codons, and an unknown codon, give no resistant signal.</p>
     <p><b>Checkpoint 3.</b> PMQR genes. Susceptible if both qnrB2 and qnrS1 are absent. Resistant if either or both are present.</p>
     <p><b>Combined.</b> Susceptible if all checkpoints say susceptible. Resistant if any checkpoint says resistant.</p>
-    <p class="muted" style="font-size:.9rem">The table gives no answer when the four residues are not all in one column (for example L-D-S-E, where L at GyrA-83 is in the Resistant column but S at ParC-80 is in the Susceptible column). There the residue votes decide (two or more positions outside the Susceptible column: Resistant; none: Susceptible), and one vote is settled by &lt;H&gt; as in section 3. This is an assumption added by the site. <i>S. sonnei</i> also keeps one extra rule from the reference isolates: a single change at GyrA-83 or GyrA-87 counts as Resistant.</p></div>`;
+    <p class="muted" style="font-size:.9rem">The table gives no answer only when both columns have the same number of marked positions (for example L-D-S-E, where L at GyrA-83 and D, E in the Resistant column match S at ParC-80 and D, E in the Susceptible column: three marks each). There the residue votes decide (two or more positions outside the Susceptible class: Resistant; none: Susceptible), and one vote is settled by &lt;H&gt; as in section 3. This tie-break is an assumption added by the site. <i>S. sonnei</i> also keeps one extra rule from the reference isolates: a single change at GyrA-83 or GyrA-87 counts as Resistant.</p></div>`;
   const htab = b => `<div class="scroll"><table class="step"><tr><th>${esc(b.gene)} helix ${b.start}-${b.end}</th><th>Residue</th><th class="num">H</th></tr>${b.values.map(x => `<tr${x.sub ? ' class="hit-row"' : ""}><td>${esc(x.position)}</td><td class="mono">${esc(x.residue)}</td><td class="num">${f2(x.h)}</td></tr>`).join("")}<tr><td colspan="2">Sum of ${b.n}</td><td class="num">${f2(b.sum)}</td></tr><tr><td colspan="2"><b>${esc(b.gene)} mean = sum / ${b.n}</b></td><td class="num"><b>${f3(b.mean)}</b></td></tr></table></div>`;
   const side = (t, v) => `<div><h3 style="font-size:1rem">${t}</h3>${htab(v.gyr)}${htab(v.parc)}<p class="formula wrap">&lt;H&gt; = (${f3(v.gyr.mean)} + ${f3(v.parc.mean)}) / 2 = <b>${f3(v.mean)}</b></p></div>`;
   const draw = async () => {
@@ -682,7 +719,7 @@ INIT.calc = async () => {
     try {
       const c = await api(`/api/v1/grammar?residues=${r}&reference=${rf}`), hy = c.hydrophobicity, rr = c.reference;
       el.innerHTML = `<div class="row2">${side("Sample", hy)}${side("Reference", rr)}</div>${hChart(hy.mean, rr.mean, hy.cutoff, { res: cs.mean_resistant, sus: cs.mean_susceptible })}
-        <p>Sample &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} the cutoff of ${f3(hy.cutoff)}, which points to <b>${hy.side === "above" ? "resistant" : "susceptible"}</b>. ${c.checkpoints.residues.resolved_by === "hydrophobicity" ? "Here it settles checkpoint 1, because the four residues are not all in one column and exactly one position votes Resistant." : "It does not settle this sample: " + (c.checkpoints.residues.pattern ? "the residue classes below do." : esc(c.checkpoints.residues.rule) + ".")}</p>
+        <p>Sample &lt;H&gt; is ${hy.side === "above" ? "above" : "at or below"} the cutoff of ${f3(hy.cutoff)}, which points to <b>${hy.side === "above" ? "resistant" : "susceptible"}</b>. ${c.checkpoints.residues.resolved_by === "hydrophobicity" ? "Here it settles checkpoint 1, because both columns have the same number of marks and exactly one position votes Resistant." : "It does not settle this sample: " + (c.checkpoints.residues.pattern ? "the residue table below does." : esc(c.checkpoints.residues.rule) + ".")}</p>
         <p><b>Checkpoint 1 says ${esc(c.checkpoints.residues.call)}.</b> ${c.checkpoints.residues.pattern ? `All four residues are in the ${c.checkpoints.residues.pattern === "resistant" ? "Resistant" : "Susceptible"} column.` : "The four residues are not all in one column."}</p>${critTable(c.positions)}`;
     } catch (e) { el.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
@@ -741,7 +778,7 @@ INIT.curate = () => {
         try {
           const res = await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value.trim() },
             body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "", curator: (($("#c-name") || {}).value || "").trim() }) });
-          LOADED.browse = false; LOADED.home = false; LOADED.analytics = false;
+          LOADED.browse = false; LOADED.home = false; LOADED.analyze = false;
           if (b.dataset.a === "approve") META.counts.genomes += 1; else if (res.revoked) META.counts.genomes -= 1;
           load();
         } catch (e) { $("#c-err").innerHTML = `<div class="err">${esc(e.message)}</div>`; }

@@ -279,3 +279,24 @@ dialog.consent h2{margin:0 0 4px;font-size:1.2rem;color:var(--th-ink)}
 .consent-actions .btn{flex:1 1 140px}
 .consent-actions .btn:disabled{opacity:.5;cursor:not-allowed}
 button.linklike{background:none;border:0;padding:0;font:inherit;color:var(--blue);text-decoration:underline;cursor:pointer}
+
+/* Help menu: the button sits in the main navigation, its pages open in a panel under the header */
+.dd-btn{background:none;border:0;border-bottom:3px solid transparent;color:#dbe8f7;font:inherit;font-size:.95rem;padding:14px 12px;cursor:pointer;white-space:nowrap}
+.dd-btn:hover,.dd-btn[aria-expanded="true"]{color:#fff}
+.dd-btn.on{color:#fff;border-color:#fff}
+.dd-menu{position:absolute;top:100%;left:8px;z-index:40;min-width:190px;background:var(--top);border:1px solid #ffffff33;border-top:0;border-radius:0 0 8px 8px;box-shadow:0 10px 28px rgba(11,60,114,.4);padding:4px 0}
+.dd-menu[hidden]{display:none!important}
+.dd-menu a{display:block;padding:12px 18px;color:#dbe8f7;text-decoration:none;font-size:.95rem;border-left:3px solid transparent}
+.dd-menu a:hover{background:#ffffff1f;color:#fff}
+.dd-menu a.on{background:#ffffff2e;color:#fff;border-left-color:#fff}
+
+/* checkpoint 1 table: amino-acid properties; the sample's residue and the properties it has are lit */
+.ptags{display:flex;flex-wrap:wrap;gap:4px;max-width:16em;margin-top:3px}
+.ptag{display:inline-block;white-space:normal;padding:2px 8px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--muted);font:500 .76rem var(--sans)}
+.ptag.exc{border-style:dashed}
+.ptag.hit{font-weight:700}
+.ptag.hit.s{background:var(--sus-bg);border-color:var(--sus);color:var(--sus);box-shadow:0 0 0 2px var(--sus-bg)}
+.ptag.hit.r{background:var(--res-bg);border-color:var(--res);color:var(--res);box-shadow:0 0 0 2px var(--res-bg)}
+table.rtab tr.marks td{border-top:2px solid var(--line);font-size:.88rem}
+ol.refs{margin:0;padding-left:1.4em}
+ol.refs li{margin:0 0 10px;overflow-wrap:anywhere}
