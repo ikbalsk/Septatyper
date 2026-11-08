@@ -251,9 +251,9 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                 out["tier"] = "database_other_site"
                 flags.append("Not seen for this isolation source, so the call uses isolates of this species from all sources.")
             if n < LOW_SUPPORT:
-                flags.append(f"Only {n} reference isolate(s) carry this septatype, so treat the call with care.")
+                flags.append(f"Only {n} reference isolate(s) carry this ciprotype, so treat the call with care.")
             if use["confidence"] < MIXED:
-                flags.append(f"The reference isolates with this septatype are mixed: {r} resistant, {s} susceptible.")
+                flags.append(f"The reference isolates with this ciprotype are mixed: {r} resistant, {s} susceptible.")
             if r == s:
                 flags.append("The reference isolates are split evenly, so the paper's rule calls it susceptible.")
             if g["call"] != out["call"]:
@@ -261,7 +261,7 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
         else:
             out.update(call=g["call"], tier="grammar", known=False, novel=True, n_isolates=0, n_resistant=0,
                        n_susceptible=0, confidence=None, reference_sts=[], reference_sites=[], reference_countries=[])
-            flags.append("New septatype: not seen in the reference isolates for this species, "
+            flags.append("New ciprotype: not seen in the reference isolates for this species, "
                          "so the call comes from the grammar and is less certain. It is flagged for curation.")
             rows = db.execute("SELECT septatype,n_isolates,n_resistant,n_susceptible,predicted FROM septatypes "
                               "WHERE species=? AND habitat=? AND tetratype=? ORDER BY n_isolates DESC",
@@ -600,7 +600,7 @@ def decide(job_id: str, action: str, note: str = "", by: str = "") -> dict:
         if status == "approved":
             raise ValueError("Already approved")
         if s["lab_phenotype"] not in ("Resistant", "Susceptible") or not s["septatype"]:
-            raise ValueError("Cannot approve without a laboratory phenotype and a complete septatype.")
+            raise ValueError("Cannot approve without a laboratory phenotype and a complete ciprotype.")
         gid = apply_approval(db, s)
         db.execute("UPDATE submissions SET status='approved', curator_note=?, decided=?, decided_by=? WHERE job_id=?",
                    (note, _now(), by or None, job_id))
@@ -623,7 +623,7 @@ def cutoff_stats() -> dict:
     for t in rows:
         a = t["tetratype"].split("-")
         nv = sum(1 for v in grammar.votes(*a) if v["vote"])
-        # <H> decides only where the two columns of the table have the same number of marks and exactly one position votes Resistant
+        # <H> no longer decides checkpoint 1 (a tetratype not all in one column simply skips checkpoint 1), so this group is empty
         groups.append((grammar.mean_h(a), nv, t["r"], t["s"], grammar.checkpoint1("ecoli", a)["resolved_by"] == "hydrophobicity"))
     n_r, n_s = sum(g[2] for g in groups), sum(g[3] for g in groups)
     cut = grammar.H_CUTOFF

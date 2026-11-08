@@ -154,7 +154,22 @@ def _cp1_reason(species, cp1):
             + (" RecN itself matches poorly, so checkpoint 2 is also less certain." if recn else ""))
 
 
+def _species_mismatch(species, habitat, analysis, sc):
+    """The genome's MLST genes do not match the chosen species (below the identity threshold): no sequence type, no phenotype and
+    no checkpoints are reported, only the request to check the species and resubmit."""
+    ml = (analysis or {}).get("mlst") or {}
+    msg = sc.get("message") or "Please verify the species selected and resubmit."
+    scrubbed = {"input": (analysis or {}).get("input"), "warnings": [], "checkpoint1": None,
+                "mlst": {"st": None, "status": "species_mismatch", "scheme_name": ml.get("scheme_name"), "species_check": sc,
+                         "note": "No sequence type is assigned because the genome does not match the selected species."}}
+    return {"status": "species_mismatch", "species_check": sc, "species": species, "species_name": SPECIES[species],
+            "habitat": habitat, "septatype": None, "analysis": scrubbed, "prediction": None, "warnings": [msg]}
+
+
 def _result(species, habitat, analysis, sep):
+    sc0 = ((analysis or {}).get("mlst") or {}).get("species_check") or {}
+    if sc0.get("checked") and not sc0.get("ok"):          # wrong species: nothing is called (no ST, no phenotype, no checkpoints)
+        return _species_mismatch(species, habitat, analysis, sc0)
     cp1 = (analysis or {}).get("checkpoint1")
     if analysis and cp1 and not cp1["applicable"]:
         pos, qn = analysis.get("positions") or {}, analysis.get("qnr") or {}
@@ -616,6 +631,8 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
         raise HTTPException(400, "Provide a genome FASTA (file or pasted).")
     analysis = _analyse_text(text, species, {"qnrB2": qnrB2, "qnrS1": qnrS1})
     result = _result(species, habitat, analysis, analysis["septatype"])
+    if result.get("status") == "species_mismatch":         # nothing is called for a genome of the wrong species, so nothing is queued
+        raise HTTPException(400, (result.get("species_check") or {}).get("message") or "Please verify the species selected and resubmit.")
     # keep only derived genotype data. The genome itself is never stored.
     d = dict(species=species, habitat=habitat, genome_id=genome_id.strip() or None, genome_name=genome_name.strip()[:200] or None,
              country=country_name, year=year.strip() or None, source_text=None,
