@@ -171,6 +171,18 @@ def _result(species, habitat, analysis, sep):
     if sc0.get("checked") and not sc0.get("ok"):          # wrong species: nothing is called (no ST, no phenotype, no checkpoints)
         return _species_mismatch(species, habitat, analysis, sc0)
     cp1 = (analysis or {}).get("checkpoint1")
+    # Wrong species, second sign: gyrA, parC or recN WERE found but match the chosen species reference at less than the identity
+    # threshold (CP1_MIN_ID). Then nothing is called either: no sequence type, no phenotype, no checkpoints.
+    # (A gene that was simply not found is different: that is a gene or assembly gap, and keeps the partial call below.)
+    if analysis and cp1 and not cp1["applicable"]:
+        div = [x for x in cp1["low"] if x["found"] and x["identity"] is not None]
+        if div:
+            genes = ", ".join(f"{x['gene']} {x['identity']:g}%" for x in div)
+            msg = (f"Please verify the species selected and resubmit. {genes} match the {SPECIES[species]} reference at less than "
+                   f"{cp1['threshold']:g}% identity, so this sequence is probably from a different species. "
+                   "No sequence type, phenotype or checkpoints are reported.")
+            sc = {"checked": True, "ok": False, "kind": "gene_identity", "threshold": cp1["threshold"], "low": div, "message": msg}
+            return _species_mismatch(species, habitat, analysis, sc)
     if analysis and cp1 and not cp1["applicable"]:
         pos, qn = analysis.get("positions") or {}, analysis.get("qnr") or {}
         r346 = (pos.get("recN346") or {}).get("aa")

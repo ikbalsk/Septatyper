@@ -161,7 +161,7 @@ function drawBatch(done, total, unit = "file") {
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing ${unit} ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
     <div class="scroll"><table><tr><th>${unit === "genome" ? "Genome" : "File"}</th><th>Ciprotype</th><th>ST</th><th>Call</th><th>Call from</th><th>Support</th></tr>${rows}</table></div>
     ${working ? "" : `<div class="actions no-print"><button class="btn solid" data-act="bcsv" type="button">Download CSV</button><button class="btn line" data-act="print" type="button">Print or save as PDF</button></div><p class="muted" style="font-size:.85rem">Tap a row for the full result.</p>`}
-    <p class="print-only">Ciprotyper batch report, ${new Date().toLocaleDateString()}. Research use only. Based on Ghosh, A., Deb, P., Bose, P. et al. Sci Rep (2026), https://doi.org/10.1038/s41598-026-75690-y</p></div><div id="bdetail"></div>`;
+    <p class="print-only">Ciprotyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
 }
 async function runBatch(species, habitat) {
   if (!PFILES.length) throw new Error("Choose at least one FASTA file.");
@@ -241,11 +241,10 @@ function critTable(positions) {
     return `<td>${byLine(res, l => `<div class="rline">${l.map(c => `<span class="rl${c.observed ? " obs" : ""}${c.hit ? " hit " + side : ""}${c.exception ? " exc" : ""}">${esc(c.residue)}${c.exception ? "<small>exception</small>" : ""}</span>`).join(",")}</div>`)}` +
       (props ? byLine(props, l => `<div class="pline">${l.map(t => `<span class="pp${t.hit ? " hit " + side : ""}">${esc(t.text)}</span>`).join("")}</div>`) : `<div class="pline">${esc(label || "")}</div>`) + `</td>`;
   };
-  const ns = positions.filter(x => x.fits_susceptible).length, nr = positions.filter(x => x.fits_resistant).length, n = positions.length;
-  const all = (k, side) => k === n ? `<b class="${side}">Yes, all ${n}</b>` : `No (${k} of ${n})`;
+  const seen = x => { const hits = [...(x.susceptible || []), ...(x.resistant || [])].filter(c => c.hit); return hits.length ? (hits.some(c => c.observed) ? " &middot; observed in our dataset (bold)" : " &middot; possible residue, not observed in our dataset") : ""; };
   return `<div class="scroll"><table class="rtab cp1"><tr><th>Amino acid position</th><th>Susceptible</th><th>Resistant</th></tr>${positions.map(x =>
-    `<tr><td class="nw"><b>${esc(x.position)}</b><span class="alias">sample: ${esc(x.residue)}${x.column === "neither" ? " (in neither column)" : ""}</span></td>${cell(x, "s")}${cell(x, "r")}</tr>`).join("")}
-    <tr class="marks"><td class="nw"><b>All four residues in the column?</b></td><td>${all(ns, "s")}</td><td>${all(nr, "r")}</td></tr></table></div><p class="tnote">${esc(CP1_NOTE)}</p>${positions.some(x => x.exception) ? `<p class="tnote">${esc(CP1_EXC)}</p>` : ""}`;
+    `<tr><td class="nw"><b>${esc(x.position)}</b><span class="alias">sample: ${esc(x.residue)}${x.column === "neither" ? " (in neither column)" : seen(x)}</span></td>${cell(x, "s")}${cell(x, "r")}</tr>`).join("")}</table></div>
+    <p class="tnote">${esc(CP1_NOTE)}</p><p class="tnote">Your residue is boxed. A filled box means it is also bold, so it was observed in our dataset. An outlined box means it is a possible residue that was not observed.</p>${positions.some(x => x.exception) ? `<p class="tnote">${esc(CP1_EXC)}</p>` : ""}`;
 }
 /* number line: sample and reference <H> against the cutoff; extra = typical resistant and susceptible isolates */
 function hChart(sample, ref, cutoff, extra) {
@@ -280,7 +279,7 @@ function whyNotApplied(p, c) {
 }
 function whyBlock(p) {
   const c = p.criteria; if (!c) return "";
-  const k = c.checkpoints, r1 = k.residues, dec = c.decided_by;
+  const k = c.checkpoints, r1 = k.residues, dec = c.decided_by, hy = c.hydrophobicity, rf = c.reference, res = (c.positions || []).map(x => x.residue).join("");
   if (r1.applied === false && !(c.positions || []).length) return whyNotApplied(p, c);      // a gene matches the species too poorly: no table to show
   const mixed = r1.applied === false;                                                          // the four residues are not all in one column
   const intro = p.tier === "grammar" ? "Call from the three checkpoints, because this ciprotype is new." : `Call from the database majority rule${c.grammar_call !== p.call ? `. The three checkpoints alone would say ${esc(c.grammar_call)}` : ""}.`;
@@ -289,9 +288,15 @@ function whyBlock(p) {
   const why1 = mixed ? "The four residues are not all in one column of the table (a residue that is in both columns still needs the other three in the same column), so checkpoint 1 is <b>not applied</b>. The call comes from checkpoints 2 and 3 only."
     : r1.override ? `${r1.pattern ? "All four residues are in the Susceptible column, but " : "The four residues are not all in one column. "}${esc(r1.rule)}: counted Resistant. This is an extra rule from the reference isolates, not one of the three checkpoints.`
     : `All four residues are in the ${r1.pattern === "resistant" ? "Resistant" : "Susceptible"} column${(r1.exceptions || []).length ? ", counting the S-K pair at ParC-80 and ParC-84 as an exception that is Resistant" : ""}.`;
+  const hBlock = hy && rf ? `<div class="crit dim"><h4>QRDR helix mean hydrophobicity &lt;H&gt; <span class="tag off">information only</span></h4>
+    <p class="muted small" style="margin:0 0 4px">Shown for information only. &lt;H&gt; is not used by any checkpoint and does not change the call.</p>${hChart(hy.mean, rf.mean, hy.cutoff)}
+    ${helixLines("Sample", hy)}${helixLines("Reference", rf)}
+    <p class="muted small" style="margin:4px 0">Every residue of the GyrA and ParC helices counts. Your residues at the four tetratype positions are marked red. Means are rounded to three decimals.</p>
+    <p class="small"><a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}">How is this calculated?</a> &nbsp; <a class="calc-link" href="#/calc?r=${esc(res)}&ref=${esc(rf.residues)}&s=cutoff">Why a cutoff of ${f3(hy.cutoff)}?</a></p></div>` : "";
   let h = `<h3>Why ${esc(p.call)}</h3><p class="muted small">${intro} Highlighted is what applies to this sample.</p>`;
   h += `<div class="crit ${mixed ? "dim" : dim(r1.call)}"><h4>Checkpoint 1: residues at GyrA-83, GyrA-87, ParC-80 and ParC-84 ${mixed ? `<span class="tag off">not applied</span>` : badge(r1.call, 1)} ${tag(["pattern", "override"].includes(dec))}</h4>${critTable(c.positions)}
     <p style="margin:8px 0 0">${why1}${mixed ? "" : ` <b>Checkpoint 1 says ${esc(r1.call)}.</b>`}</p></div>`;
+  h += hBlock;
   h += `<div class="crit ${dim(k.recn.call)}"><h4>Checkpoint 2: RecN-346 ${cpBadge(k.recn.call)} ${tag(dec === "checkpoint2")}</h4>
     <p style="margin:0">${esc(k.recn.text)}.</p><p class="muted small" style="margin:6px 0 0">${CP2_RULE}</p></div>`;
   h += `<div class="crit ${dim(k.qnr.call)}"><h4>Checkpoint 3: PMQR genes ${badge(k.qnr.call, 1)} ${tag(dec === "checkpoint3")}</h4>
@@ -359,7 +364,7 @@ function renderResult(r, extra) {
       `</table></div><p class="muted small" style="margin-top:8px">${a.input.records} sequence record(s), ${fmt(a.input.total_bp)} bp.</p></details>`;
   }
   if (p && p.novel) h += `<div class="info">This ciprotype is new for ${esc(SHORT[r.species])}. If you have the laboratory phenotype, <a href="#/submit">submit the isolate</a> so curators can add it.</div>`;
-  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div><p class="muted small">Research use only. Confirm with laboratory testing.</p><p class="muted small credit-line">Ciprotyper is based on Ghosh, A., Deb, P., Bose, P. et al. <i>Sci Rep</i> (2026), <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">doi:10.1038/s41598-026-75690-y</a>.</p></div>`;
+  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div><p class="muted small">Research use only. Confirm with laboratory testing.</p></div>`;
   return h;
 }
 INIT.predict = () => {

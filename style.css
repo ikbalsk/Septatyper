@@ -321,3 +321,9 @@ table.rtab.cp1 td.nw{text-align:left}
 
 .rl small{margin-left:3px;font:600 .62rem var(--sans);text-transform:uppercase;letter-spacing:.03em;opacity:.85}
 .rl.exc{border-style:dashed}
+
+/* the sample's residue: a FILLED box when it is also bold (observed in our dataset), an OUTLINED box when it is only a possible residue */
+.rl.hit.s.obs{background:var(--sus);border-color:var(--sus);color:#fff}
+.rl.hit.r.obs{background:var(--res);border-color:var(--res);color:#fff}
+.rl.hit:not(.obs){font-weight:400;border-style:dashed;background:#fff}
+.rl.hit.obs small{color:#fff}
