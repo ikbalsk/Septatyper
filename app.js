@@ -279,7 +279,7 @@ function whyNotApplied(p, c) {
 }
 function whyBlock(p) {
   const c = p.criteria; if (!c) return "";
-  const k = c.checkpoints, r1 = k.residues, dec = c.decided_by, hy = c.hydrophobicity, rf = c.reference, res = (c.positions || []).map(x => x.residue).join("");
+  const k = c.checkpoints, r1 = k.residues, dec = c.decided_by, hy = c.hydrophobicity, res = (c.positions || []).map(x => x.residue).join("");
   if (r1.applied === false && !(c.positions || []).length) return whyNotApplied(p, c);      // a gene matches the species too poorly: no table to show
   const mixed = r1.applied === false;                                                          // the four residues are not all in one column
   const intro = p.tier === "grammar" ? "Call from the three checkpoints, because this ciprotype is new." : `Call from the database majority rule${c.grammar_call !== p.call ? `. The three checkpoints alone would say ${esc(c.grammar_call)}` : ""}.`;

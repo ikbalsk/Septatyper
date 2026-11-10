@@ -300,7 +300,7 @@
       <tr><td class="mono">GET /api/v1/stats/accuracy</td><td>Accuracy, benchmark against BV-BRC and edge cases.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/geography</td><td>Counts per country.</td></tr>
       <tr><td class="mono">GET /api/v1/stats/septatypes</td><td>Ciprotype frequency by isolation source.</td></tr>
-      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence. The reply holds the ciprotype (field <span class="mono">septatype</span>), the call, <span class="mono">analysis.mlst</span> (sample ST and alleles) and, under <span class="mono">prediction</span>, the isolation sources, countries and STs of the reference isolates behind the call.</td></tr>
+      <tr><td class="mono">POST /api/v1/predict</td><td>Form fields: species, habitat, file or sequence. The reply holds the ciprotype (field <span class="mono">septatype</span>), the call, <span class="mono">analysis.mlst</span> (sample ST and alleles) and, under <span class="mono">prediction</span>, the isolation sources, countries and STs of the reference isolates behind the call. If the genome does not match the selected species, <span class="mono">status</span> is <span class="mono">species_mismatch</span> and the reply holds no ciprotype, sequence type or call.</td></tr>
       <tr><td class="mono">POST /api/v1/predict/bvbrc</td><td>JSON with <span class="mono">genome_id</span> (for example 562.7710). The assembly is fetched from BV-BRC. One genome per call.</td></tr>
       <tr><td class="mono">POST /api/v1/predict/manual</td><td>JSON with the five residues and qnr flags.</td></tr>
       <tr><td class="mono">POST /api/v1/submissions</td><td>Community submission (enters the curation queue).</td></tr>

@@ -87,8 +87,19 @@ def _refresh_from_seed(path) -> None:
             icols = [c for c in (x[1] for x in live.execute("PRAGMA main.table_info(isolates)"))
                      if c in {x[1] for x in live.execute("PRAGMA seed.table_info(isolates)")}]
             cl = ",".join(icols)
+            # BV-BRC names and computational calls do not depend on our rules: keep them across the refresh, so the
+            # BV-BRC comparison does not disappear (and is not downloaded again) after every deployment
+            try:
+                keep = {r[0]: (r[1], r[2], r[3]) for r in live.execute(
+                    "SELECT genome_id, genome_name, bvbrc_call, bvbrc_method FROM main.isolates WHERE source='founding'")}
+            except sqlite3.Error:
+                keep = {}
             live.execute("DELETE FROM main.isolates WHERE source='founding'")
             live.execute(f"INSERT INTO main.isolates ({cl}) SELECT {cl} FROM seed.isolates WHERE source='founding'")
+            for gid, (nm, call, meth) in keep.items():
+                if nm or call:
+                    live.execute("UPDATE main.isolates SET genome_name=COALESCE(?, genome_name), bvbrc_call=?, bvbrc_method=? WHERE genome_id=?",
+                                 (nm, call, meth, gid))
             for t in ("septatypes", "species_stats", "aa_properties"):
                 live.execute(f"DELETE FROM main.{t}")
                 live.execute(f"INSERT INTO main.{t} SELECT * FROM seed.{t}")
@@ -105,7 +116,8 @@ def _refresh_from_seed(path) -> None:
                                   max(res_, sus_) / (res_ + sus_), grammar.mean_h(sep.split("-")[:4])))
             live.execute("DELETE FROM main.meta")
             live.execute("INSERT INTO main.meta SELECT * FROM seed.meta")
-            live.execute("UPDATE main.meta SET value='0' WHERE key='bvbrc_loaded'")           # the BV-BRC comparison is loaded again
+            kept = any(v[1] for v in keep.values())                                       # BV-BRC calls were carried over
+            live.execute("INSERT OR REPLACE INTO main.meta VALUES ('bvbrc_loaded', ?)", ("1" if kept else "0",))
             live.execute("INSERT OR REPLACE INTO main.meta VALUES ('seed_built', ?)", (built,))
             live.execute("COMMIT")
         except Exception:
