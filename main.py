@@ -313,6 +313,15 @@ def limit_predict(request: Request):
     _limit(request, "prediction", RATE_PREDICT_PER_HOUR)
 
 
+@app.get("/api/v1/bvbrc-cache")
+def bvbrc_cache():
+    """The BV-BRC names and calls as a file (bvbrc_cache.json). Save it into the repo root: afterwards every start loads the
+    comparison in seconds instead of asking BV-BRC again. Available once the comparison has been loaded."""
+    if not bvbrc.is_loaded():
+        raise HTTPException(409, "The BV-BRC comparison is not loaded yet. Try again when /api/v1/bvbrc-status says loaded.")
+    return JSONResponse(bvbrc.export_cache(), headers={"Content-Disposition": 'attachment; filename="bvbrc_cache.json"'})
+
+
 @app.get("/api/v1/bvbrc-status")
 def bvbrc_status():
     return bvbrc.status()

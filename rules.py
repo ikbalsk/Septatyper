@@ -116,8 +116,8 @@ def _refresh_from_seed(path) -> None:
                                   max(res_, sus_) / (res_ + sus_), grammar.mean_h(sep.split("-")[:4])))
             live.execute("DELETE FROM main.meta")
             live.execute("INSERT INTO main.meta SELECT * FROM seed.meta")
-            kept = any(v[1] for v in keep.values())                                       # BV-BRC calls were carried over
-            live.execute("INSERT OR REPLACE INTO main.meta VALUES ('bvbrc_loaded', ?)", ("1" if kept else "0",))
+            have = live.execute("SELECT COUNT(*) FROM main.isolates WHERE source='founding' AND bvbrc_call IS NOT NULL").fetchone()[0]
+            live.execute("INSERT OR REPLACE INTO main.meta VALUES ('bvbrc_loaded', ?)", ("1" if have else "0",))   # BV-BRC calls present
             live.execute("INSERT OR REPLACE INTO main.meta VALUES ('seed_built', ?)", (built,))
             live.execute("COMMIT")
         except Exception:

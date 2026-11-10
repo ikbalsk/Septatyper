@@ -259,7 +259,7 @@ function hChart(sample, ref, cutoff, extra) {
   }
   return `<svg viewBox="0 0 ${W} ${H}" class="hchart" role="img" aria-label="Sample hydrophobicity ${f3(sample)}, cutoff ${f3(cutoff)}">
     <line x1="${x(lo)}" x2="${x(cutoff)}" y1="48" y2="48" stroke="var(--sus-bg)" stroke-width="14"/><line x1="${x(cutoff)}" x2="${x(hi)}" y1="48" y2="48" stroke="var(--res-bg)" stroke-width="14"/>
-    <text x="${x(lo)}" y="12" font-size="11" fill="var(--muted)">lower H</text><text x="${x(hi)}" y="12" font-size="11" text-anchor="end" fill="var(--muted)">higher H</text>
+    <text x="${x(lo)}" y="12" font-size="11" font-weight="600" fill="var(--sus)">&#8592; lower H: expected susceptible</text><text x="${x(hi)}" y="12" font-size="11" font-weight="600" text-anchor="end" fill="var(--res)">higher H: expected resistant &#8594;</text>
     <line x1="${x(cutoff)}" x2="${x(cutoff)}" y1="38" y2="76" stroke="var(--ink)" stroke-width="2" stroke-dasharray="4 3"/><text x="${x(cutoff)}" y="14" font-size="12" text-anchor="middle" fill="var(--ink)">cutoff ${f3(cutoff)}</text>
     ${ref == null ? "" : `<circle cx="${x(ref)}" cy="48" r="11" fill="var(--white)" stroke="var(--muted)" stroke-width="3"/>`}<circle cx="${x(sample)}" cy="48" r="7" fill="${col}"/>
     <text x="${lab(sample)}" y="30" text-anchor="middle" font-size="13" font-weight="600" fill="${col}" class="hs">Sample ${f3(sample)}</text>
@@ -288,10 +288,9 @@ function whyBlock(p) {
   const why1 = mixed ? "The four residues are not all in one column of the table (a residue that is in both columns still needs the other three in the same column), so checkpoint 1 is <b>not applied</b>. The call comes from checkpoints 2 and 3 only."
     : r1.override ? `${r1.pattern ? "All four residues are in the Susceptible column, but " : "The four residues are not all in one column. "}${esc(r1.rule)}: counted Resistant. This is an extra rule from the reference isolates, not one of the three checkpoints.`
     : `All four residues are in the ${r1.pattern === "resistant" ? "Resistant" : "Susceptible"} column${(r1.exceptions || []).length ? ", counting the S-K pair at ParC-80 and ParC-84 as an exception that is Resistant" : ""}.`;
-  const hBlock = hy ? `<div class="crit dim"><h4>QRDR helix mean hydrophobicity &lt;H&gt; <span class="tag off">information only</span></h4>
+  const hBlock = hy ? `<div class="crit dim"><h4>QRDR helix mean hydrophobicity &lt;H&gt;</h4>
     ${hChart(hy.mean, null, hy.cutoff)}
     ${helixLines("Sample", hy)}
-    <p class="muted small" style="margin:4px 0">Every residue of the GyrA and ParC helices counts. Your residues at GyrA-83, GyrA-87, ParC-80 and ParC-84 are marked red. Means are rounded to three decimals.</p>
     <p class="small"><a class="calc-link" href="#/calc?r=${esc(res)}">How is this calculated?</a> &nbsp; <a class="calc-link" href="#/calc?r=${esc(res)}&s=cutoff">Why a cutoff of ${f3(hy.cutoff)}?</a></p></div>` : "";
   let h = `<h3>Why ${esc(p.call)}</h3><p class="muted small">${intro} Highlighted is what applies to this sample.</p>`;
   h += `<div class="crit ${mixed ? "dim" : dim(r1.call)}"><h4>Checkpoint 1: residues at GyrA-83, GyrA-87, ParC-80 and ParC-84 ${mixed ? `<span class="tag off">not applied</span>` : badge(r1.call, 1)} ${tag(["pattern", "override"].includes(dec))}</h4>${critTable(c.positions)}
@@ -491,7 +490,10 @@ async function bvNote() {
   const n = $("#bv-note");
   if (st.loaded) { n.innerHTML = ""; return; }
   if (st.running) { n.innerHTML = `<div class="info">Fetching BV-BRC predictions: ${st.done} of ${st.total} genomes. This table updates when it finishes.</div>`; setTimeout(async () => { await bvNote(); if (META.bvLoaded) loadBrowse(); }, 6000); }
-  else if (st.error) n.innerHTML = `<div class="info">The BV-BRC comparison is not available right now (${esc(st.error)}). It retries when the server restarts.</div>`;
+  else if (st.error) {
+    n.innerHTML = `<div class="info">The BV-BRC comparison is not available right now (${esc(st.error)}). ${st.retrying ? `It keeps retrying in the background (${st.done} of ${st.total} genomes fetched so far).` : "It retries when the server restarts."}</div>`;
+    if (st.retrying) setTimeout(async () => { await bvNote(); if (META.bvLoaded) loadBrowse(); }, 20000);
+  }
   else n.innerHTML = `<div class="info">The BV-BRC comparison is being prepared and will appear here soon.</div>`;
 }
 INIT.browse = async () => {
@@ -697,7 +699,6 @@ INIT.calc = async () => {
     <div class="row2"><div><label for="calc-in">Sample residues</label><input type="text" id="calc-in" maxlength="4" value="${esc(start)}" class="mono-in"></div></div>
     <div id="calc-steps"></div></div>
   <div class="band" id="calc-cutoff"><h3>3. Where the cutoff comes from</h3>
-    <p class="info" style="margin-top:0"><b>&lt;H&gt; does not decide any call.</b> Checkpoint 1 is read from the residue table in section 4: a call needs all four residues in one column, and otherwise checkpoint 1 is not applied and the phenotype comes from checkpoints 2 and 3. The numbers below are kept as a worked example of the hydrophobicity of the QRDR helices.</p>
     <p><b>The cutoff is the midpoint between two reference helices.</b> The susceptible wild-type residues ${esc(wt.residues.split("").join("-"))} give a GyrA helix mean of ${f3(wt.gyr.mean)} and a ParC helix mean of ${f3(wt.parc.mean)}, so &lt;H&gt; = <b>${f3(wt.mean)}</b>. The resistant reference residues ${esc(rs.residues.split("").join("-"))} (the commonest fully changed ciprotype) give ${f3(rs.gyr.mean)} and ${f3(rs.parc.mean)}, so &lt;H&gt; = <b>${f3(rs.mean)}</b>. The midpoint is (${f3(wt.mean)} + ${f3(rs.mean)}) / 2 = <b>${f3(cut)}</b>.</p>
     <p><b>Agreement with the paper.</b> The paper reports &lt;H&gt; of 0.27 to 0.32 for the susceptible ciprotypes (S-D-S-E, S-N-S-E, Y-D-S-E, S-Y-S-E, L-D-S-E) and 0.40 to 0.48 for the resistant ones (L-N-I-E, F-N-I-E, I-D-I-E, I-N-I-E, L-G-I-E, I-Y-I-E, F-A-I-E, L-N-I-V), with F-N-S-K an exception at 0.297. This calculation gives the same values (for example S-D-S-E ${f3(wt.mean)}, L-N-I-E ${f3(rs.mean)}). The value ${f3(cut)} lies in the gap between the two groups, above L-D-S-E (0.322) and F-D-S-E (0.327).</p>
     <p><b>Check against the data.</b> Across the ${fmt(cs.n_isolates)} reference isolates the mean &lt;H&gt; is <b>${f3(cs.mean_resistant)}</b> for resistant and <b>${f3(cs.mean_susceptible)}</b> for susceptible isolates. The values run from ${f3(cs.range[0])} to ${f3(cs.range[1])}. The two groups differ on average, but only by a small step. Used on its own at ${f3(cut)}, &lt;H&gt; classifies ${cs.all.find(x => x.cutoff === cut).accuracy}% of the reference isolates correctly (scored on the isolates the rules were built from, so this is not a validation).</p></div>
