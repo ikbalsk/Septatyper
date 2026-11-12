@@ -44,9 +44,9 @@ const PAL = ["#1d4e89", "#4d9de0", "#9cc4f5", "#00897b", "#8e6bbf", "#c98a00", "
 const hcol = h => PAL[Math.max(0, META.sources.findIndex(s => s.key === h)) % PAL.length];
 
 /* ------------------------------------------------------------------ router */
-const PAGES = ["home", "predict", "browse", "analyze", "submit", "theory", "documentation", "data", "references", "about", "terms", "privacy", "curate", "calc"];
-const ALIAS = { analytics: "analyze" };                       // the old #/analytics address still opens the page
-const HELP = ["about", "theory", "documentation", "data", "references", "terms", "privacy", "calc"];     // pages that live under the Help menu
+const PAGES = ["home", "predict", "browse", "analyze", "submit", "theory", "documentation", "data", "references", "about", "curate", "calc"];
+const ALIAS = { analytics: "analyze", terms: "about", privacy: "about" };                       // the old #/analytics address still opens the page
+const HELP = ["about", "theory", "documentation", "data", "references", "calc"];     // pages that live under the Help menu
 function closeHelp() { const m = $("#help-menu"), b = $("#help-btn"); if (m) m.hidden = true; if (b) b.setAttribute("aria-expanded", "false"); }
 function route() {
   const p0 = (location.hash.replace(/^#\/?/, "") || "home").split("?")[0], p = ALIAS[p0] || p0;
@@ -196,6 +196,10 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-act]"); if (!b) return;
   const act = b.dataset.act;
   if (act === "print") printNow();
+  else if (act === "jump") {
+    e.preventDefault();
+    const el = document.getElementById(b.dataset.to); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   else if (act === "copycite") {
     const txt = $("#cite-text").innerText, done = $("#cite-done");
     const ok = () => { done.textContent = "Copied."; setTimeout(() => { done.textContent = ""; }, 2500); };
