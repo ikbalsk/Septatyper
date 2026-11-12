@@ -313,6 +313,10 @@ def limit_predict(request: Request):
     _limit(request, "prediction", RATE_PREDICT_PER_HOUR)
 
 
+def limit_track(request: Request):
+    _limit(request, "look-up", 60)
+
+
 @app.get("/api/v1/bvbrc-cache")
 def bvbrc_cache():
     """The BV-BRC names and calls as a file (bvbrc_cache.json). Save it into the repo root: afterwards every start loads the
@@ -390,9 +394,11 @@ def predict_bvbrc(m: BvbrcReq):
     if not meta:
         raise HTTPException(404, f"BV-BRC has no genome with ID {gid}.")
     name, detected, notes = meta.get("genome_name") or gid, bvbrc.detect_species(meta), []
+    named = bool((meta.get("species") or "").strip() or (meta.get("genome_name") or "").strip())
     species = m.species
-    if species == "auto":
-        named = bool((meta.get("species") or "").strip() or (meta.get("genome_name") or "").strip())
+    info = {"genome_id": gid, "genome_name": name, "species_detected": detected, "isolation_source": meta.get("isolation_source"),
+            "year": meta.get("collection_year"), "country": meta.get("isolation_country"), "url": f"https://www.bv-brc.org/view/Genome/{gid}"}
+    if species == "auto":                    # the API way: read the species from the BV-BRC record
         if detected:
             species = detected
         elif named:      # the record names another organism: never guess
@@ -402,8 +408,18 @@ def predict_bvbrc(m: BvbrcReq):
             if species not in SPECIES:
                 raise HTTPException(400, "BV-BRC does not name the species of this genome. Choose the species and try again.")
             notes.append(f"BV-BRC did not name the species, so {SPECIES[species]} (your selection) was used.")
-    elif species in SPECIES and detected and detected != species:
-        notes.append(f"BV-BRC calls this genome '{name}', but {SPECIES[species]} was chosen.")
+    else:                                    # the species the visitor chose is kept and checked against the BV-BRC record
+        if species not in SPECIES:
+            raise HTTPException(400, "Unknown species.")
+        if detected and detected != species:       # a different one of the four: no result at all
+            msg = (f"Please verify the species selected and resubmit. BV-BRC lists genome {gid} as {SPECIES[detected]}, "
+                   f"but {SPECIES[species]} was selected. No sequence type, phenotype or checkpoints are reported.")
+            res = _species_mismatch(species, m.habitat if m.habitat in HABITATS[species] else "ALL", None,
+                                    {"checked": True, "ok": False, "kind": "bvbrc_species", "message": msg})
+            res["bvbrc"] = info | {"in_reference": False, "lab_phenotype": None}
+            return res
+        if not detected and named:
+            raise HTTPException(400, f"BV-BRC calls this genome '{name}', which is not one of the four species Ciprotyper covers.")
     if species not in SPECIES:
         raise HTTPException(400, "Unknown species.")
     habitat = m.habitat
@@ -425,9 +441,7 @@ def predict_bvbrc(m: BvbrcReq):
         db.close()
     if ref:
         notes.append(f"This genome is one of the reference isolates (laboratory phenotype {ref[0]}), so its call is not an independent test.")
-    res["bvbrc"] = {"genome_id": gid, "genome_name": name, "species_detected": detected, "isolation_source": meta.get("isolation_source"),
-                    "year": meta.get("collection_year"), "country": meta.get("isolation_country"),
-                    "url": f"https://www.bv-brc.org/view/Genome/{gid}", "in_reference": bool(ref), "lab_phenotype": ref[0] if ref else None}
+    res["bvbrc"] = info | {"in_reference": bool(ref), "lab_phenotype": ref[0] if ref else None}
     res["warnings"] = list(res.get("warnings") or []) + notes
     return res
 
@@ -661,6 +675,18 @@ def submit(species: str = Form(...), habitat: str = Form(...), genome_id: str = 
              affiliation=affiliation.strip()[:200] or None, publication=pub or None, consent_version=CONSENT_VERSION)
     sub = rules.create_submission(d, result)
     return sub | {"result": result}
+
+
+@app.get("/api/v1/submissions/{job_id}", dependencies=[Depends(limit_track)])
+def track(job_id: str):
+    """A submitter looks up the status of their own submission with the ID they were given."""
+    jid = job_id.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{12}", jid):
+        raise HTTPException(400, "That is not a submission ID. An ID has 12 letters and numbers.")
+    r = rules.track_submission(jid)
+    if not r:
+        raise HTTPException(404, "No submission with this ID.")
+    return r
 
 
 @app.get("/api/v1/admin/queue", dependencies=[Depends(admin)])

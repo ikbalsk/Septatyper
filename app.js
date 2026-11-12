@@ -44,9 +44,9 @@ const PAL = ["#1d4e89", "#4d9de0", "#9cc4f5", "#00897b", "#8e6bbf", "#c98a00", "
 const hcol = h => PAL[Math.max(0, META.sources.findIndex(s => s.key === h)) % PAL.length];
 
 /* ------------------------------------------------------------------ router */
-const PAGES = ["home", "predict", "browse", "analyze", "submit", "theory", "documentation", "data", "references", "about", "curate", "calc"];
+const PAGES = ["home", "predict", "browse", "analyze", "submit", "theory", "documentation", "data", "references", "about", "terms", "privacy", "curate", "calc"];
 const ALIAS = { analytics: "analyze" };                       // the old #/analytics address still opens the page
-const HELP = ["about", "theory", "documentation", "data", "references", "calc"];     // pages that live under the Help menu
+const HELP = ["about", "theory", "documentation", "data", "references", "terms", "privacy", "calc"];     // pages that live under the Help menu
 function closeHelp() { const m = $("#help-menu"), b = $("#help-btn"); if (m) m.hidden = true; if (b) b.setAttribute("aria-expanded", "false"); }
 function route() {
   const p0 = (location.hash.replace(/^#\/?/, "") || "home").split("?")[0], p = ALIAS[p0] || p0;
@@ -155,7 +155,7 @@ function drawBatch(done, total, unit = "file") {
     if (x.error) return `<tr><td>${esc(x.name)}</td><td colspan="5" class="muted">${esc(x.error)}</td></tr>`;
     const p = x.res.prediction;
     const bv = x.res.bvbrc, sub = bv ? `<span class="alias"><i>${esc(SHORT[x.res.species] || "")}</i> ${esc(bv.genome_name)}${bv.in_reference ? " (reference isolate)" : ""}</span>` : "";
-    return `<tr class="clk" data-act="detail" data-i="${i}"><td>${esc(x.name)}${sub}</td><td class="mono nw">${p && x.res.septatype ? mutSep(x.res.septatype) : "-"}</td><td class="nw">${esc(((x.res.analysis || {}).mlst || {}).st || "-")}</td><td>${p ? badge(p.call, 1) : "No call"}${x.res.species_check && x.res.species_check.message ? `<span class="alias" style="color:var(--res)" title="${esc(x.res.species_check.message)}">verify species</span>` : ""}</td><td>${p ? esc(TIER[p.tier] || p.tier) : "-"}</td><td class="stat">${p && p.known ? p.n_resistant + " of " + p.n_isolates + " resistant" : "-"}</td></tr>`;
+    return `<tr class="clk" data-act="detail" data-i="${i}"><td>${esc(x.name)}${sub}</td><td class="mono nw">${p && x.res.septatype ? mutSep(x.res.septatype) : "-"}</td><td class="nw">${esc(((x.res.analysis || {}).mlst || {}).st || "-")}</td><td>${p ? badge(p.call, 1) : (x.res && x.res.status === "species_mismatch" ? "No result" : "No call")}${x.res.species_check && x.res.species_check.message ? `<span class="alias" style="color:var(--res)" title="${esc(x.res.species_check.message)}">verify species</span>` : ""}</td><td>${p ? esc(TIER[p.tier] || p.tier) : "-"}</td><td class="stat">${p && p.known ? p.n_resistant + " of " + p.n_isolates + " resistant" : "-"}</td></tr>`;
   }).join("");
   const working = done < total;
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing ${unit} ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
@@ -185,7 +185,7 @@ async function runBvbrc(fallback, habitat) {
     const id = ids[i];
     if (!/^\d{1,9}\.\d{1,6}$/.test(id)) { BATCH.push({ name: id, error: "Not a BV-BRC genome ID. An ID looks like 562.7710." }); continue; }
     try {
-      const res = await api("/api/v1/predict/bvbrc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ genome_id: id, species: "auto", fallback_species: fallback, habitat }) });
+      const res = await api("/api/v1/predict/bvbrc", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ genome_id: id, species: fallback || "auto", fallback_species: fallback, habitat }) });
       res._name = `${id} ${res.bvbrc.genome_name}`; BATCH.push({ name: id, res });
     } catch (e) { BATCH.push({ name: id, error: e.message }); }
   }
@@ -201,6 +201,10 @@ document.addEventListener("click", e => {
     const ok = () => { done.textContent = "Copied."; setTimeout(() => { done.textContent = ""; }, 2500); };
     const old = () => { const t = document.createElement("textarea"); t.value = txt; document.body.appendChild(t); t.select(); try { document.execCommand("copy"); ok(); } catch (e) { done.textContent = "Select the text above and copy it."; } t.remove(); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, old); else old();
+  }
+  else if (act === "copyid") {
+    const done = $("#id-done"), ok = () => { done.textContent = "Copied."; setTimeout(() => { done.textContent = ""; }, 2500); }, no = () => { done.textContent = "Select the ID and copy it."; };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(b.dataset.id).then(ok, no); else no();
   }
   else if (act === "csv" && LAST) download("ciprotyper_result.csv", toCsv([flat(LAST, LAST._name || "result")]), "text/csv");
   else if (act === "json" && LAST) download("ciprotyper_result.json", JSON.stringify(LAST, null, 2), "application/json");
@@ -241,9 +245,8 @@ function critTable(positions) {
     return `<td>${byLine(res, l => `<div class="rline">${l.map(c => `<span class="rl${c.observed ? " obs" : ""}${c.hit ? " hit " + side : ""}${c.exception ? " exc" : ""}">${esc(c.residue)}${c.exception ? "<small>exception</small>" : ""}</span>`).join(",")}</div>`)}` +
       (props ? byLine(props, l => `<div class="pline">${l.map(t => `<span class="pp${t.hit ? " hit " + side : ""}">${esc(t.text)}</span>`).join("")}</div>`) : `<div class="pline">${esc(label || "")}</div>`) + `</td>`;
   };
-  const seen = x => { const hits = [...(x.susceptible || []), ...(x.resistant || [])].filter(c => c.hit); return hits.length ? (hits.some(c => c.observed) ? " &middot; observed in our dataset (bold)" : " &middot; possible residue, not observed in our dataset") : ""; };
   return `<div class="scroll"><table class="rtab cp1"><tr><th>Amino acid position</th><th>Susceptible</th><th>Resistant</th></tr>${positions.map(x =>
-    `<tr><td class="nw"><b>${esc(x.position)}</b><span class="alias">sample: ${esc(x.residue)}${x.column === "neither" ? " (in neither column)" : seen(x)}</span></td>${cell(x, "s")}${cell(x, "r")}</tr>`).join("")}</table></div>
+    `<tr><td class="nw"><b>${esc(x.position)}</b>${x.column === "neither" ? `<span class="alias">sample: ${esc(x.residue)}, not in this table</span>` : ""}</td>${cell(x, "s")}${cell(x, "r")}</tr>`).join("")}</table></div>
     <p class="tnote">${esc(CP1_NOTE)}</p><p class="tnote">Your residue is boxed. A filled box means it is also bold, so it was observed in our dataset. An outlined box means it is a possible residue that was not observed.</p>${positions.some(x => x.exception) ? `<p class="tnote">${esc(CP1_EXC)}</p>` : ""}`;
 }
 /* number line: sample and reference <H> against the cutoff; extra = typical resistant and susceptible isolates */
@@ -600,6 +603,20 @@ INIT.submit = () => {
     try { const r = await api("/api/v1/bvbrc/" + encodeURIComponent(id)); $("#s-name").textContent = r.found ? "BV-BRC name: " + r.genome_name : r.reason; $("#s-name").dataset.name = r.found ? r.genome_name : ""; }
     catch (e) { $("#s-name").textContent = e.message; }
   };
+  const STATUS = { in_review: ["In review", ""], approved: ["Approved", "The isolate is in the repository."], rejected: ["Not added", "The isolate was not added to the repository."] };
+  const track = async id => {
+    const out = $("#t-out"); id = (id || "").trim().toLowerCase();
+    if (!id) { out.innerHTML = `<div class="info">Enter your submission ID.</div>`; return; }
+    out.innerHTML = `<p class="muted">Checking</p>`;
+    try {
+      const t = await api("/api/v1/submissions/" + encodeURIComponent(id)), [label, text] = STATUS[t.status] || [t.status, ""];
+      out.innerHTML = `<div class="info"><b>Status: ${esc(label)}</b>${text ? `<br>${esc(text)}` : ""}<br><span class="muted small">ID ${esc(t.job_id)} &middot; submitted ${esc(t.created)}${t.decided ? ` &middot; decided ${esc(t.decided)}` : ""}</span>
+        <br>${esc(SHORT[t.species] || t.species)}, ${esc(SITE[t.habitat] || t.habitat)}${t.septatype ? `, ciprotype <span class="mono">${esc(t.septatype)}</span>` : ""}${t.call ? `, Ciprotyper call ${badge(t.call, 1)}` : ""}${t.lab_phenotype ? `, laboratory result ${esc(t.lab_phenotype)}` : ""}</div>`;
+    } catch (e) { out.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+  };
+  $("#t-go").onclick = () => track($("#t-id").value);
+  $("#t-id").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); track($("#t-id").value); } };
+  const pre = (location.hash.split("?")[1] || "").match(/id=([0-9a-fA-F]{12})/); if (pre) { $("#t-id").value = pre[1]; track(pre[1]); }
   $("#sf").onsubmit = async e => {
     e.preventDefault();
     const btn = $("#s-go"), err = $("#s-err"); err.innerHTML = "";
@@ -612,8 +629,10 @@ INIT.submit = () => {
       [["species", "#s-sp"], ["habitat", "#s-hb"], ["genome_id", "#s-gid"], ["country", "#s-country"], ["year", "#s-year"], ["lab_phenotype", "#s-ph"], ["submitter", "#s-submitter"], ["affiliation", "#s-aff"], ["publication", "#s-pub"], ["email", "#s-email"]].forEach(([k, s]) => fd.append(k, $(s).value.trim()));
       fd.append("genome_name", $("#s-name").dataset.name || ""); fd.append("consent", META.consent_version || ""); fd.append("file", await maybeGzip(f));
       const r = await api("/api/v1/submissions", { method: "POST", body: fd });
-      const msg = { needs_review: "Needs review: the ciprotype is new or the prediction disagrees with your laboratory result.", pending: "Pending: the prediction matches your result or no result was given. A curator will check it." }[r.status] || r.status;
-      $("#s-result").innerHTML = renderResult(r.result, `<div class="info"><b>Submission ${esc(r.job_id)}</b><br>${esc(msg)}${r.matches === null ? " Without a laboratory phenotype the isolate cannot be approved." : ""}</div>`);
+      $("#s-result").innerHTML = `<div class="band"><b>Submission received.</b><br>Your submission ID: <span class="mono" style="font-size:1.05rem"><b>${esc(r.job_id)}</b></span>
+        <button type="button" class="btn line" data-act="copyid" data-id="${esc(r.job_id)}" style="padding:2px 10px;margin-left:6px">Copy</button> <span id="id-done" class="muted small"></span>
+        <br><span class="muted">Keep this ID. Enter it under Track your submission to check the status.</span></div>` + renderResult(r.result, "");
+      $("#t-id").value = r.job_id;
       $("#sf").reset(); setDate(); $("#s-name").textContent = ""; $("#s-name").dataset.name = ""; upd();
     } catch (ex) { err.innerHTML = `<div class="err">${esc(ex.message)}</div>`; }
     finally { btn.disabled = false; btn.textContent = old; }
@@ -702,14 +721,9 @@ INIT.calc = async () => {
     <p><b>The cutoff is the midpoint between two reference helices.</b> The susceptible wild-type residues ${esc(wt.residues.split("").join("-"))} give a GyrA helix mean of ${f3(wt.gyr.mean)} and a ParC helix mean of ${f3(wt.parc.mean)}, so &lt;H&gt; = <b>${f3(wt.mean)}</b>. The resistant reference residues ${esc(rs.residues.split("").join("-"))} (the commonest fully changed ciprotype) give ${f3(rs.gyr.mean)} and ${f3(rs.parc.mean)}, so &lt;H&gt; = <b>${f3(rs.mean)}</b>. The midpoint is (${f3(wt.mean)} + ${f3(rs.mean)}) / 2 = <b>${f3(cut)}</b>.</p>
     <p><b>Agreement with the paper.</b> The paper reports &lt;H&gt; of 0.27 to 0.32 for the susceptible ciprotypes (S-D-S-E, S-N-S-E, Y-D-S-E, S-Y-S-E, L-D-S-E) and 0.40 to 0.48 for the resistant ones (L-N-I-E, F-N-I-E, I-D-I-E, I-N-I-E, L-G-I-E, I-Y-I-E, F-A-I-E, L-N-I-V), with F-N-S-K an exception at 0.297. This calculation gives the same values (for example S-D-S-E ${f3(wt.mean)}, L-N-I-E ${f3(rs.mean)}). The value ${f3(cut)} lies in the gap between the two groups, above L-D-S-E (0.322) and F-D-S-E (0.327).</p>
     <p><b>Check against the data.</b> Across the ${fmt(cs.n_isolates)} reference isolates the mean &lt;H&gt; is <b>${f3(cs.mean_resistant)}</b> for resistant and <b>${f3(cs.mean_susceptible)}</b> for susceptible isolates. The values run from ${f3(cs.range[0])} to ${f3(cs.range[1])}. The two groups differ on average, but only by a small step. Used on its own at ${f3(cut)}, &lt;H&gt; classifies ${cs.all.find(x => x.cutoff === cut).accuracy}% of the reference isolates correctly (scored on the isolates the rules were built from, so this is not a validation).</p></div>
-  <div class="band"><h3>4. The three checkpoints</h3>
-    <p><b>Checkpoint 1.</b> Context-sensitive table of GyrA-83, GyrA-87, ParC-80 and ParC-84. A residue can be in both columns (for example D and E at GyrA-87, D and E at ParC-84). A call needs <b>all four residues in one column</b>: all four in the Susceptible column is <b>susceptible</b>, all four in the Resistant column is <b>resistant</b>.</p>
-    ${cp1Static()}
-    <p class="muted small" style="margin-top:6px">If the four residues are not all in one column, checkpoint 1 is <b>not applied</b> and the phenotype comes from checkpoints 2 and 3 alone. In a result, the residue found in your sample is boxed and blinks in the column or columns it belongs to, and the property it has is highlighted. The S-K pair counts as Resistant, and <i>S. sonnei</i> keeps one extra rule from the reference isolates: a single change at GyrA-83 or GyrA-87 counts as Resistant.</p>
-    <p><b>Checkpoint 2.</b> RecN-346. Susceptible if it is leucine (L) encoded by cta. Resistant if it is leucine encoded by ctg, or phenylalanine (F). In every other case (another codon, an unknown codon, another amino acid) checkpoint 2 is not considered.</p>
-    <p><b>Checkpoint 3.</b> PMQR genes. Susceptible if both qnrB2 and qnrS1 are absent. Resistant if either or both are present.</p>
-    <p><b>Combined.</b> Resistant if any checkpoint that is considered says resistant. Susceptible only if all the checkpoints that are considered say susceptible. When checkpoint 1 is not applied, checkpoints 2 and 3 decide: if either is resistant the call is resistant.</p>
-    <p class="muted" style="font-size:.9rem">The grammar is only used for ciprotypes not seen in the reference isolates. When a ciprotype was seen, the majority rule is used instead.</p></div>`;
+  <div class="band"><h3>4. The checkpoints</h3>
+    <p>&lt;H&gt; is shown for your sample only. The rules that decide the call, including the checkpoint 1 table, are on the <a href="#/theory">Theory</a> page.</p>
+  </div>`;
   const htab = b => `<div class="scroll"><table class="step"><tr><th>${esc(b.gene)} helix ${b.start}-${b.end}</th><th>Residue</th><th class="num">H</th></tr>${b.values.map(x => `<tr${x.sub ? ' class="hit-row"' : ""}><td>${esc(x.position)}</td><td class="mono">${esc(x.residue)}</td><td class="num">${f2(x.h)}</td></tr>`).join("")}<tr><td colspan="2">Sum of ${b.n}</td><td class="num">${f2(b.sum)}</td></tr><tr><td colspan="2"><b>${esc(b.gene)} mean = sum / ${b.n}</b></td><td class="num"><b>${f3(b.mean)}</b></td></tr></table></div>`;
   const side = (t, v) => `<div><h3 style="font-size:1rem">${t}</h3>${htab(v.gyr)}${htab(v.parc)}<p class="formula wrap">&lt;H&gt; = (${f3(v.gyr.mean)} + ${f3(v.parc.mean)}) / 2 = <b>${f3(v.mean)}</b></p></div>`;
   const draw = async () => {
@@ -758,15 +772,15 @@ INIT.curate = () => {
       const actions = r => {
         const note = `<input type="text" placeholder="note (optional)" data-n="${esc(r.job_id)}" style="margin-bottom:6px">`;
         const btn = (a, t, cls) => `<button class="btn ${cls}" data-a="${a}" data-j="${esc(r.job_id)}" data-st="${esc(r.status)}">${t}</button>`;
-        if (r.status === "approved") return `${note}${btn("reject", "Reject and remove", "line")}<span class="alias">In the database as ${esc(r.genome_id || "SUB-" + r.job_id)}</span>`;
-        if (r.status === "rejected") return `${note}${btn("approve", "Approve instead", "solid")}`;
-        return `${note}${btn("approve", "Approve", "solid")} ${btn("reject", "Reject", "line")}`;
+        if (r.status === "approved") return `${note}${btn("reject", "Reject and remove", "line")} ${btn("delete", "Delete", "line")}<span class="alias">In the database as ${esc(r.genome_id || "SUB-" + r.job_id)}</span>`;
+        if (r.status === "rejected") return `${note}${btn("approve", "Approve instead", "solid")} ${btn("delete", "Delete", "line")}`;
+        return `${note}${btn("approve", "Approve", "solid")} ${btn("reject", "Reject", "line")} ${btn("delete", "Delete", "line")}`;
       };
       $("#c-table").innerHTML = `<tr><th>Submission</th><th>Isolate</th><th>Ciprotype</th><th>ST</th><th>Prediction</th><th>Lab</th><th>Status</th><th>Decision</th></tr>` +
         (d.rows.length ? d.rows.map(r => `<tr><td class="nw">${esc(r.job_id)}<span class="alias">submitted ${esc(r.created)}</span></td>
           <td>${esc(r.genome_id || "no ID")}<span class="alias">${esc(SHORT[r.species])}, ${esc(SITE[r.habitat])}, ${esc(r.country || "-")} ${esc(r.year || "")}</span>
             <span class="alias">${esc(r.submitter || "-")}${r.affiliation ? ", " + esc(r.affiliation) : ""}${r.email ? " (" + esc(r.email) + ")" : ""}</span>${r.consent_version ? `<span class="alias">consent ${esc(r.consent_version)}, ${esc(r.consent_at || "")}</span>` : `<span class="alias">no consent recorded</span>`}${r.publication ? `<span class="alias"><a href="${esc(r.publication)}" target="_blank" rel="noopener">${esc(r.publication.replace(/^https?:\/\//, ""))}</a></span>` : ""}</td>
-          <td class="mono nw">${mutSep(r.septatype)}${r.novel ? `<span class="alias">new septatype</span>` : ""}</td>
+          <td class="mono nw">${mutSep(r.septatype)}${r.novel ? `<span class="alias">new ciprotype</span>` : ""}</td>
           <td class="nw">${esc(r.st || "-")}</td>
           <td>${r.call ? badge(r.call, 1) : "-"}<span class="alias">${esc(r.tier || "")}</span></td>
           <td>${r.lab_phenotype ? badge(r.lab_phenotype, 1) : "-"}${r.matches === 0 ? `<span class="alias">disagrees</span>` : ""}</td>
@@ -774,7 +788,8 @@ INIT.curate = () => {
           <td>${actions(r)}</td></tr>`).join("")
           : `<tr><td colspan="8" class="muted">Nothing in this list.</td></tr>`);
       $$("#c-table button[data-a]").forEach(b => b.onclick = async () => {
-        if (b.dataset.st === "approved" && !confirm("Reject this approved submission? Its isolate is removed from the repository and the rules.")) return;
+        if (b.dataset.a === "delete" && !confirm(b.dataset.st === "approved" ? "Delete this submission? Its isolate is removed from the repository and the rules, and the submission is erased from the record." : "Delete this submission from the record?")) return;
+        if (b.dataset.a === "reject" && b.dataset.st === "approved" && !confirm("Reject this approved submission? Its isolate is removed from the repository and the rules.")) return;
         try {
           const res = await api("/api/v1/admin/decide", { method: "POST", headers: { "Content-Type": "application/json", "X-Admin-Token": $("#c-token").value.trim() },
             body: JSON.stringify({ job_id: b.dataset.j, action: b.dataset.a, note: ($(`[data-n="${b.dataset.j}"]`) || {}).value || "", curator: (($("#c-name") || {}).value || "").trim() }) });

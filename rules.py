@@ -512,6 +512,22 @@ def list_queue(status: str = "") -> list[dict]:
     return out
 
 
+def track_submission(job_id: str) -> dict | None:
+    """What a submitter may see about their own submission (they hold the ID): status and the prediction, never the email or notes.
+    The status is shown as in_review (needs review or pending), approved or rejected."""
+    db = conn()
+    try:
+        r = db.execute("SELECT job_id, created, status, species, habitat, genome_id, lab_phenotype, septatype, call, decided "
+                       "FROM submissions WHERE job_id=?", (job_id,)).fetchone()
+    finally:
+        db.close()
+    if not r:
+        return None
+    d = dict(r)
+    d["status"] = {"approved": "approved", "rejected": "rejected"}.get(d["status"], "in_review")
+    return d
+
+
 def queue_counts() -> dict:
     db = conn()
     try:
@@ -590,13 +606,21 @@ def audit(who: str, ip: str, action: str, job_id: str, detail: str = "") -> None
 
 def decide(job_id: str, action: str, note: str = "", by: str = "") -> dict:
     """approve: pending, needs review or rejected -> approved. reject: pending, needs review or approved -> rejected.
-    Rejecting an approved submission removes its isolate again and takes its vote out of the rules."""
+    Rejecting an approved submission removes its isolate again and takes its vote out of the rules.
+    delete: removes the submission from the record altogether (an approved one is taken out of the repository and the rules first)."""
     db = conn()
     try:
         s = db.execute("SELECT * FROM submissions WHERE job_id=?", (job_id,)).fetchone()
         if not s:
             raise KeyError("Unknown submission")
         status = s["status"]
+        if action == "delete":
+            if status == "approved":
+                _revoke(db, s)
+            db.execute("DELETE FROM submissions WHERE job_id=?", (job_id,))
+            db.commit()
+            _persist()
+            return {"status": "deleted", "revoked": status == "approved"}
         if action == "reject":
             if status == "rejected":
                 raise ValueError("Already rejected")
@@ -608,7 +632,7 @@ def decide(job_id: str, action: str, note: str = "", by: str = "") -> dict:
             _persist()
             return {"status": "rejected", "revoked": status == "approved"}
         if action != "approve":
-            raise ValueError("action must be approve or reject")
+            raise ValueError("action must be approve, reject or delete")
         if status == "approved":
             raise ValueError("Already approved")
         if s["lab_phenotype"] not in ("Resistant", "Susceptible") or not s["septatype"]:
