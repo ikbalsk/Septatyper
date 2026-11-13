@@ -327,3 +327,6 @@ table.rtab.cp1 td.nw{text-align:left}
 .rl.hit.r.obs{background:var(--res);border-color:var(--res);color:#fff}
 .rl.hit:not(.obs){font-weight:400;border-style:dashed;background:#fff}
 .rl.hit.obs small{color:#fff}
+
+/* typed residues and ciprotypes show as capitals */
+.caps{text-transform:uppercase}

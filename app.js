@@ -161,7 +161,7 @@ function drawBatch(done, total, unit = "file") {
   $("#presult").innerHTML = `<div class="band"><h3>Batch result</h3>${working ? `<p class="muted">Analysing ${unit} ${done + 1} of ${total}. Keep this page open.</p><div class="prog"><i style="width:${100 * done / total}%"></i></div>` : ""}
     <div class="scroll"><table><tr><th>${unit === "genome" ? "Genome" : "File"}</th><th>Ciprotype</th><th>ST</th><th>Call</th><th>Call from</th><th>Support</th></tr>${rows}</table></div>
     ${working ? "" : `<div class="actions no-print"><button class="btn solid" data-act="bcsv" type="button">Download CSV</button><button class="btn line" data-act="print" type="button">Print or save as PDF</button></div><p class="muted" style="font-size:.85rem">Tap a row for the full result.</p>`}
-    <p class="print-only">Ciprotyper batch report, ${new Date().toLocaleDateString()}. Research use only.</p></div><div id="bdetail"></div>`;
+    <p class="print-only">Ciprotyper batch report, ${new Date().toLocaleDateString()}.</p></div><div id="bdetail"></div>`;
 }
 async function runBatch(species, habitat) {
   if (!PFILES.length) throw new Error("Choose at least one FASTA file.");
@@ -369,11 +369,32 @@ function renderResult(r, extra) {
       Object.entries(a.qnr).map(([k, x]) => `<tr><td>${k === "qnrB2" ? "qnrB" : "qnrS"}</td><td>${x.present ? "Present" : "Absent"}${x.source === "set by user" ? " (set by you)" : ""}</td><td>${x.identity != null ? `${x.identity}% identity, ${x.coverage}% coverage to ${esc(x.reference)}` : "-"}</td></tr>`).join("") +
       `</table></div><p class="muted small" style="margin-top:8px">${a.input.records} sequence record(s), ${fmt(a.input.total_bp)} bp.</p></details>`;
   }
-  if (p && p.novel) h += `<div class="info">This ciprotype is new for ${esc(SHORT[r.species])}. If you have the laboratory phenotype, <a href="#/submit">submit the isolate</a> so curators can add it.</div>`;
-  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div><p class="muted small">Research use only. Confirm with laboratory testing.</p></div>`;
+  if (p && p.novel) h += `<div class="info">This ciprotype is new for ${esc(SHORT[r.species])}.${(p.other_species || []).length ? ` It is in the reference for ${p.other_species.map(o => `${esc(SHORT[o.species] || o.species)} (${o.n_isolates} isolate${o.n_isolates === 1 ? "" : "s"}, ${o.n_resistant} resistant)`).join(" and ")}, but a call uses the species you chose.` : ""} If you have the laboratory phenotype, <a href="#/submit">submit the isolate</a> so curators can add it.</div>`;
+  h += (extra || "") + `<div class="actions no-print"><button class="btn line" data-act="print" type="button">Print or save as PDF</button><button class="btn line" data-act="csv" type="button">Download CSV</button><button class="btn line" data-act="json" type="button">Download JSON</button></div></div>`;
   return h;
 }
+/* Typed residues and ciprotypes: capital letters at once, and no hyphens needed */
+const capsOnly = v => (v || "").toUpperCase().replace(/[^A-Z]/g, "");
+const fmtCip = v => (v || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 7).split("").join("-");      // SDSEL10 -> S-D-S-E-L-1-0
+function wireResidueBoxes(ids) {          // single-letter boxes: capitals, jump to the next box, paste "LNIEL" or "L-N-I-E-L" into the first
+  const boxes = ids.map(i => $(i));
+  boxes.forEach((b, i) => {
+    if (!b || b.dataset.wired) return;
+    b.dataset.wired = "1";
+    b.addEventListener("input", () => { const v = capsOnly(b.value); b.value = v.slice(-1); if (v && boxes[i + 1]) boxes[i + 1].focus(); });
+    b.addEventListener("keydown", e => { if (e.key === "Backspace" && !b.value && boxes[i - 1]) boxes[i - 1].focus(); });
+    b.addEventListener("focus", () => { if (b.select) b.select(); });
+    b.addEventListener("paste", e => {
+      const t = capsOnly(((e.clipboardData || window.clipboardData || { getData: () => "" }).getData("text")));
+      if (t.length < 2) return;
+      e.preventDefault();
+      [...t.slice(0, boxes.length - i)].forEach((c, k) => { boxes[i + k].value = c; });
+      (boxes[Math.min(boxes.length - 1, i + t.length)] || b).focus();
+    });
+  });
+}
 INIT.predict = () => {
+  wireResidueBoxes(["#r83", "#r87", "#r80", "#r84", "#r346"]);
   $("#sp").innerHTML = opts(Object.entries(SP));
   const upd = () => {
     setSites($("#hb"), $("#sp").value, true);
@@ -451,7 +472,7 @@ INIT.predict = () => {
 let BS = { page: 1, sort: "genome_id", desc: false }, BTOT = 0;
 let PER = 100;
 function bfilters() {
-  const f = { species: $("#f-sp").value, habitat: $("#f-hb").value, st: $("#f-st").value, country: $("#f-country").value, septatype: $("#f-sep").value.trim().toUpperCase(),
+  const f = { species: $("#f-sp").value, habitat: $("#f-hb").value, st: $("#f-st").value, country: $("#f-country").value, septatype: fmtCip($("#f-sep").value),
     phenotype: $("#f-ph").value, year_from: $("#f-y1").value, year_to: $("#f-y2").value, q: $("#f-q").value.trim(), source: $("#f-src").value };
   if ($("#f-wins").checked) f.wins = "true";
   const p = new URLSearchParams(); Object.entries(f).forEach(([k, v]) => { if (v) p.set(k, v); });
@@ -504,6 +525,8 @@ async function bvNote() {
   else n.innerHTML = `<div class="info">The BV-BRC comparison is being prepared and will appear here soon.</div>`;
 }
 INIT.browse = async () => {
+  $("#f-sep").addEventListener("input", e => { e.target.value = fmtCip(e.target.value); });
+  $("#f-st").addEventListener("input", e => { e.target.value = e.target.value.toUpperCase(); });
   await refreshMeta();
   const f = META.facets;
   $("#f-hb").innerHTML = opts(f.habitat.map(([k, n]) => [k, `${SITE[k] || k} (${fmt(n)})`]), "All");
@@ -688,7 +711,7 @@ INIT.theory = async () => {
     if (top.length) showTetra(top[0]);
   };
   $("#t-sp").onchange = pick; pick();
-  $("#t-custom").oninput = e => { const v = e.target.value.toUpperCase(); if (v.length === 4) showTetra(v); };
+  $("#t-custom").oninput = e => { const v = capsOnly(e.target.value).slice(0, 4); e.target.value = v; if (v.length === 4) showTetra(v); };
   try {
     const [s, aa] = await Promise.all([api("/api/v1/stats/accuracy"), api("/api/v1/aminoacids")]);
     const b = s.benchmark, rows = s.rows.filter(x => x.habitat !== "ALL");
@@ -719,7 +742,7 @@ INIT.calc = async () => {
     <p class="formula">ParC 80-90 &nbsp; (S)ACY(E)AMVLMA &nbsp; 11 residues, S = ParC-80, E = ParC-84</p>
     <ol class="small"><li>Add the H values of the 12 GyrA helix residues and divide by 12. That is the GyrA helix mean.</li><li>Add the H values of the 11 ParC helix residues and divide by 11. That is the ParC helix mean.</li><li>&lt;H&gt; = (GyrA helix mean + ParC helix mean) / 2.</li></ol>
     <p class="muted small">Type four residues in the order GyrA-83, GyrA-87, ParC-80, ParC-84. Rows in amber are those four positions.</p>
-    <div class="row2"><div><label for="calc-in">Sample residues</label><input type="text" id="calc-in" maxlength="4" value="${esc(start)}" class="mono-in"></div></div>
+    <div class="row2"><div><label for="calc-in">Sample residues</label><input type="text" id="calc-in" maxlength="7" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(start)}" class="mono-in"></div></div>
     <div id="calc-steps"></div></div>
   <div class="band" id="calc-cutoff"><h3>3. Where the cutoff comes from</h3>
     <p><b>The cutoff is the midpoint between two reference helices.</b> The susceptible wild-type residues ${esc(wt.residues.split("").join("-"))} give a GyrA helix mean of ${f3(wt.gyr.mean)} and a ParC helix mean of ${f3(wt.parc.mean)}, so &lt;H&gt; = <b>${f3(wt.mean)}</b>. The resistant reference residues ${esc(rs.residues.split("").join("-"))} (the commonest fully changed ciprotype) give ${f3(rs.gyr.mean)} and ${f3(rs.parc.mean)}, so &lt;H&gt; = <b>${f3(rs.mean)}</b>. The midpoint is (${f3(wt.mean)} + ${f3(rs.mean)}) / 2 = <b>${f3(cut)}</b>.</p>
@@ -741,7 +764,7 @@ INIT.calc = async () => {
         <p><b>${c.checkpoints.residues.call ? `Checkpoint 1 says ${esc(c.checkpoints.residues.call)}.` : "Checkpoint 1 is not applied."}</b> ${c.checkpoints.residues.pattern ? `All four residues are in the ${c.checkpoints.residues.pattern === "resistant" ? "Resistant" : "Susceptible"} column.` : c.checkpoints.residues.call ? esc(c.checkpoints.residues.rule) + "." : "The four residues are not all in one column, so the phenotype comes from checkpoints 2 and 3."}</p>${critTable(c.positions)}`;
     } catch (e) { el.innerHTML = `<div class="err">${esc(e.message)}</div>`; }
   };
-  $("#calc-in").oninput = draw;
+  $("#calc-in").oninput = () => { const el = $("#calc-in"); el.value = capsOnly(el.value).slice(0, 4); draw(); };
   await draw();
   if (qs.get("s") === "cutoff") $("#calc-cutoff").scrollIntoView({ behavior: "smooth" }); else window.scrollTo(0, 0);
 };
@@ -784,7 +807,7 @@ INIT.curate = () => {
         (d.rows.length ? d.rows.map(r => `<tr><td class="nw">${esc(r.job_id)}<span class="alias">submitted ${esc(r.created)}</span></td>
           <td>${esc(r.genome_id || "no ID")}<span class="alias">${esc(SHORT[r.species])}, ${esc(SITE[r.habitat])}, ${esc(r.country || "-")} ${esc(r.year || "")}</span>
             <span class="alias">${esc(r.submitter || "-")}${r.affiliation ? ", " + esc(r.affiliation) : ""}${r.email ? " (" + esc(r.email) + ")" : ""}</span>${r.consent_version ? `<span class="alias">consent ${esc(r.consent_version)}, ${esc(r.consent_at || "")}</span>` : `<span class="alias">no consent recorded</span>`}${r.publication ? `<span class="alias"><a href="${esc(r.publication)}" target="_blank" rel="noopener">${esc(r.publication.replace(/^https?:\/\//, ""))}</a></span>` : ""}</td>
-          <td class="mono nw">${mutSep(r.septatype)}${r.novel ? `<span class="alias">new ciprotype</span>` : ""}</td>
+          <td class="mono nw">${mutSep(r.septatype)}${r.status === "approved" ? "" : r.ref_n ? `<span class="alias">in reference (n=${r.ref_n})</span>` : `<span class="alias">new ciprotype</span>`}</td>
           <td class="nw">${esc(r.st || "-")}</td>
           <td>${r.call ? badge(r.call, 1) : "-"}<span class="alias">${esc(r.tier || "")}</span></td>
           <td>${r.lab_phenotype ? badge(r.lab_phenotype, 1) : "-"}${r.matches === 0 ? `<span class="alias">disagrees</span>` : ""}</td>

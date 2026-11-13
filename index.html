@@ -117,11 +117,11 @@
       <div id="m-manual" style="display:none">
         <label>Residue at each position (one letter)</label>
         <div class="res5">
-          <div><input id="r83" maxlength="1" placeholder="S" aria-label="GyrA 83"><small>GyrA-83</small></div>
-          <div><input id="r87" maxlength="1" placeholder="D" aria-label="GyrA 87"><small>GyrA-87</small></div>
-          <div><input id="r80" maxlength="1" placeholder="S" aria-label="ParC 80"><small>ParC-80</small></div>
-          <div><input id="r84" maxlength="1" placeholder="E" aria-label="ParC 84"><small>ParC-84</small></div>
-          <div><input id="r346" maxlength="1" placeholder="L" aria-label="RecN 346"><small>RecN-346</small></div>
+          <div><input id="r83" class="caps" maxlength="1" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="S" aria-label="GyrA 83"><small>GyrA-83</small></div>
+          <div><input id="r87" class="caps" maxlength="1" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="D" aria-label="GyrA 87"><small>GyrA-87</small></div>
+          <div><input id="r80" class="caps" maxlength="1" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="S" aria-label="ParC 80"><small>ParC-80</small></div>
+          <div><input id="r84" class="caps" maxlength="1" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="E" aria-label="ParC 84"><small>ParC-84</small></div>
+          <div><input id="r346" class="caps" maxlength="1" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="L" aria-label="RecN 346"><small>RecN-346</small></div>
         </div>
         <div class="checks"><label><input type="checkbox" id="mqb">qnrB present</label><label><input type="checkbox" id="mqs">qnrS present</label></div>
         <div class="row2"><div><label for="mc">RecN-346 codon (optional)</label><select id="mc"><option value="">Not known</option><option>CTA</option><option>CTG</option><option>CTT</option><option>CTC</option><option>TTA</option><option>TTG</option><option>TTT</option><option>TTC</option></select></div>
@@ -129,7 +129,7 @@
       </div>
       <button class="btn solid block" id="go" type="submit" style="margin-top:14px">Predict phenotype</button>
       <div id="perr"></div>
-      <p class="muted" style="font-size:.8rem;margin-top:12px">Research use only. Confirm with laboratory susceptibility testing. Problem with a result? Write to <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>.</p>
+      <p class="muted" style="font-size:.8rem;margin-top:12px">Problem with a result? Write to <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a>.</p>
     </form>
     <div id="presult"><div class="band muted">The result appears here.</div></div>
   </div>
@@ -142,9 +142,9 @@
     <div class="filters">
       <div><label for="f-sp">Species</label><select id="f-sp"><option value="">All</option></select></div>
       <div><label for="f-hb">Isolation source</label><select id="f-hb"><option value="">All</option></select></div>
-      <div><label for="f-st">Sequence type</label><input type="search" id="f-st" list="dl-st" placeholder="All, or type ST131" autocomplete="off"><datalist id="dl-st"></datalist></div>
+      <div><label for="f-st">Sequence type</label><input type="search" id="f-st" class="caps" list="dl-st" placeholder="All, or type ST131" autocomplete="off" autocapitalize="characters"><datalist id="dl-st"></datalist></div>
       <div><label for="f-country">Country</label><select id="f-country"><option value="">All</option></select></div>
-      <div><label for="f-sep">Ciprotype</label><input type="search" id="f-sep" placeholder="S-D-S-E-L-1-0"></div>
+      <div><label for="f-sep">Ciprotype</label><input type="search" id="f-sep" class="caps" placeholder="e.g. SDSEL10" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
       <div><label for="f-ph">Lab phenotype</label><select id="f-ph"><option value="">All</option><option>Resistant</option><option>Susceptible</option></select></div>
       <div><label for="f-y1">Year from</label><input type="number" id="f-y1" min="1990" max="2100"></div>
       <div><label for="f-y2">Year to</label><input type="number" id="f-y2" min="1990" max="2100"></div>
@@ -241,7 +241,7 @@
         <label for="t-sp">Species</label><select id="t-sp" style="margin-bottom:8px"></select>
         <label>Common ciprotypes (tap one)</label><div class="pick" id="t-pick"></div>
         <label for="t-custom">Or type four residues (GyrA-83, GyrA-87, ParC-80, ParC-84)</label>
-        <input type="text" id="t-custom" maxlength="4" placeholder="LNIE" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:12px">
+        <input type="text" id="t-custom" maxlength="7" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="LNIE" style="text-transform:uppercase;font-family:var(--mono);margin-bottom:12px">
         <dl class="kv" id="t-kv"></dl>
         <ul class="why" id="t-why"></ul>
       </div>
@@ -333,7 +333,6 @@
       <li>Four species only: <i>E. coli</i>, <i>S. sonnei</i>, <i>S. enterica</i> subsp. I and <i>K. pneumoniae</i>. Choose the species yourself. A genome that does not match it gets no result. <i>E. coli</i> and <i>S. sonnei</i> cannot be told apart from these genes.</li>
       <li>A qnr gene found in the sequence does not prove it is expressed. Some qnr-positive isolates in the data are susceptible.</li>
       <li>The accuracy figures are measured on the 2,734 founding isolates that also define the rules, so they are not independent validation.</li>
-      <li>The result is a prediction. Confirm it with laboratory susceptibility testing. Research use only.</li>
       <li>Assembled sequence only. Raw sequencing reads are not supported yet.</li>
     </ul>
     <h3>Contact</h3>
@@ -344,7 +343,6 @@
   <div class="band" id="terms">
     <h3>Terms and conditions</h3>
     <p class="muted small">Last updated November 2026. By using Ciprotyper you agree to these terms.</p>
-    <p><b>Research use only.</b> Ciprotyper is for research and epidemiological surveillance. It is not a medical device and has not been validated for guiding the treatment of patients. Confirm every prediction with laboratory susceptibility testing.</p>
     <p><b>No warranty.</b> Ciprotyper and its data are provided as they are, without any warranty. The accuracy figures describe the reference isolates and are not independent validation. The authors and maintainers are not liable for decisions made, or harm caused, by relying on a result.</p>
     <p><b>Using the site.</b> Use is free. Please do not overload the service, bypass its limits, try to reach curator functions without permission, or upload files that are not genome or gene sequences. Limits apply to file size, the number of genomes per request and the number of submissions per hour. We may block abuse.</p>
     <p><b>Submitting an isolate.</b> Submit only data you are entitled to share, with no personal information about patients or other people. Before you submit you agree to the consent notice. Curators decide whether an isolate is added. An approved isolate becomes public: it is shown in Browse and in the downloads and API, counts in the statistics and predictions, and may be removed again later. The genome file itself is not kept.</p>

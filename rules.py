@@ -279,6 +279,10 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                               "WHERE species=? AND habitat=? AND tetratype=? ORDER BY n_isolates DESC",
                               (species, "ALL", "-".join(parts[:4]))).fetchall()
             out["similar"] = [dict(x) for x in rows]
+            # the same ciprotype may be in the reference for ANOTHER species: say so (the call still uses this species only)
+            out["other_species"] = [dict(x) for x in db.execute(
+                "SELECT species,n_isolates,n_resistant,n_susceptible FROM septatypes WHERE habitat='ALL' AND septatype=? AND species<>? "
+                "ORDER BY n_isolates DESC", (sep, species)).fetchall()]
         if habitat == "ALL":
             calls = {}
             for h in HABITATS[species]:
@@ -499,16 +503,22 @@ def list_queue(status: str = "") -> list[dict]:
                "email,submitter,affiliation,publication,lab_phenotype,septatype,tier,call,novel,matches,curator_note,decided,decided_by,consent_version,consent_at,result_json FROM submissions")
         rows = db.execute(sql + (" WHERE status=?" if status else "") + " ORDER BY created DESC",
                           (status,) if status else ()).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["st"] = ((json.loads(d.pop("result_json") or "{}").get("analysis") or {}).get("mlst") or {}).get("st")
+            except (TypeError, ValueError):
+                d["st"] = None
+            # "new" is judged NOW, not when the isolate was submitted: another isolate may have been approved since
+            n = db.execute("SELECT n_isolates FROM septatypes WHERE species=? AND habitat='ALL' AND septatype=?",
+                           (d["species"], d["septatype"])).fetchone()
+            d["ref_n"] = n[0] if n else 0
+            if d["status"] != "approved":
+                d["novel"] = 1 if not d["ref_n"] else 0
+            out.append(d)
     finally:
         db.close()
-    out = []
-    for r in rows:
-        d = dict(r)
-        try:
-            d["st"] = ((json.loads(d.pop("result_json") or "{}").get("analysis") or {}).get("mlst") or {}).get("st")
-        except (TypeError, ValueError):
-            d["st"] = None
-        out.append(d)
     return out
 
 
