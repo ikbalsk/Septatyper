@@ -248,15 +248,30 @@
     </div>
   </div>
   <div class="band"><h3>Grammar rules: three checkpoints</h3>
-    <p><b>Checkpoint 1: GyrA-83, GyrA-87, ParC-80 and ParC-84.</b> The four residues are read together, because a residue can be in both columns of the table (for example D and E). A call needs <b>all four residues in one column</b>: all in the Susceptible column is susceptible, all in the Resistant column is resistant. The pair S at ParC-80 with K at ParC-84 counts as Resistant. In any other case checkpoint 1 is <b>not applied</b>. <i>S. sonnei</i> has one extra rule: a single change at GyrA-83 or GyrA-87 counts as Resistant.</p>
+    <p><b>Checkpoint 1: GyrA-83, GyrA-87, ParC-80 and ParC-84.</b> The four residues are read together, because a residue can be in both columns of the table (for example D and E). A call needs <b>all four residues in one column</b>: all in the Susceptible column is susceptible, all in the Resistant column is resistant. In any other case checkpoint 1 is <b>inconclusive</b>.</p>
     <div id="cp1-static"></div>
     <p><b>Checkpoint 2: RecN-346.</b> Leucine encoded by cta is susceptible. Leucine encoded by ctg, or phenylalanine, is resistant. Anything else is not considered.</p>
     <p><b>Checkpoint 3: qnr genes.</b> qnrB2 and qnrS1 both absent is susceptible. Either or both present is resistant.</p>
-    <p><b>Combined.</b> Resistant if any checkpoint that applies says resistant. Susceptible only if all of them say susceptible. When checkpoint 1 is not applied, checkpoints 2 and 3 decide.</p>
-    <p class="muted">The checkpoints call ciprotypes not seen in the reference isolates, and are shown beside every majority-rule call. The reference isolates carry no RecN-346 codon, so checkpoint 2 for ctg could not be scored on them. The hydrophobicity &lt;H&gt; in a result is not part of any checkpoint (<a href="#/calc">how it is calculated</a>).</p>
+    <p><b>Combined.</b> Resistant if any checkpoint that gives a call says resistant. Susceptible only if all of them say susceptible. When checkpoint 1 is inconclusive, checkpoints 2 and 3 decide.</p>
+    <p class="muted">A ciprotype that is in the reference isolates takes the phenotype of the majority of those isolates. A new ciprotype is called by the three checkpoints. The reference isolates carry no RecN-346 codon, so checkpoint 2 for ctg could not be scored on them. The hydrophobicity &lt;H&gt; in a result is not part of any checkpoint (<a href="#/calc">how it is calculated</a>).</p>
   </div>
-  <div class="band"><h3>Performance validation</h3><div id="t-valid"></div></div>
+  <div class="band" id="t-valid-band" hidden><div id="t-valid"></div></div>
   <div class="band"><h3>Amino acid hydrophobicity (Eisenberg normalised consensus)</h3><div class="scroll"><table id="t-aa"></table></div></div>
+
+  <div class="band">
+    <h3>Sequence types</h3>
+    <p>The sequence type (ST) is read with PubMLST schemes: Achtman for <i>E. coli</i>, <i>S. sonnei</i> and <i>S. enterica</i>, Diancourt for <i>K. pneumoniae</i>. An ST is given only when all seven alleles match exactly and the profile exists; otherwise the nearest alleles are shown. The STs of the reference isolates come from Table S1. Scheme data are from the tseemann/mlst database (downloaded 2026-03-11) and PubMLST; please cite PubMLST (Jolley et al. 2018).</p>
+  </div>
+  <div class="band">
+    <h3>Limits</h3>
+    <ul>
+      <li>Four species only: <i>E. coli</i>, <i>S. sonnei</i>, <i>S. enterica</i> subsp. I and <i>K. pneumoniae</i>. Choose the species yourself. A genome that does not match it gets no result. <i>E. coli</i> and <i>S. sonnei</i> cannot be told apart from these genes.</li>
+      <li>The founding dataset is limited. It holds 2,734 isolates from 28 countries, more than half from the USA, and from only three isolation sources (stool, urine and respiratory). More populations need to be studied before the rules can be trusted widely.</li>
+      <li>A qnr gene found in the sequence does not prove it is expressed. Some qnr-positive isolates in the data are susceptible.</li>
+      <li>The accuracy figures are measured on the 2,734 founding isolates that also define the rules, so they are not independent validation.</li>
+      <li>Assembled sequence only. Raw sequencing reads are not supported yet.</li>
+    </ul>
+  </div>
 </section>
 
 <!-- CALC -->
@@ -320,41 +335,46 @@
 
 <!-- ABOUT -->
 <section id="p-about" class="page">
-  <div class="page-head"><h2>About Ciprotyper</h2><p>Jump to: <a href="#/about" data-act="jump" data-to="terms">Terms and conditions</a> &middot; <a href="#/about" data-act="jump" data-to="privacy">Privacy policy</a></p></div>
+  <div class="page-head"><h2>About Ciprotyper</h2></div>
   <div class="band">
+    <p>Ciprotyper is an open web server, reference repository and REST API for predicting ciprofloxacin resistance in <i>Escherichia coli</i>, <i>Shigella sonnei</i>, <i>Salmonella enterica</i> subsp. I and <i>Klebsiella pneumoniae</i>. It reads five codon positions in <i>gyrA</i>, <i>parC</i> and <i>recN</i> and the plasmid genes <i>qnrB2</i> and <i>qnrS1</i>, joins them into a ciprotype, and explains every call with the reference isolates and rules behind it. The Help menu has the rules, the documentation and the API.</p>
     <h3>Credit and how to cite</h3>
-    <p>The 2,734 founding isolates, the ciprotype scheme, the syntax rules and the hydrophobicity analysis behind Ciprotyper come from the following study. If you use Ciprotyper or its database, please cite it:</p>
+    <p>The 2,734 founding isolates, the ciprotype scheme and the syntax rules come from the following study. If you use Ciprotyper or its database, please cite it:</p>
     <p class="cite-box" id="cite-text">Ghosh, A., Deb, P., Bose, P. <i>et al.</i> Generic context-dependence governs clonal emergence of ciprofloxacin resistance mutations. <i>Sci Rep</i> (2026). <a href="https://doi.org/10.1038/s41598-026-75690-y" target="_blank" rel="noopener">https://doi.org/10.1038/s41598-026-75690-y</a></p>
     <p><button class="btn line" type="button" data-act="copycite">Copy citation</button> <span id="cite-done" class="muted small" aria-live="polite"></span></p>
-    <h3>Sequence types</h3>
-    <p>The sequence type (ST) is read with PubMLST schemes: Achtman for <i>E. coli</i>, <i>S. sonnei</i> and <i>S. enterica</i>, Diancourt for <i>K. pneumoniae</i>. An ST is given only when all seven alleles match exactly and the profile exists; otherwise the nearest alleles are shown. The STs of the reference isolates come from Table S1. Scheme data are from the tseemann/mlst database (downloaded 2026-03-11) and PubMLST; please cite PubMLST (Jolley et al. 2018).</p>
-    <h3>Limits</h3>
-    <ul>
-      <li>Four species only: <i>E. coli</i>, <i>S. sonnei</i>, <i>S. enterica</i> subsp. I and <i>K. pneumoniae</i>. Choose the species yourself. A genome that does not match it gets no result. <i>E. coli</i> and <i>S. sonnei</i> cannot be told apart from these genes.</li>
-      <li>A qnr gene found in the sequence does not prove it is expressed. Some qnr-positive isolates in the data are susceptible.</li>
-      <li>The accuracy figures are measured on the 2,734 founding isolates that also define the rules, so they are not independent validation.</li>
-      <li>Assembled sequence only. Raw sequencing reads are not supported yet.</li>
-    </ul>
     <h3>Contact</h3>
     <p>Suggestions, problems or questions: <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a></p>
-    <p id="about-build" class="muted"></p>
+    <p class="small" style="margin-top:18px"><a href="#/terms">Terms and conditions</a> &middot; <a href="#/privacy">Privacy policy</a> &middot; <a href="#/curate">Curator sign in</a></p>
   </div>
+</section>
 
-  <div class="band" id="terms">
-    <h3>Terms and conditions</h3>
-    <p class="muted small">Last updated November 2026. By using Ciprotyper you agree to these terms.</p>
-    <p><b>No warranty.</b> Ciprotyper and its data are provided as they are, without any warranty. The accuracy figures describe the reference isolates and are not independent validation. The authors and maintainers are not liable for decisions made, or harm caused, by relying on a result.</p>
-    <p><b>Using the site.</b> Use is free. Please do not overload the service, bypass its limits, try to reach curator functions without permission, or upload files that are not genome or gene sequences. Limits apply to file size, the number of genomes per request and the number of submissions per hour. We may block abuse.</p>
+<!-- TERMS -->
+<section id="p-terms" class="page">
+  <div class="page-head"><h2>Terms and conditions</h2><p>Last updated November 2026. By using Ciprotyper you agree to these terms. <a href="#/about">&larr; About</a></p></div>
+  <div class="band">
+    <p><b>Using the site.</b> Use is free. So that everyone gets a fair share, limits apply to file size, the number of genomes per request and the number of submissions per hour. A request over a limit is refused with a message that says how long to wait. If an address keeps going over the limits, or its use slows the service for others, we may pause or block that address. Repeated wrong sign-ins to the curator page pause the address for 15 minutes.</p>
+    <p><b>Fair use and REST API rate limits.</b> Scripts and calls to the REST API (<span class="mono">/api/v1</span>) must respect the server&#39;s limits and must not overload or disrupt the hosting infrastructure. The current limits are:</p>
+    <ul>
+      <li>Genome analyses: the server runs at most two at a time. Send genome requests one after another. If the server answers 429 (busy, or too many requests), wait for the time it gives and try again.</li>
+      <li>Submissions: 20 per hour for each IP address.</li>
+      <li>Submission ID look-ups: 60 per hour for each IP address.</li>
+      <li>Files: up to 60 MB each, and up to 10 MB for a pasted sequence.</li>
+      <li>Data lists (the isolates endpoint): up to 1,000 rows per page.</li>
+    </ul>
+    <p>The limits may change as the service grows.</p>
     <p><b>Submitting an isolate.</b> Submit only data you are entitled to share, with no personal information about patients or other people. Before you submit you agree to the consent notice. Curators decide whether an isolate is added. An approved isolate becomes public: it is shown in Browse and in the downloads and API, counts in the statistics and predictions, and may be removed again later. The genome file itself is not kept.</p>
-    <p><b>Data, credit and source code.</b> The reference data come from Ghosh et al. (2026) and public sources such as BV-BRC and PubMLST, which have their own terms. If you use Ciprotyper or its data, please cite the study (see Credit and how to cite above) and the tools on the <a href="#/references">References</a> page. The source code is on <a href="https://github.com/ikbalsk/Septatyper" target="_blank" rel="noopener">GitHub</a>; see the repository for its licence.</p>
-    <p><b>Availability and changes.</b> The site is hosted on a free plan and can be slow, unavailable or reset at any time. Predictions, rules and data may change as the database grows. We may change these terms; using the site after a change means you accept the new terms.</p>
+    <p><b>Data, credit and source code.</b> The reference data come from Ghosh et al. (2026) and public sources such as BV-BRC and PubMLST, which have their own terms. If you use Ciprotyper or its data, please cite the study (see <a href="#/about">About</a>) and the tools on the <a href="#/references">References</a> page. The source code is on <a href="https://github.com/ikbalsk/Septatyper" target="_blank" rel="noopener">GitHub</a>; see the repository for its licence.</p>
+    <p><b>A light note on accuracy.</b> On our reference isolates, Ciprotyper&#39;s calls agree with the laboratory phenotype in roughly 97&ndash;99% of cases, depending on the species (measured on the same isolates the rules were built from). Bacteria do enjoy an exception or two, so please treat a call as a well-informed estimate. We cannot take responsibility for any harm that follows from relying on it.</p>
+    <p><b>Changes to these terms.</b> We may change these terms from time to time.</p>
   </div>
+</section>
 
-  <div class="band" id="privacy">
-    <h3>Privacy policy</h3>
-    <p class="muted small">Last updated November 2026.</p>
-    <p><b>In short.</b> There are no accounts, no advertising and no tracking or analytics. The site sets no cookies and stores nothing in your browser. Sequences you upload for a prediction are deleted after analysis.</p>
-    <p><b>Predictions.</b> A genome you upload, paste or fetch with a BV-BRC ID is analysed in a temporary folder and deleted when the request ends. The prediction is not stored. For a BV-BRC ID, the ID is sent to BV-BRC to get the assembly. To speed up identical requests, the analysis of an input may be kept briefly in the server&#39;s memory; it is lost when the server restarts.</p>
+<!-- PRIVACY -->
+<section id="p-privacy" class="page">
+  <div class="page-head"><h2>Privacy policy</h2><p>Last updated November 2026. <a href="#/about">&larr; About</a></p></div>
+  <div class="band">
+    <p><b>What we do not collect.</b> There are no accounts, no advertising and no tracking or analytics. The site sets no cookies and stores nothing in your browser. Sequences you upload for a prediction are deleted after analysis.</p>
+    <p><b>Predictions.</b> A genome you upload, paste or fetch with a BV-BRC ID is analysed in a temporary folder and deleted when the request ends. The prediction is not stored. For a BV-BRC ID, the ID is sent to BV-BRC to get the assembly. To speed up identical requests, the analysis of an input may be kept briefly in the server&#39;s memory.</p>
     <p><b>Submissions.</b> When you submit an isolate we store the ciprotype, the residues and the qnr result, the sequence type, the prediction and the details you enter: species, isolation source, genome ID and name, country, year, laboratory phenotype, your name, affiliation, publication link and contact email, the time of your agreement and the version of the consent notice. Each submission gets a submission ID. The genome file is not stored.</p>
     <p><b>Who sees what.</b></p>
     <ul>
@@ -362,12 +382,13 @@
       <li>Your email stays private. Only the curators use it, to contact you about your submission.</li>
       <li>Anyone who has your submission ID can see its status and the prediction, but not your name or email.</li>
     </ul>
+    <p><b>Stored on the server.</b> Submission records, including the email address, are stored on the server and are available only to the maintainers. When you enter a BV-BRC genome ID, the ID is sent to BV-BRC to get the assembly; nothing else about you is sent.</p>
     <p><b>IP addresses and logs.</b> Your IP address is used in the server&#39;s memory to limit repeated requests. It is not stored with your submission. The hosting service may keep its own server logs.</p>
-    <p><b>Backups and other services.</b> Submissions, including the email, are backed up to a private GitHub repository so they survive a restart. Access is limited to the maintainers. The site is hosted on Render. It contacts BV-BRC to look up genomes and GitHub to read a saved copy of the BV-BRC comparison; none of your data is sent in those requests except a BV-BRC genome ID you entered.</p>
-    <p><b>Keeping and removing data.</b> Submissions are kept until they are removed. To correct or remove your submission, write to the contact address above with your submission ID. We can remove the record and take an approved isolate out of the repository, the statistics and the predictions. Copies that other people already downloaded cannot be recalled.</p>
+    <p><b>Keeping and removing data.</b> Submissions are kept until they are removed. To correct or remove your submission, write to <a href="mailto:ikbalsk.personal@gmail.com">ikbalsk.personal@gmail.com</a> with your submission ID. We can remove the record and take an approved isolate out of the repository, the statistics and the predictions. Copies that other people already downloaded cannot be recalled.</p>
     <p><b>Changes.</b> We may update this policy and will change the date above.</p>
   </div>
 </section>
+
 
 
 <!-- CURATE -->
@@ -387,7 +408,7 @@
 </section>
 
 </main>
-<footer><a href="#/curate">Curator sign in</a></footer>
+
 <script src="/static/app.js"></script>
 
 <dialog id="consent" class="consent" aria-labelledby="consent-title">

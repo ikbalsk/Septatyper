@@ -109,7 +109,7 @@ def read_fasta(path: Path):
 # ------------------------------------------------------- identity rules (checkpoint 1, species check)
 def checkpoint1_check(genes: dict) -> dict:
     """Checkpoint 1 reads GyrA, ParC and RecN against the chosen species. If any of the three matches its reference at
-    less than CP1_MIN_ID % (or is not found at all), the residues cannot be trusted and checkpoint 1 is not applied."""
+    less than CP1_MIN_ID % (or is not found at all), the residues cannot be trusted and checkpoint 1 is inconclusive."""
     low = []
     for g in ("gyrA", "parC", "recN"):
         info = genes.get(g) or {}

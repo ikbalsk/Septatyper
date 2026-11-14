@@ -20,11 +20,8 @@ the rules were silent are marked ASSUMPTION and are easy to change here.
   resistant reference helices (L-N-I-E, 0.397), which is 0.334. It is set from these two reference helices,
   not by searching the isolates for the best score. A cutoff at the wild-type value alone (0.270) would turn
   single-vote septatypes such as S. enterica F-D-S-E (0.327) resistant whatever the codon.
-  S. sonnei with a single vote at GyrA-83 or GyrA-87 -> Resistant (data show L-D-S-E and S-Y-S-E are resistant).
-  Septatype overrides (applied to a Susceptible baseline):
-    qnrB or qnrS present            -> Resistant
-    S. sonnei with RecN-346 F       -> Resistant
-    S. enterica F-D-S-E, RecN ctg   -> Resistant (cta stays Susceptible)
+  Checkpoint 1 is read from the residue table (all four residues in one column), checkpoint 2 from RecN-346 (cta Susceptible,
+  ctg or F Resistant) and checkpoint 3 from qnrB2/qnrS1. The votes and <H> above are only worked out for information.
 """
 from __future__ import annotations
 
@@ -142,9 +139,6 @@ CLASS_TEXT = {p: tuple(" ".join(" ".join("".join(t for t, _ in line) for line in
 # Resistant. S alone is the susceptible state and K alone is not in the table, so the exception applies only when both are present.
 RESISTANT_EXCEPTION = {"ParC-80": "S", "ParC-84": "K"}
 EXCEPTION_TEXT = "Exception: S at ParC-80 together with K at ParC-84 is Resistant"
-# S. sonnei: one change at GyrA-83 or GyrA-87 on an otherwise wild-type background is already resistant (reference isolates).
-# It is a species rule outside the table, kept from the earlier versions. Set False to give it up, then S. sonnei is read by the table.
-SONNEI_SINGLE_GYRA_RULE = True
 
 
 def _side(pos: str, k: str, res: str, pair: bool = False) -> tuple[list[dict], list[dict], bool]:
@@ -176,9 +170,9 @@ def checkpoint1(species: str, aas4) -> dict:
     """Checkpoint 1, the syntax table of GyrA-83, GyrA-87, ParC-80 and ParC-84. Each sample residue is marked in the column or
     columns of the table it belongs to. To give a call ALL FOUR residues must be in one column: all four in the Susceptible
     column is Susceptible, all four in the Resistant column is Resistant. If they are not all in one column (some residues
-    may be in both), checkpoint 1 is NOT applied and the phenotype comes from checkpoints 2 and 3 alone. The hydrophobicity
+    may be in both), checkpoint 1 is INCONCLUSIVE and the phenotype comes from checkpoints 2 and 3 alone. The hydrophobicity
     <H> plays no part in this decision (it is only worked out for information). The S-K pair at ParC-80/ParC-84 counts as
-    Resistant (RESISTANT_EXCEPTION), and there is one extra S. sonnei rule (SONNEI_SINGLE_GYRA_RULE)."""
+    Resistant (RESISTANT_EXCEPTION)."""
     pair = aas4[2] == RESISTANT_EXCEPTION["ParC-80"] and aas4[3] == RESISTANT_EXCEPTION["ParC-84"]
     cells = []
     for pos, res in zip(POS, aas4):
@@ -188,19 +182,16 @@ def checkpoint1(species: str, aas4) -> dict:
     pattern = "susceptible" if all_s else "resistant" if all_r else None
     vs = votes(*aas4)
     n = sum(1 for x in vs if x["vote"])
-    voter = next((x["position"] for x in vs if x["vote"]), None)
-    override = None
+    override = None                  # kept in the reply for compatibility; there is no override any more
     applied = True
     used_exc = [c["position"] for c in cells if c["exception"]] if all_r else []
     if all_r:
         call, by, rule = "Resistant", "pattern", "all four residues are in the Resistant column" + (" (exception: the S-K pair at ParC-80 and ParC-84)" if used_exc else "")
-    elif SONNEI_SINGLE_GYRA_RULE and species == "ssonnei" and n == 1 and voter in ("GyrA-83", "GyrA-87"):
-        call, by, override, rule = "Resistant", "override", "sonnei_gyr", "S. sonnei single GyrA-83 or GyrA-87 change"
     elif all_s:
         call, by, rule = "Susceptible", "pattern", "all four residues are in the Susceptible column"
     else:
         call, by, applied = None, "not_applied", False
-        rule = "the four residues are not all in one column of the table, so checkpoint 1 is not applied"
+        rule = "the four residues are not all in one column of the table, so checkpoint 1 is inconclusive"
     return {"call": call, "applied": applied, "pattern": pattern, "resolved_by": by, "rule": rule, "cells": cells, "votes": vs,
             "n_votes": n, "mean_h": mean_h(list(aas4)), "override": override, "exceptions": used_exc,
             "marks": {"susceptible": sum(1 for c in cells if c["fits_s"]), "resistant": sum(1 for c in cells if c["fits_r"])}}
@@ -240,11 +231,11 @@ def predict_without_checkpoint1(r346, recn_codon, qnrB: bool, qnrS: bool, why: s
     c1 = {"call": None, "applied": False, "pattern": None, "resolved_by": "not_applied", "rule": why, "cells": [], "votes": [],
           "n_votes": 0, "mean_h": None, "override": None, "exceptions": []}
     if c2["call"] == "Resistant":
-        call, decided, rule = "Resistant", "checkpoint2", f"checkpoint 2: {c2['text']} (checkpoint 1 not applied)"
+        call, decided, rule = "Resistant", "checkpoint2", f"checkpoint 2: {c2['text']} (checkpoint 1 inconclusive)"
     elif c3["call"] == "Resistant":
-        call, decided, rule = "Resistant", "checkpoint3", f"checkpoint 3: {c3['text']} (checkpoint 1 not applied)"
+        call, decided, rule = "Resistant", "checkpoint3", f"checkpoint 3: {c3['text']} (checkpoint 1 inconclusive)"
     else:
-        call, decided, rule = "Susceptible", "checkpoints_2_3", "checkpoints 2 and 3 are both without a resistant signal (checkpoint 1 not applied)"
+        call, decided, rule = "Susceptible", "checkpoints_2_3", "checkpoints 2 and 3 are both without a resistant signal (checkpoint 1 inconclusive)"
     return {"call": call, "rule": rule, "votes": [], "n_votes": 0, "mean_h": None, "override": None, "decided_by": decided,
             "checkpoints": {"residues": c1, "recn": c2, "qnr": c3}}
 
@@ -277,8 +268,8 @@ def predict(species: str, aas, qnrB: bool, qnrS: bool, recn_codon: str | None = 
         call, rule, decided = "Resistant", f"checkpoint 2: {c2['text']}", "checkpoint2"
     elif c3["call"] == "Resistant":
         call, rule, decided = "Resistant", f"checkpoint 3: {c3['text']}", "checkpoint3"
-    elif c1["call"] is None:        # checkpoint 1 not applied: Susceptible because no checkpoint that was considered says Resistant
-        call, rule, decided = "Susceptible", "checkpoints 2 and 3 are both without a resistant signal (checkpoint 1 not applied)", "checkpoints_2_3"
+    elif c1["call"] is None:        # checkpoint 1 inconclusive: Susceptible because no checkpoint that was considered says Resistant
+        call, rule, decided = "Susceptible", "checkpoints 2 and 3 are both without a resistant signal (checkpoint 1 inconclusive)", "checkpoints_2_3"
     else:
         call, rule, decided = "Susceptible", c1["rule"], c1["resolved_by"]
     return {"call": call, "rule": rule, "votes": c1["votes"], "n_votes": c1["n_votes"], "mean_h": c1["mean_h"],

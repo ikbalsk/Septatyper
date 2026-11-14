@@ -330,3 +330,4 @@ table.rtab.cp1 td.nw{text-align:left}
 
 /* typed residues and ciprotypes show as capitals */
 .caps{text-transform:uppercase}
+.band[hidden]{display:none}

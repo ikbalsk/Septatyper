@@ -145,11 +145,11 @@ def _read_upload(file: UploadFile) -> str | bytes:
 
 
 def _cp1_reason(species, cp1):
-    """The sentence shown when checkpoint 1 cannot be applied."""
+    """The sentence shown when checkpoint 1 is inconclusive."""
     low = ", ".join(f"{x['gene']} {x['identity']}%" if x["identity"] is not None and x["found"] else
                     (f"{x['gene']} not found" if x["identity"] is None else f"{x['gene']} not found (best match {x['identity']}%)") for x in cp1["low"])
     recn = any(x["gene"] == "recN" and x["found"] for x in cp1["low"])
-    return (f"Checkpoint 1 can't be applied: identity to the {SPECIES[species]} reference is below {cp1['threshold']:g}% for {low}. "
+    return (f"Checkpoint 1 is inconclusive: identity to the {SPECIES[species]} reference is below {cp1['threshold']:g}% for {low}. "
             f"The phenotype is based on checkpoints 2 and 3 only."
             + (" RecN itself matches poorly, so checkpoint 2 is also less certain." if recn else ""))
 

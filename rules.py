@@ -222,7 +222,7 @@ def _rule(db, species, habitat, sep):
 
 
 def predict_checkpoints_2_3(species: str, habitat: str, r346, recn_codon, qnrB: bool, qnrS: bool, why: str) -> dict:
-    """A call from checkpoints 2 and 3 only, used when checkpoint 1 cannot be applied. There is no septatype to look up, so
+    """A call from checkpoints 2 and 3 only, used when checkpoint 1 is inconclusive. There is no septatype to look up, so
     no reference isolates are shown."""
     if species not in SPECIES:
         raise ValueError("Unknown species")
@@ -268,10 +268,9 @@ def predict(species: str, habitat: str, sep: str, recn_codon: str | None = None)
                 flags.append(f"The reference isolates with this ciprotype are mixed: {r} resistant, {s} susceptible.")
             if r == s:
                 flags.append("The reference isolates are split evenly, so the paper's rule calls it susceptible.")
-            if g["call"] != out["call"]:
-                flags.append(f"The grammar alone would call this {g['call']}. The database majority is used.")
+            out["grammar_agrees"] = g["call"] == out["call"]       # the page words the result differently when they differ
         else:
-            out.update(call=g["call"], tier="grammar", known=False, novel=True, n_isolates=0, n_resistant=0,
+            out.update(call=g["call"], tier="grammar", known=False, novel=True, grammar_agrees=True, n_isolates=0, n_resistant=0,
                        n_susceptible=0, confidence=None, reference_sts=[], reference_sites=[], reference_countries=[])
             flags.append("New ciprotype: not seen in the reference isolates for this species, "
                          "so the call comes from the grammar and is less certain. It is flagged for curation.")
